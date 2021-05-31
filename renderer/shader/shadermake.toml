@@ -1,0 +1,17 @@
+target-dir = "."
+
+[shaders.sprite-vert]
+path = "sprite.vert.glsl"
+kind = "vertex"
+
+[shaders.sprite-frag]
+path = "sprite.frag.glsl"
+kind = "fragment"
+
+[shaders.glyph-vert]
+path = "glyph.vert.glsl"
+kind = "vertex"
+
+[shaders.glyph-frag]
+path = "glyph.frag.glsl"
+kind = "fragment"
