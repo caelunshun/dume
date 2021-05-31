@@ -64,13 +64,13 @@ impl TextureAtlas {
     ) -> Allocation {
         assert_ne!(width, 0, "width cannot be zero");
         assert_ne!(height, 0, "height cannot be zero");
-        let size = Size::new(width as i32, height as i32);
+        let size = Size::new(width as i32 + 2, height as i32 + 2);
         let allocation = match self.allocator.allocate(size) {
             Some(a) => a,
             None => {
                 self.grow(
-                    width + self.descriptor.size.width,
-                    height + self.descriptor.size.height,
+                    width + self.descriptor.size.width + 2,
+                    height + self.descriptor.size.height + 2,
                     encoder,
                 );
                 self.allocator.allocate(size).expect("did not grow")
@@ -114,8 +114,8 @@ impl TextureAtlas {
                 texture: &self.texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d {
-                    x: allocation.rectangle.min.x as u32,
-                    y: allocation.rectangle.min.y as u32,
+                    x: allocation.rectangle.min.x as u32 + 1,
+                    y: allocation.rectangle.min.y as u32 + 1,
                     z: 0,
                 },
             },
