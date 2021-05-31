@@ -2,13 +2,24 @@ use std::{fs, iter, sync::Arc, time::Instant};
 
 use dume_renderer::{Canvas, SpriteData, SpriteDescriptor, TARGET_FORMAT};
 use glam::Vec2;
-use minifb::Window;
 use pollster::block_on;
+use winit::{
+    dpi::LogicalSize,
+    event::{Event, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+    window::WindowBuilder,
+};
 
 fn main() {
     let width = 1920 / 2;
     let height = 1080 / 2;
-    let mut window = Window::new("Dume", width, height, Default::default()).unwrap();
+    let event_loop = EventLoop::new();
+    let window = WindowBuilder::new()
+        .with_title("Dume")
+        .with_inner_size(LogicalSize::new(width, height))
+        .with_resizable(false)
+        .build(&event_loop)
+        .unwrap();
 
     let instance = wgpu::Instance::new(wgpu::BackendBit::all());
     let surface = unsafe { instance.create_surface(&window) };
@@ -48,26 +59,37 @@ fn main() {
     });
     let sprite2 = canvas.create_sprite(SpriteDescriptor {
         name: "sprite2",
-        data:  SpriteData::Encoded(&fs::read("/home/caelum/Pictures/volume1.png").unwrap()),
+        data: SpriteData::Encoded(&fs::read("/home/caelum/Pictures/volume1.png").unwrap()),
     });
 
     let start = Instant::now();
-    while window.is_open() {
-        let time = start.elapsed().as_secs_f32();
-        let pos = Vec2::new(time.sin() * 100.0 + width as f32 / 2.0, 50.0);
-        canvas.draw_sprite(sprite1, pos, 500.0);
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = ControlFlow::Poll;
 
-        canvas.draw_sprite(sprite2, Vec2::ZERO, 600.0);
+        match event {
+            Event::RedrawRequested(_) => {
+                let time = start.elapsed().as_secs_f32();
+                let pos = Vec2::new(time.sin() * 100.0 + width as f32 / 2.0, 50.0);
+                canvas.draw_sprite(sprite1, pos, 500.0);
 
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-        let frame = swap_chain.get_current_frame().unwrap();
-        canvas.render(
-            &frame.output.view,
-            &mut encoder,
-            Vec2::new(width as f32, height as f32),
-        );
-        queue.submit(iter::once(encoder.finish()));
+                canvas.draw_sprite(sprite2, Vec2::ZERO, 600.0);
 
-        window.update();
-    }
+                let mut encoder =
+                    device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+                let frame = swap_chain.get_current_frame().unwrap();
+                canvas.render(
+                    &frame.output.view,
+                    &mut encoder,
+                    Vec2::new(width as f32, height as f32),
+                );
+                queue.submit(iter::once(encoder.finish()));
+            }
+            Event::MainEventsCleared => window.request_redraw(),
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                ..
+            } => *control_flow = ControlFlow::Exit,
+            _ => (),
+        }
+    });
 }

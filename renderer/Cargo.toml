@@ -19,5 +19,5 @@ ttf-parser = "0.12"
 wgpu = "0.8"
 
 [dev-dependencies]
-minifb = { version = "0.19", default-features = false, features = [ "x11" ] }
+winit = { version = "0.25", default-features = false, features = [ "x11" ] }
 pollster = "0.2"
