@@ -2,7 +2,7 @@ use std::{iter, sync::Arc};
 
 use glam::{Mat4, Vec2};
 
-use crate::{sprite_renderer::SpriteRenderer, SpriteId};
+use crate::{renderer::Renderer, SpriteId};
 
 #[derive(Debug)]
 pub struct SpriteDescriptor<'a> {
@@ -25,13 +25,13 @@ pub struct Canvas {
     device: Arc<wgpu::Device>,
     queue: Arc<wgpu::Queue>,
 
-    sprite_renderer: SpriteRenderer,
+    renderer: Renderer,
 }
 
 impl Canvas {
     pub fn new(device: Arc<wgpu::Device>, queue: Arc<wgpu::Queue>) -> Self {
         Self {
-            sprite_renderer: SpriteRenderer::new(Arc::clone(&device), Arc::clone(&queue)),
+            renderer: Renderer::new(Arc::clone(&device), Arc::clone(&queue)),
 
             device,
             queue,
@@ -62,7 +62,7 @@ impl Canvas {
             } => (data, width, height),
         };
 
-        let id = self.sprite_renderer.sprites_mut().insert(
+        let id = self.renderer.sprites_mut().insert(
             rgba_data,
             width,
             height,
@@ -74,11 +74,11 @@ impl Canvas {
     }
 
     pub fn remove_sprite(&mut self, id: SpriteId) {
-        self.sprite_renderer.sprites_mut().remove(id);
+        self.renderer.sprites_mut().remove(id);
     }
 
     pub fn draw_sprite(&mut self, sprite: SpriteId, pos: Vec2, width: f32) -> &mut Self {
-        self.sprite_renderer.record(sprite, pos, width);
+        self.renderer.record_sprite(sprite, pos, width);
         self
     }
 
@@ -89,7 +89,7 @@ impl Canvas {
         window_size: Vec2,
     ) {
         let ortho = Mat4::orthographic_lh(0.0, window_size.x, window_size.y, 0.0, -1.0, 1.0);
-        let mut prepared_sprites = self.sprite_renderer.prepare(ortho);
+        let mut prepared_sprites = self.renderer.prepare(ortho);
 
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -105,8 +105,7 @@ impl Canvas {
                 depth_stencil_attachment: None,
             });
 
-            self.sprite_renderer
-                .render(&mut pass, &mut prepared_sprites);
+            self.renderer.render(&mut pass, &mut prepared_sprites);
         }
     }
 }

@@ -21,3 +21,5 @@ wgpu = "0.8"
 [dev-dependencies]
 winit = { version = "0.25", default-features = false, features = [ "x11" ] }
 pollster = "0.2"
+simple_logger = "1"
+log = "0.4"

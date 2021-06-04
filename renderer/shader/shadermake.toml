@@ -1,17 +1,9 @@
 target-dir = "."
 
-[shaders.sprite-vert]
-path = "sprite.vert.glsl"
+[shaders.uber-vert]
+path = "uber.vert.glsl"
 kind = "vertex"
 
-[shaders.sprite-frag]
-path = "sprite.frag.glsl"
-kind = "fragment"
-
-[shaders.glyph-vert]
-path = "glyph.vert.glsl"
-kind = "vertex"
-
-[shaders.glyph-frag]
-path = "glyph.frag.glsl"
+[shaders.uber-frag]
+path = "uber.frag.glsl"
 kind = "fragment"

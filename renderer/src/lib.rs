@@ -3,8 +3,8 @@
 mod atlas;
 mod canvas;
 pub mod font;
+mod renderer;
 mod sprite;
-mod sprite_renderer;
 mod text;
 
 pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;

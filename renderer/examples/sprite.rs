@@ -3,6 +3,7 @@ use std::{fs, iter, sync::Arc, time::Instant};
 use dume_renderer::{Canvas, SpriteData, SpriteDescriptor, TARGET_FORMAT};
 use glam::Vec2;
 use pollster::block_on;
+use simple_logger::SimpleLogger;
 use winit::{
     dpi::LogicalSize,
     event::{Event, WindowEvent},
@@ -11,6 +12,8 @@ use winit::{
 };
 
 fn main() {
+    SimpleLogger::new().with_level(log::LevelFilter::Warn).init().unwrap();
+    
     let width = 1920 / 2;
     let height = 1080 / 2;
     let event_loop = EventLoop::new();
@@ -21,13 +24,14 @@ fn main() {
         .build(&event_loop)
         .unwrap();
 
-    let instance = wgpu::Instance::new(wgpu::BackendBit::all());
+    let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
     let surface = unsafe { instance.create_surface(&window) };
     let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::HighPerformance,
         compatible_surface: Some(&surface),
     }))
     .expect("failed to find adapter");
+    println!("Adapter: {:?}", adapter.get_info());
     let (device, queue) = block_on(adapter.request_device(
         &wgpu::DeviceDescriptor {
             label: None,
@@ -55,7 +59,7 @@ fn main() {
 
     let sprite1 = canvas.create_sprite(SpriteDescriptor {
         name: "sprite1",
-        data: SpriteData::Encoded(&fs::read("/home/caelum/Pictures/test.jpg").unwrap()),
+        data: SpriteData::Encoded(&fs::read("/home/caelum/Pictures/test.png").unwrap()),
     });
     let sprite2 = canvas.create_sprite(SpriteDescriptor {
         name: "sprite2",

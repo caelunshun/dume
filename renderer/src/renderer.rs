@@ -1,7 +1,7 @@
 use std::{mem::size_of, sync::Arc};
 
 use bytemuck::{Pod, Zeroable};
-use glam::{Mat4, Vec2};
+use glam::{IVec2, Mat4, Vec2, Vec4};
 use wgpu::util::DeviceExt;
 
 use crate::{
@@ -9,11 +9,17 @@ use crate::{
     TARGET_FORMAT,
 };
 
+// Must match uber.frag.glsl defines
+const PAINT_SOLID_COLOR: i32 = 0;
+const PAINT_SPRITE: i32 = 1;
+const PAINT_ALPHA_TEXTURE: i32 = 2;
+
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 #[repr(C)]
 struct Vertex {
     pos: Vec2,
     texcoord: Vec2,
+    paint: IVec2,
 }
 
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
@@ -26,16 +32,17 @@ pub struct PreparedRender {
     bind_group: wgpu::BindGroup,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
+    color_buffer: wgpu::Buffer,
 
     num_indices: u32,
 }
 
-/// Renders sprites.
+/// Renders sprites, glyphs, and paths using a single draw call.
 ///
-/// Calling `record` adds another command, which is
+/// Calling `record_*` adds another command, which is
 /// buffered in a vertex buffer. Calling `render` causes
 /// the sprites to be rendered.
-pub struct SpriteRenderer {
+pub struct Renderer {
     sprites: Sprites,
 
     device: Arc<wgpu::Device>,
@@ -48,9 +55,10 @@ pub struct SpriteRenderer {
     /// Buffered for the current layer.
     vertices: Vec<Vertex>,
     indices: Vec<u16>,
+    colors: Vec<Vec4>,
 }
 
-impl SpriteRenderer {
+impl Renderer {
     pub fn new(device: Arc<wgpu::Device>, queue: Arc<wgpu::Queue>) -> Self {
         let (pipeline, bg_layout) = create_pipeline(&device);
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -78,6 +86,7 @@ impl SpriteRenderer {
 
             vertices: Vec::new(),
             indices: Vec::new(),
+            colors: Vec::new(),
         }
     }
 
@@ -90,7 +99,7 @@ impl SpriteRenderer {
     }
 
     /// Draws a sprite on the current layer.
-    pub fn record(&mut self, id: SpriteId, pos: Vec2, width: f32) {
+    pub fn record_sprite(&mut self, id: SpriteId, pos: Vec2, width: f32) {
         let allocation = self.sprites.sprite_allocation(id);
         let height =
             width * allocation.rectangle.height() as f32 / allocation.rectangle.width() as f32;
@@ -98,22 +107,28 @@ impl SpriteRenderer {
 
         let texcoords = self.sprites().atlas().texture_coordinates(allocation);
 
+        let paint = glam::ivec2(PAINT_SPRITE, 0);
+
         let vertices = [
             Vertex {
                 pos,
                 texcoord: texcoords[0],
+                paint,
             },
             Vertex {
                 pos: pos + Vec2::new(size.x, 0.0),
                 texcoord: texcoords[1],
+                paint,
             },
             Vertex {
                 pos: pos + size,
                 texcoord: texcoords[2],
+                paint,
             },
             Vertex {
                 pos: pos + Vec2::new(0.0, size.y),
                 texcoord: texcoords[3],
+                paint,
             },
         ];
         let i = self.vertices.len() as u16;
@@ -138,20 +153,34 @@ impl SpriteRenderer {
         let vertex_buffer = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
+                label: Some("vertices"),
                 contents: bytemuck::cast_slice(&self.vertices),
                 usage: wgpu::BufferUsage::VERTEX,
             });
         let index_buffer = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
+                label: Some("indices"),
                 contents: bytemuck::cast_slice(&self.indices),
                 usage: wgpu::BufferUsage::INDEX,
             });
+
+        if self.colors.is_empty() {
+            self.colors.push(glam::vec4(1.0, 1.0, 1.0, 1.0));
+        }
+
+        let color_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("colors"),
+                contents: bytemuck::cast_slice(&self.colors),
+                usage: wgpu::BufferUsage::STORAGE,
+            });
+
         let num_indices = self.indices.len() as u32;
         self.vertices.clear();
         self.indices.clear();
+        self.colors.clear();
 
         let tv = self
             .sprites()
@@ -179,6 +208,18 @@ impl SpriteRenderer {
                     binding: 2,
                     resource: wgpu::BindingResource::TextureView(&tv),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(&tv), // TODO: use font atlas here. This is a placeholder.
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &color_buffer,
+                        offset: 0,
+                        size: None,
+                    }),
+                },
             ],
         });
 
@@ -186,6 +227,7 @@ impl SpriteRenderer {
             bind_group,
             vertex_buffer,
             index_buffer,
+            color_buffer,
             num_indices,
         }
     }
@@ -204,8 +246,15 @@ impl SpriteRenderer {
 }
 
 fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGroupLayout) {
-    let vert_mod = device.create_shader_module(&wgpu::include_spirv!("../shader/sprite.vert.spv"));
-    let frag_mod = device.create_shader_module(&wgpu::include_spirv!("../shader/sprite.frag.spv"));
+    // Validation needs to be disabled for non-uniformity in the fragment shader (?)
+    let vert_mod = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        flags: wgpu::ShaderFlags::default(),
+        ..wgpu::include_spirv!("../shader/uber.vert.spv")
+    });
+    let frag_mod = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        flags: wgpu::ShaderFlags::default(),
+        ..wgpu::include_spirv!("../shader/uber.frag.spv")
+    });
 
     let bg_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
@@ -239,6 +288,26 @@ fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGr
                 },
                 count: None,
             },
+            wgpu::BindGroupLayoutEntry {
+                binding: 3,
+                visibility: wgpu::ShaderStage::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 4,
+                visibility: wgpu::ShaderStage::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
         ],
     });
 
@@ -257,7 +326,7 @@ fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGr
             buffers: &[wgpu::VertexBufferLayout {
                 array_stride: size_of::<Vertex>() as _,
                 step_mode: wgpu::InputStepMode::Vertex,
-                attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2],
+                attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Sint32x2],
             }],
         },
         primitive: wgpu::PrimitiveState {
