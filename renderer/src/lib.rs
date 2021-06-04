@@ -2,10 +2,13 @@
 
 mod atlas;
 mod canvas;
+pub mod font;
 mod sprite;
 mod sprite_renderer;
+mod text;
 
 pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 
 pub use canvas::{Canvas, SpriteData, SpriteDescriptor};
 pub use sprite::SpriteId;
+pub use text::{Text, TextSection, TextStyle};
