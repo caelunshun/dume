@@ -12,8 +12,11 @@ use winit::{
 };
 
 fn main() {
-    SimpleLogger::new().with_level(log::LevelFilter::Warn).init().unwrap();
-    
+    SimpleLogger::new()
+        .with_level(log::LevelFilter::Warn)
+        .init()
+        .unwrap();
+
     let width = 1920 / 2;
     let height = 1080 / 2;
     let event_loop = EventLoop::new();
@@ -66,6 +69,19 @@ fn main() {
         data: SpriteData::Encoded(&fs::read("/home/caelum/Pictures/volume1.png").unwrap()),
     });
 
+    const NUM_SPRITES: usize = 1024;
+    let mut sprites: Vec<_> = iter::repeat_with(|| {
+        (
+            Vec2::new(
+                fastrand::f32() * width as f32,
+                fastrand::f32() * height as f32,
+            ),
+            Vec2::ZERO,
+        )
+    })
+    .take(NUM_SPRITES)
+    .collect();
+
     let start = Instant::now();
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -74,9 +90,19 @@ fn main() {
             Event::RedrawRequested(_) => {
                 let time = start.elapsed().as_secs_f32();
                 let pos = Vec2::new(time.sin() * 100.0 + width as f32 / 2.0, 50.0);
-                canvas.draw_sprite(sprite1, pos, 500.0);
 
-                canvas.draw_sprite(sprite2, Vec2::ZERO, 600.0);
+                for (pos, vel) in &mut sprites {
+                    if vel.x.abs() < 0.1 || vel.y.abs() < 0.1 {
+                        vel.x = (fastrand::f32() - 0.5) * 0.2;
+                        vel.y = (fastrand::f32() - 0.5) * 0.2;
+                    }
+                    *pos += *vel;
+                    *vel *= 0.99;
+                }
+
+                for (pos, _) in &sprites {
+                    canvas.draw_sprite(sprite1, *pos, 50.0);
+                }
 
                 let mut encoder =
                     device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
