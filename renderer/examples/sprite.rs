@@ -62,14 +62,9 @@ fn main() {
 
     let sprite1 = canvas.create_sprite(SpriteDescriptor {
         name: "sprite1",
-        data: SpriteData::Encoded(&fs::read("/home/caelum/Pictures/test.png").unwrap()),
+        data: SpriteData::Encoded(&fs::read("/home/caelum/dev/riposte/assets/texture/tile/grassland_basecolor.png").unwrap()),
     });
-    let sprite2 = canvas.create_sprite(SpriteDescriptor {
-        name: "sprite2",
-        data: SpriteData::Encoded(&fs::read("/home/caelum/Pictures/volume1.png").unwrap()),
-    });
-
-    const NUM_SPRITES: usize = 1024;
+    const NUM_SPRITES: usize = 2;
     let mut sprites: Vec<_> = iter::repeat_with(|| {
         (
             Vec2::new(

@@ -107,6 +107,8 @@ impl Renderer {
 
         let texcoords = self.sprites().atlas().texture_coordinates(allocation);
 
+        dbg!(texcoords);
+
         let paint = glam::ivec2(PAINT_SPRITE, 0);
 
         let vertices = [

@@ -36,34 +36,6 @@ impl From<Weight> for fontdb::Weight {
     }
 }
 
-/// A font family in a query, indicating what type of font to use.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[repr(C)]
-pub enum Family {
-    /// Any sans serif font.
-    SansSerif,
-    /// Any serif font.
-    Serif,
-    /// Only font families with the given name.
-    Name(String),
-}
-
-impl Default for Family {
-    fn default() -> Self {
-        Self::SansSerif
-    }
-}
-
-impl<'a> From<&'a Family> for fontdb::Family<'a> {
-    fn from(f: &'a Family) -> Self {
-        match f {
-            Family::SansSerif => fontdb::Family::SansSerif,
-            Family::Serif => fontdb::Family::Serif,
-            Family::Name(s) => fontdb::Family::Name(s.as_str()),
-        }
-    }
-}
-
 /// Font style: normal or italic. We do not support
 /// oblique fonts.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -92,7 +64,7 @@ impl From<Style> for fontdb::Style {
 /// be used in a given context.
 #[derive(Debug, Clone)]
 pub struct Query {
-    pub families: Vec<Family>,
+    pub family: String,
     pub style: Style,
     pub weight: Weight,
 }
@@ -100,7 +72,7 @@ pub struct Query {
 impl Default for Query {
     fn default() -> Self {
         Self {
-            families: vec![Family::default()],
+            family: "Merriweather".to_owned(),
             style: Style::default(),
             weight: Weight::default(),
         }
@@ -110,7 +82,7 @@ impl Default for Query {
 impl Query {
     pub fn with_fontdb_family<R>(&self, f: impl FnOnce(&fontdb::Query) -> R) -> R {
         let query = fontdb::Query {
-            families: &self.families.iter().map(From::from).collect::<Vec<_>>(),
+            families: &[fontdb::Family::Name(&self.family)],
             style: self.style.into(),
             weight: self.weight.into(),
             stretch: fontdb::Stretch::default(),
