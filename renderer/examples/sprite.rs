@@ -62,7 +62,10 @@ fn main() {
 
     let sprite1 = canvas.create_sprite(SpriteDescriptor {
         name: "sprite1",
-        data: SpriteData::Encoded(&fs::read("/home/caelum/dev/riposte/assets/texture/tile/grassland_basecolor.png").unwrap()),
+        data: SpriteData::Encoded(
+            &fs::read("/home/caelum/dev/riposte/assets/texture/tile/grassland_basecolor.png")
+                .unwrap(),
+        ),
     });
     const NUM_SPRITES: usize = 2;
     let mut sprites: Vec<_> = iter::repeat_with(|| {
@@ -84,7 +87,6 @@ fn main() {
         match event {
             Event::RedrawRequested(_) => {
                 let time = start.elapsed().as_secs_f32();
-                let pos = Vec2::new(time.sin() * 100.0 + width as f32 / 2.0, 50.0);
 
                 for (pos, vel) in &mut sprites {
                     if vel.x.abs() < 0.1 || vel.y.abs() < 0.1 {

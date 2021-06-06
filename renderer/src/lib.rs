@@ -1,5 +1,7 @@
 //! 2D rendering library on top of wgpu and lyon.
 
+#![allow(unused)]
+
 mod atlas;
 mod canvas;
 pub mod font;
