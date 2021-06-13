@@ -141,16 +141,25 @@ fn parse_internal(
                 String::new()
             };
 
-            // Parse a child using the new specifier.
-            let mut child_style = style.clone();
-            apply_specifier(specifier, &mut child_style, &arg1);
+            if specifier == "icon" {
+                // Special case: an icon becomes a new text section
+                // and then we continue parsing.
+                sections.push(TextSection::Icon {
+                    name: arg1,
+                    size: style.size,
+                });
+            } else {
+                // Parse a child using the new specifier.
+                let mut child_style = style.clone();
+                apply_specifier(specifier, &mut child_style, &arg1);
 
-            // Argument 2 (recurse)
-            if !matches!(tokens.pop(), Some((Token::LBrace, _))) {
-                bail!("expected at least one argument for formatting specifier");
+                // Argument 2 (recurse)
+                if !matches!(tokens.pop(), Some((Token::LBrace, _))) {
+                    bail!("expected at least one argument for formatting specifier");
+                }
+
+                parse_internal(tokens, sections, child_style)?;
             }
-
-            parse_internal(tokens, sections, child_style)?;
 
             parse_internal(tokens, sections, style)?;
         }
@@ -167,6 +176,7 @@ fn specifier_has_first_argument(specifier: &str) -> bool {
         "italic" => false,
         "font" => true,
         "size" => true,
+        "icon" => true,
         _ => false,
     }
 }
@@ -287,6 +297,37 @@ mod tests {
                 text: "My name is Ozymandias.".to_owned(),
                 style: TextStyle::default()
             }])
+        );
+    }
+
+    #[test]
+    fn icons() {
+        let text = parse(
+            "I'm happy @icon{happy}. Data, let me crush you. @size{64}{@icon{angry}}",
+            TextStyle::default(),
+            |_| String::new(),
+        )
+        .unwrap();
+        assert_eq!(
+            text,
+            Text::from_sections(vec![
+                TextSection::Text {
+                    text: "I'm happy ".to_owned(),
+                    style: TextStyle::default(),
+                },
+                TextSection::Icon {
+                    name: "happy".to_owned(),
+                    size: TextStyle::default().size,
+                },
+                TextSection::Text {
+                    text: ". Data, let me crush you. ".to_owned(),
+                    style: TextStyle::default()
+                },
+                TextSection::Icon {
+                    name: "angry".to_owned(),
+                    size: 64.0,
+                }
+            ])
         );
     }
 }

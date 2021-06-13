@@ -29,8 +29,13 @@ pub enum TextSection {
     Text { text: String, style: TextStyle },
     /// Embed an icon inside text.
     Icon {
-        /// Name of the sprite registered in the sprite registry
+        /// Name of the sprite registered in the sprite registry.
+        ///
+        /// Dume will search both for the sprite called `{name}` and the sprite
+        /// called "icon/{name}".
         name: String,
+        /// Height of the icon. Matches the size of a glyph with the same size.
+        size: f32,
     },
 }
 
