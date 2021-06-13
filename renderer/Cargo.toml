@@ -6,11 +6,13 @@ edition = "2018"
 
 [dependencies]
 ahash = "0.7"
+anyhow = "1"
 bytemuck = { version = "1", features = [ "derive" ] }
 fontdb = "0.5"
-glam = { version = "0.15", features = [ "bytemuck" ] }
+glam = { version = "0.16", features = [ "bytemuck" ] }
 guillotiere = "0.6"
 image = { version = "0.23", default-features = false, features = [ "png", "jpeg" ] }
+logos = "0.12"
 lyon = "0.17"
 palette = "0.5"
 slotmap = "1"

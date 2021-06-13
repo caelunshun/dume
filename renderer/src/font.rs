@@ -62,7 +62,7 @@ impl From<Style> for fontdb::Style {
 
 /// A font query. Specifies which fonts can
 /// be used in a given context.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Query {
     pub family: String,
     pub style: Style,
