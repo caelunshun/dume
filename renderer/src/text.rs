@@ -43,7 +43,7 @@ pub enum TextSection {
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextStyle {
     /// Text color.
-    color: Srgba,
+    color: Srgba<u8>,
     /// Font size in logical pixels.
     size: f32,
     /// The font to use. Accounts for bold and italics too.
@@ -53,7 +53,7 @@ pub struct TextStyle {
 impl Default for TextStyle {
     fn default() -> Self {
         Self {
-            color: Srgba::new(0.0, 0.0, 0.0, 1.0),
+            color: Srgba::new(0, 0, 0, u8::MAX),
             size: 12.0,
             font: Query {
                 family: "Times New Roman".to_owned(),

@@ -31,6 +31,8 @@ use crate::{
 
 use std::str::FromStr;
 
+mod color;
+
 #[derive(Debug, Clone, PartialEq, Eq, Logos)]
 enum Token {
     #[token("@")]
@@ -176,6 +178,7 @@ fn specifier_has_first_argument(specifier: &str) -> bool {
         "italic" => false,
         "font" => true,
         "size" => true,
+        "color" => true,
         "icon" => true,
         _ => false,
     }
@@ -187,6 +190,8 @@ fn apply_specifier(specifier: &str, style: &mut TextStyle, argument: &str) -> an
         "italic" => style.font.style = Style::Italic,
         "font" => style.font.family = argument.to_owned(),
         "size" => style.size = f32::from_str(argument)?,
+        "color" => style.color = color::parse_color(argument)?,
+        // "icon" => is a special case
         _ => bail!("unknown formatting specifier '{}'", specifier),
     }
     Ok(())
@@ -194,6 +199,8 @@ fn apply_specifier(specifier: &str, style: &mut TextStyle, argument: &str) -> an
 
 #[cfg(test)]
 mod tests {
+    use palette::Srgba;
+
     use crate::font::Query;
 
     use super::*;
@@ -328,6 +335,26 @@ mod tests {
                     size: 64.0,
                 }
             ])
+        );
+    }
+
+    #[test]
+    fn color() {
+        let text = parse(
+            "@color{rgb(255, 0, 0)}{Red text}",
+            TextStyle::default(),
+            |_| String::new(),
+        )
+        .unwrap();
+        assert_eq!(
+            text,
+            Text::from_sections(vec![TextSection::Text {
+                text: "Red text".to_owned(),
+                style: TextStyle {
+                    color: Srgba::new(255, 0, 0, 255),
+                    ..Default::default()
+                }
+            }])
         );
     }
 }
