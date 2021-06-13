@@ -31,7 +31,7 @@ use crate::{
 
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Logos)]
+#[derive(Debug, Clone, PartialEq, Eq, Logos)]
 enum Token {
     #[token("@")]
     At,
@@ -50,16 +50,18 @@ enum Token {
 pub fn parse(
     markup: &str,
     default_style: TextStyle,
-    mut resolve_variable: impl FnMut(&str) -> &str,
+    resolve_variable: impl FnMut(&str) -> String,
 ) -> anyhow::Result<Text> {
     let lexer = Token::lexer(markup);
-    let mut tokens: Vec<(Token, &str)> = lexer
+    let mut tokens: Vec<(Token, String)> = lexer
         .spanned()
-        .map(|(token, span)| (token, &markup[span]))
+        .map(|(token, span)| (token, markup[span].to_owned()))
         .collect();
 
     // Reverse the order so we can pop() when consuming tokens.
     tokens.reverse();
+
+    apply_variables(&mut tokens, resolve_variable);
 
     let mut sections = Vec::new();
     parse_internal(&mut tokens, &mut sections, default_style)?;
@@ -67,9 +69,36 @@ pub fn parse(
     Ok(Text::from_sections(sections))
 }
 
+fn apply_variables(
+    tokens: &mut Vec<(Token, String)>,
+    mut resolve_variable: impl FnMut(&str) -> String,
+) {
+    for (token, text) in tokens {
+        if *token != Token::Text {
+            continue;
+        }
+
+        let mut cursor = 0;
+        while let Some(var_start) = (&text[cursor..]).chars().position(|c| c == '%') {
+            let var_end = (&text[var_start + 1..])
+                .chars()
+                .position(|c| !c.is_alphanumeric() && c != '_')
+                .map(|pos| pos + var_start + 1)
+                .unwrap_or_else(|| text.len());
+            let var = &text[var_start + 1..var_end];
+
+            let new_value = resolve_variable(var);
+
+            *text = String::from(&text[..var_start]) + (&new_value) + &text[var_end..];
+
+            cursor = var_start + new_value.len();
+        }
+    }
+}
+
 // Recursive descent parser.
 fn parse_internal(
-    tokens: &mut Vec<(Token, &str)>,
+    tokens: &mut Vec<(Token, String)>,
     sections: &mut Vec<TextSection>,
     style: TextStyle,
 ) -> anyhow::Result<()> {
@@ -78,7 +107,7 @@ fn parse_internal(
         // Text
         Some((Token::Text, text)) => {
             sections.push(TextSection::Text {
-                text: text.to_owned(),
+                text,
                 style: style.clone(),
             });
 
@@ -107,14 +136,14 @@ fn parse_internal(
                     bail!("unterminated first argument to a formatting specifier");
                 }
 
-                arg1.trim()
+                arg1.trim().to_owned()
             } else {
-                ""
+                String::new()
             };
 
             // Parse a child using the new specifier.
             let mut child_style = style.clone();
-            apply_specifier(specifier, &mut child_style, arg1);
+            apply_specifier(specifier, &mut child_style, &arg1);
 
             // Argument 2 (recurse)
             if !matches!(tokens.pop(), Some((Token::LBrace, _))) {
@@ -161,7 +190,7 @@ mod tests {
 
     #[test]
     fn simple() {
-        let text = parse(" basic text  ", TextStyle::default(), |_| "").unwrap();
+        let text = parse(" basic text  ", TextStyle::default(), |_| String::new()).unwrap();
         assert_eq!(
             text,
             Text::from_sections(vec![TextSection::Text {
@@ -173,7 +202,10 @@ mod tests {
 
     #[test]
     fn bold() {
-        let text = parse("basic text @bold{bold text }", TextStyle::default(), |_| "").unwrap();
+        let text = parse("basic text @bold{bold text }", TextStyle::default(), |_| {
+            String::new()
+        })
+        .unwrap();
         assert_eq!(
             text,
             Text::from_sections(vec![
@@ -200,7 +232,7 @@ mod tests {
         let text = parse(
             "@size{5}{very small text }@size{50}{Big text @bold{Bold big text}} default text",
             TextStyle::default(),
-            |_| "",
+            |_| String::new(),
         )
         .unwrap();
         assert_eq!(
@@ -236,6 +268,25 @@ mod tests {
                     style: TextStyle::default(),
                 }
             ])
+        );
+    }
+
+    #[test]
+    fn variables() {
+        let text = parse("My name is %name.", TextStyle::default(), |var| {
+            if var == "name" {
+                "Ozymandias".to_owned()
+            } else {
+                panic!("unknown variable {}", var);
+            }
+        })
+        .unwrap();
+        assert_eq!(
+            text,
+            Text::from_sections(vec![TextSection::Text {
+                text: "My name is Ozymandias.".to_owned(),
+                style: TextStyle::default()
+            }])
         );
     }
 }
