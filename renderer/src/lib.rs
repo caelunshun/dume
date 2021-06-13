@@ -9,6 +9,7 @@ mod renderer;
 mod sprite;
 mod rect;
 mod text;
+mod glyph;
 
 pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 
