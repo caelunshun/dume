@@ -1,13 +1,20 @@
 //! Rich text implementation.
 
-mod markup;
+#![allow(clippy::clippy::derive_hash_xor_eq)]
+
+mod layout;
+pub mod markup;
+
+use std::hash::Hash;
 
 use palette::Srgba;
 
 use crate::font::{Query, Style, Weight};
 
+pub type FontId = fontdb::ID;
+
 /// Some rich text. Implemented as a list of [`TextSection`]s.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Text {
     sections: Vec<TextSection>,
 }
@@ -39,6 +46,25 @@ pub enum TextSection {
     },
 }
 
+impl Eq for TextSection {}
+
+impl Hash for TextSection {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            TextSection::Text { text, style } => {
+                0u8.hash(state);
+                text.hash(state);
+                style.hash(state);
+            }
+            TextSection::Icon { name, size } => {
+                1u8.hash(state);
+                name.hash(state);
+                size.to_bits().hash(state);
+            }
+        };
+    }
+}
+
 /// Style of a text section.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextStyle {
@@ -63,3 +89,16 @@ impl Default for TextStyle {
         }
     }
 }
+
+impl Hash for TextStyle {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.color.red.hash(state);
+        self.color.green.hash(state);
+        self.color.blue.hash(state);
+        self.color.alpha.hash(state);
+        self.size.to_bits().hash(state);
+        self.font.hash(state);
+    }
+}
+
+impl Eq for TextStyle {}

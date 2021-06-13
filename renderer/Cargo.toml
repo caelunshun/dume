@@ -9,6 +9,7 @@ ahash = "0.7"
 anyhow = "1"
 bytemuck = { version = "1", features = [ "derive" ] }
 fontdb = "0.5"
+fontdue = "0.5"
 glam = { version = "0.16", features = [ "bytemuck" ] }
 guillotiere = "0.6"
 image = { version = "0.23", default-features = false, features = [ "png", "jpeg" ] }
@@ -19,6 +20,7 @@ slotmap = "1"
 rustybuzz = "0.3"
 thiserror = "1"
 ttf-parser = "0.12"
+unicode-bidi = "0.3"
 wgpu = "0.8"
 
 [dev-dependencies]

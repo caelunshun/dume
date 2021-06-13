@@ -7,6 +7,7 @@ mod canvas;
 pub mod font;
 mod renderer;
 mod sprite;
+mod rect;
 mod text;
 
 pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;

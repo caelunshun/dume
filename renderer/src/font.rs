@@ -1,5 +1,5 @@
 /// A font weight, indicating how dark it appears.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum Weight {
     Thin,
@@ -38,7 +38,7 @@ impl From<Weight> for fontdb::Weight {
 
 /// Font style: normal or italic. We do not support
 /// oblique fonts.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum Style {
     Normal,
@@ -62,7 +62,7 @@ impl From<Style> for fontdb::Style {
 
 /// A font query. Specifies which fonts can
 /// be used in a given context.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Query {
     pub family: String,
     pub style: Style,
@@ -88,5 +88,19 @@ impl Query {
             stretch: fontdb::Stretch::default(),
         };
         f(&query)
+    }
+}
+
+pub struct Font<'a> {
+    pub hb: rustybuzz::Face<'a>,
+    pub ttf: ttf_parser::Face<'a>,
+}
+
+impl<'a> Font<'a> {
+    pub fn new(data: &'a [u8]) -> Option<Self> {
+        Some(Self {
+            hb: rustybuzz::Face::from_slice(data, 0)?,
+            ttf: ttf_parser::Face::from_slice(data, 0).ok()?,
+        })
     }
 }
