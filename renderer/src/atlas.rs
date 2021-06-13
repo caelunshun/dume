@@ -1,4 +1,4 @@
-use std::{num::NonZeroU32, sync::Arc};
+use std::{iter, num::NonZeroU32, sync::Arc};
 
 use glam::Vec2;
 use guillotiere::{Allocation, AtlasAllocator, Size};
@@ -37,7 +37,9 @@ impl TextureAtlas {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format,
-            usage: wgpu::TextureUsage::COPY_DST | wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_SRC,
+            usage: wgpu::TextureUsage::COPY_DST
+                | wgpu::TextureUsage::SAMPLED
+                | wgpu::TextureUsage::COPY_SRC,
         };
         let texture = device.create_texture(&descriptor);
 
@@ -55,23 +57,16 @@ impl TextureAtlas {
     /// Inserts a new texture, returning its ID.
     ///
     /// The atlas is grown if necessary.
-    pub fn insert(
-        &mut self,
-        texture: &[u8],
-        width: u32,
-        height: u32,
-        encoder: &mut wgpu::CommandEncoder,
-    ) -> Allocation {
+    pub fn insert(&mut self, texture: &[u8], width: u32, height: u32) -> Allocation {
         assert_ne!(width, 0, "width cannot be zero");
         assert_ne!(height, 0, "height cannot be zero");
-        let size = Size::new(width as i32 + 2, height as i32 + 2);
+        let size = Size::new(width as i32, height as i32);
         let allocation = match self.allocator.allocate(size) {
             Some(a) => a,
             None => {
                 self.grow(
-                    width + self.descriptor.size.width + 2,
-                    height + self.descriptor.size.height + 2,
-                    encoder,
+                    width + self.descriptor.size.width,
+                    height + self.descriptor.size.height,
                 );
                 self.allocator.allocate(size).expect("did not grow")
             }
@@ -109,13 +104,17 @@ impl TextureAtlas {
     }
 
     fn write_texture(&mut self, texture: &[u8], width: u32, height: u32, allocation: Allocation) {
+        println!(
+            "Writing texture - {}x{} at ({}, {})",
+            width, height, allocation.rectangle.min.x, allocation.rectangle.min.y
+        );
         self.queue.write_texture(
             wgpu::ImageCopyTexture {
                 texture: &self.texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d {
-                    x: allocation.rectangle.min.x as u32 + 1,
-                    y: allocation.rectangle.min.y as u32 + 1,
+                    x: allocation.rectangle.min.x as u32,
+                    y: allocation.rectangle.min.y as u32,
                     z: 0,
                 },
             },
@@ -136,9 +135,11 @@ impl TextureAtlas {
         );
     }
 
-    fn grow(&mut self, min_width: u32, min_height: u32, encoder: &mut wgpu::CommandEncoder) {
+    fn grow(&mut self, min_width: u32, min_height: u32) {
         let new_width = min_width.next_power_of_two();
         let new_height = min_height.next_power_of_two();
+
+        println!("Atlas growing to {}x{}", new_width, new_height);
 
         self.allocator
             .grow(Size::new(new_width as i32, new_height as i32));
@@ -153,6 +154,8 @@ impl TextureAtlas {
         self.descriptor.size.height = new_height;
 
         let new_texture = self.device.create_texture(&self.descriptor);
+
+        let mut encoder = self.device.create_command_encoder(&Default::default());
         encoder.copy_texture_to_texture(
             wgpu::ImageCopyTexture {
                 texture: &self.texture,
@@ -170,6 +173,7 @@ impl TextureAtlas {
                 depth_or_array_layers: 1,
             },
         );
+        self.queue.submit(iter::once(encoder.finish()));
 
         self.texture = new_texture;
     }

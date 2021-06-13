@@ -39,7 +39,6 @@ impl Sprites {
         width: u32,
         height: u32,
         name: String,
-        encoder: &mut wgpu::CommandEncoder,
     ) -> SpriteId {
         // Make data BGRA.
         rgba_data.chunks_exact_mut(4).for_each(|chunk| {
@@ -49,7 +48,7 @@ impl Sprites {
         });
         let bgra_data = rgba_data;
 
-        let allocation = self.atlas.insert(bgra_data, width, height, encoder);
+        let allocation = self.atlas.insert(bgra_data, width, height);
         let sprite_id = self.allocations.insert(allocation);
 
         self.by_name.insert(name, sprite_id);

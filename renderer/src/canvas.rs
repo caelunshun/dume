@@ -39,10 +39,6 @@ impl Canvas {
     }
 
     pub fn create_sprite(&mut self, descriptor: SpriteDescriptor) -> SpriteId {
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-
         let mut image;
         let mut flat_samples;
         let (rgba_data, width, height) = match descriptor.data {
@@ -67,9 +63,7 @@ impl Canvas {
             width,
             height,
             descriptor.name.to_owned(),
-            &mut encoder,
         );
-        self.queue.submit(iter::once(encoder.finish()));
         id
     }
 

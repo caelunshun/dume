@@ -1,4 +1,4 @@
-use std::{fs, iter, sync::Arc, time::Instant};
+use std::{fs, iter, sync::Arc};
 
 use dume_renderer::{Canvas, SpriteData, SpriteDescriptor, TARGET_FORMAT};
 use glam::Vec2;
@@ -80,14 +80,11 @@ fn main() {
     .take(NUM_SPRITES)
     .collect();
 
-    let start = Instant::now();
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
 
         match event {
             Event::RedrawRequested(_) => {
-                let time = start.elapsed().as_secs_f32();
-
                 for (pos, vel) in &mut sprites {
                     if vel.x.abs() < 0.1 || vel.y.abs() < 0.1 {
                         vel.x = (fastrand::f32() - 0.5) * 0.2;
