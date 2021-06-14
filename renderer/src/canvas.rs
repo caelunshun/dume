@@ -187,6 +187,7 @@ impl Canvas {
 
     pub fn render(
         &mut self,
+        sampled_view: &wgpu::TextureView,
         target_view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
         window_size: Vec2,
@@ -198,8 +199,8 @@ impl Canvas {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("doom"),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: target_view,
-                    resolve_target: None,
+                    view: sampled_view,
+                    resolve_target: Some(target_view),
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                         store: true,

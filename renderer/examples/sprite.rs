@@ -2,9 +2,10 @@ use std::{fs, iter, sync::Arc};
 
 use dume_renderer::{
     markup, Align, Baseline, Canvas, SpriteData, SpriteDescriptor, TextLayout, TextStyle,
-    TARGET_FORMAT,
+    SAMPLE_COUNT, TARGET_FORMAT,
 };
 use glam::{vec2, Vec2};
+use palette::Srgba;
 use pollster::block_on;
 use simple_logger::SimpleLogger;
 use winit::{
@@ -60,6 +61,20 @@ fn main() {
             present_mode: wgpu::PresentMode::Fifo,
         },
     );
+    let sample_texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("sample"),
+        size: wgpu::Extent3d {
+            width: width as u32,
+            height: height as u32,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: SAMPLE_COUNT,
+        dimension: wgpu::TextureDimension::D2,
+        format: TARGET_FORMAT,
+        usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
+    });
+    let sample_texture = sample_texture.create_view(&Default::default());
 
     let mut canvas = Canvas::new(Arc::clone(&device), Arc::clone(&queue));
 
@@ -130,12 +145,14 @@ fn main() {
                     .line_to(vec2(150.0, 150.0))
                     .quad_to(vec2(250.0, 300.0), vec2(400.0, 150.0))
                     .stroke_width(20.0)
+                    .solid_color(Srgba::new(8, 127, 226, 128))
                     .stroke();
 
                 let mut encoder =
                     device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
                 let frame = swap_chain.get_current_frame().unwrap();
                 canvas.render(
+                    &sample_texture,
                     &frame.output.view,
                     &mut encoder,
                     Vec2::new(width as f32, height as f32),

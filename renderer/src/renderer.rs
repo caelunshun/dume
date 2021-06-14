@@ -11,7 +11,7 @@ use crate::{
     glyph::{GlyphCache, GlyphKey},
     path::{Path, PathCache, TesselateKind},
     sprite::{SpriteId, Sprites},
-    TARGET_FORMAT,
+    SAMPLE_COUNT, TARGET_FORMAT,
 };
 
 // Must match uber.frag.glsl defines
@@ -435,7 +435,7 @@ fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGr
         },
         depth_stencil: None,
         multisample: wgpu::MultisampleState {
-            count: 1,
+            count: SAMPLE_COUNT,
             mask: !0,
             alpha_to_coverage_enabled: false,
         },
