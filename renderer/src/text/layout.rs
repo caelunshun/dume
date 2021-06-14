@@ -16,6 +16,7 @@ use crate::{
 use super::FontId;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
 pub enum Align {
     /// Top or left
     Start,
@@ -27,6 +28,7 @@ pub enum Align {
 
 /// Defines the baseline of a line of text.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
 pub enum Baseline {
     Top,
     Middle,
@@ -39,6 +41,7 @@ pub enum Baseline {
 /// TODO: should some parameters be moved to the rich text
 /// representation, so that alignments can be mixed within a paragraph?
 #[derive(Debug, Clone)]
+#[repr(C)]
 pub struct TextLayout {
     /// The maximum dimensions of the formatted text.
     ///

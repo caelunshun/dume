@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["caelunshun <caelunshun@gmail.com>"]
 edition = "2018"
 
+[lib]
+crate-type = ["rlib", "cdylib"]
+
 [dependencies]
 ahash = "0.7"
 anyhow = "1"
@@ -17,7 +20,9 @@ logos = "0.12"
 lru = "0.6"
 lyon = "0.17"
 palette = "0.5"
+pollster = "0.2"
 slotmap = "1"
+raw-window-handle = "0.3"
 rustybuzz = "0.3"
 thiserror = "1"
 ttf-parser = "0.12"
@@ -27,6 +32,5 @@ wgpu = "0.8"
 [dev-dependencies]
 fastrand = "1"
 winit = { version = "0.25", default-features = false, features = [ "x11" ] }
-pollster = "0.2"
 simple_logger = "1"
 log = "0.4"

@@ -8,6 +8,7 @@ use crate::atlas::TextureAtlas;
 
 slotmap::new_key_type! {
     /// Unique ID of a sprite.
+
     pub struct SpriteId;
 }
 

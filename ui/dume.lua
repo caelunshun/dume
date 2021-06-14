@@ -18,7 +18,7 @@
 -- Widget members:
 -- init(cv) - called to compute state from initial parameters.
 -- paint(cv) - paints the widget to a canvas. should paint children too
--- layout(maxSize) - lays out the widget's children by setting their `pos` and `size` fields. Should set `self.size`
+-- layout(maxSize, cv) - lays out the widget's children by setting their `pos` and `size` fields. Should set `self.size`
 -- to the size of the widget.
 --
 -- `init` is optional and defaults to a no-op
@@ -104,7 +104,7 @@ end
 function UI:computeWidgetLayouts()
     for _, window in ipairs(self.windows) do
         window.rootWidget.pos = window.pos
-        window.rootWidget:layout(window.size)
+        window.rootWidget:layout(window.size, self.cv)
     end
 end
 
@@ -132,9 +132,9 @@ function UI:inflate(widget, parent)
         self:paintChildren(cv)
     end
 
-    widget.layout = widget.layout or function(self, maxSize)
+    widget.layout = widget.layout or function(self, maxSize, cv)
         for _, child in ipairs(self.children) do
-            child.layout(maxSize)
+            child:layout(maxSize, cv)
             child.pos = Vector(0, 0)
         end
         self.size = maxSize

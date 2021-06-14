@@ -11,6 +11,7 @@ mod rect;
 mod renderer;
 mod sprite;
 mod text;
+pub mod ffi;
 
 pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 pub const SAMPLE_COUNT: u32 = 8;

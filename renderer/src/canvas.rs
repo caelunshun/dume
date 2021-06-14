@@ -115,6 +115,10 @@ impl Canvas {
         Paragraph::new(text, layout, &self.fonts, self.renderer.sprites())
     }
 
+    pub fn resize_paragraph(&self, paragraph: &mut Paragraph, new_max_dimensions: Vec2) {
+        paragraph.update_max_dimensions(&self.fonts, new_max_dimensions);
+    }
+
     pub fn draw_paragraph(&mut self, pos: Vec2, paragraph: &Paragraph) -> &mut Self {
         for glyph in paragraph.glyphs() {
             match glyph.c {
