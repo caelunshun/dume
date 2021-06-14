@@ -1,8 +1,5 @@
 -- A UI library for games.
 --
--- Dume exposes an immediate-mode API, but internally
--- the widget tree is retained mode.
---
 -- Each widget is a table with the following fields:
 -- * `state`, which stores persistent widget state
 -- * `params`, which stores user-provided parameters for the widget.
@@ -10,25 +7,21 @@
 -- * `style`, which contains style parameters for drawing. Style
 -- is inherited from the parent.
 --
--- Each frame, the user code builds a widget tree by
--- creating widgets with initial parameters. Dume
--- then diffs the new parameters with the current ones
--- and calls the updated() method on a widget for each changed parameter.
--- If this function does not exist, the default behavior is to recreate the widget.
---
--- Widgets can create their own children in their build() method, which is called
--- each frame. They paint in the paint() method and handle input in the event() method.
+-- Widget lifecycle:
+-- * user invokes constructor and adds the widget to a window or a parent widget
+-- * Dume invokes init()
+-- * Each frame:
+--    * layout()
+--    * paint()
+--  * widget destroyed - either because its parent died or by explicit destruction
 --
 -- Widget members:
--- updated(param_name, param_val) - update a parameter (optional, default behavior recreates)
--- build() - called every frame to build children. Returns a list of children. (optional, default returns the empty list)
--- init(cv) - called to compute state from initial parameters. This is called only
--- if the widget was added to the tree or was recreated, instead of every frame.
--- recreate() - clears the state table, then calls init()
+-- init(cv) - called to compute state from initial parameters.
 -- paint(cv) - paints the widget to a canvas. should paint children too
 -- layout(maxSize) - lays out the widget's children by setting their `pos` and `size` fields. Should set `self.size`
 -- to the size of the widget.
 --
+-- `init` is optional and defaults to a no-op
 -- `paint` is optional and defaults to painting all children.
 -- `layout` is optional and defaults to laying out all children at the
 -- same position as their parent. (Best for single-child or zero-child widgets.)
@@ -81,7 +74,7 @@ end
 dume.cross = cross
 
 function UI:new(cv)
-    local o = { cv = cv, style = {} }
+    local o = { cv = cv, style = {}, windows = {} }
 
     setmetatable(o, self)
     self.__index = self
@@ -89,19 +82,18 @@ function UI:new(cv)
     return o
 end
 
-function UI:begin()
-    self.widgets = {}
-    self.windows = {}
-end
-
-function UI:window(pos, size, rootWidget)
+function UI:createWindow(name, pos, size, rootWidget)
     self:inflate(rootWidget)
 
-    self.windows[#self.windows + 1] = {
+    self.windows[name] = {
         pos = pos,
         size = size,
         rootWidget = rootWidget,
     }
+end
+
+function UI:deleteWindow(name)
+    self.windows[name] = nil
 end
 
 function UI:render()
@@ -125,6 +117,9 @@ end
 function UI:inflate(widget, parent)
     self.widgets[#self.widgets + 1] = widget
 
+    window.children = window.children or {}
+
+    -- Set default methods
     widget.paintChildren = function(self, cv)
         for _, child in ipairs(self.children) do
             cv:translate(child.pos)
@@ -145,6 +140,7 @@ function UI:inflate(widget, parent)
         self.size = maxSize
     end
 
+    -- Style inheritance
     widget.style = widget.style or {}
 
     local parentStyle = nil
@@ -160,10 +156,9 @@ function UI:inflate(widget, parent)
         end
     end
 
+    -- Initialize widget and inflate children
     widget:init(self.cv)
-    local children = widget:build()
-    widget.children = children
-    for _, child in ipairs(children) do
+    for _, child in ipairs(widget.children) do
         self:inflate(child, widget)
     end
 end

@@ -94,8 +94,4 @@ function Flex:layout(maxSize)
     self.bounds.size = maxSize
 end
 
-function Flex:build()
-    return self.children
-end
-
 return Flex

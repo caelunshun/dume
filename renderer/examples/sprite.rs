@@ -101,9 +101,11 @@ fn main() {
     canvas.load_font(
         fs::read("/home/caelum/dev/riposte/assets/font/Merriweather-Regular.ttf").unwrap(),
     );
+    canvas.load_font(fs::read("/home/caelum/Downloads/Merriweather-Bold.ttf").unwrap());
+    canvas.load_font(fs::read("/home/caelum/Downloads/Merriweather-Italic.ttf").unwrap());
 
     let text = markup::parse(
-        "@color{rgb(0,142,170)}{My name is @size{40}{@color{rgb(239,106,0)}{Ozymandias,}} King of Kings;} look on my Works, ye Mighty,@icon{sprite1} and despair!",
+        "@color{rgb(0,142,170)}{My name is @bold{@size{40}{@color{rgb(239,106,0)}{Ozymandias,}}} King of Kings;} look on my @bold{Works}, ye Mighty,@icon{sprite1} and despair!",
         TextStyle::default(),
         |_| String::new(),
     )
@@ -133,6 +135,23 @@ fn main() {
             baseline: Baseline::Top,
             align_h: Align::Start,
             align_v: Align::Start,
+        },
+    );
+
+    let text3 = markup::parse(
+        "@italic{@size{100}{@color{rgb(192, 78, 32)}{DU}@color{rgb(78, 192, 32)}{ME}}}",
+        TextStyle::default(),
+        |_| String::new(),
+    )
+    .unwrap();
+    let paragraph3 = canvas.create_paragraph(
+        text3,
+        TextLayout {
+            max_dimensions: vec2(width as f32, height as f32),
+            line_breaks: true,
+            baseline: Baseline::Top,
+            align_h: Align::Center,
+            align_v: Align::Center,
         },
     );
 
@@ -184,8 +203,9 @@ fn main() {
                         Srgba::new(8, 127, 226, u8::MAX),
                         Srgba::new(u8::MAX, u8::MAX, u8::MAX, u8::MAX),
                     )
-                    //.solid_color(Srgba::new(8, 127, 226, 128))
                     .fill();
+
+                canvas.draw_paragraph(Vec2::ZERO, &paragraph3);
 
                 let mut encoder =
                     device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
