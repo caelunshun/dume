@@ -70,7 +70,7 @@ fn main() {
                 .unwrap(),
         ),
     });
-    const NUM_SPRITES: usize = 2;
+    const NUM_SPRITES: usize = 512;
     let mut sprites: Vec<_> = iter::repeat_with(|| {
         (
             Vec2::new(
@@ -88,7 +88,7 @@ fn main() {
     );
 
     let text = markup::parse(
-        "My name is @size{40}{@color{rgb(255, 0, 0)}{Ozymandias}}, King of Kings; look on my Works, ye Mighty,@icon{sprite1} and despair!",
+        "@color{rgb(0,142,170)}{My name is @size{40}{@color{rgb(239,106,0)}{Ozymandias,}} King of Kings;} look on my Works, ye Mighty,@icon{sprite1} and despair!",
         TextStyle::default(),
         |_| String::new(),
     )
@@ -111,11 +111,11 @@ fn main() {
             Event::RedrawRequested(_) => {
                 for (pos, vel) in &mut sprites {
                     if vel.x.abs() < 0.1 || vel.y.abs() < 0.1 {
-                        vel.x = (fastrand::f32() - 0.5) * 0.2;
-                        vel.y = (fastrand::f32() - 0.5) * 0.2;
+                        vel.x = (fastrand::f32() - 0.5) * 1.1;
+                        vel.y = (fastrand::f32() - 0.5) * 1.1;
                     }
                     *pos += *vel;
-                    *vel *= 0.99;
+                    *vel *= 0.9999999;
                 }
 
                 for (pos, _) in &sprites {
