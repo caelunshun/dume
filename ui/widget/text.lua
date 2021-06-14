@@ -38,11 +38,11 @@ end
 
 function Text:layout(maxSize)
     self.state.paragraph:updateMaxSize(maxSize)
-    self.bounds.size = Vector(self.state.paragraph:width(), self.state.paragraph:height())
+    self.size = Vector(self.state.paragraph:width(), self.state.paragraph:height())
 end
 
 function Text:paint(cv)
-    cv:drawParagraph(self.bounds.pos, self.state.paragraph)
+    cv:drawParagraph(self.pos, self.state.paragraph)
 end
 
 return Text
