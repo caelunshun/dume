@@ -9,6 +9,7 @@ use wgpu::util::DeviceExt;
 
 use crate::{
     glyph::{GlyphCache, GlyphKey},
+    path::{Path, PathCache, TesselateKind},
     sprite::{SpriteId, Sprites},
     TARGET_FORMAT,
 };
@@ -49,6 +50,7 @@ pub struct PreparedRender {
 pub struct Renderer {
     sprites: Sprites,
     glyphs: GlyphCache,
+    paths: PathCache,
 
     device: Arc<wgpu::Device>,
     #[allow(unused)]
@@ -98,6 +100,7 @@ impl Renderer {
         Self {
             sprites: Sprites::new(Arc::clone(&device), Arc::clone(&queue)),
             glyphs: GlyphCache::new(Arc::clone(&device), Arc::clone(&queue)),
+            paths: PathCache::new(),
 
             device,
             queue,
@@ -147,6 +150,26 @@ impl Renderer {
 
             self.push_quad(pos, size, texcoords, paint);
         }
+    }
+
+    pub fn record_path(&mut self, path: &(Path, TesselateKind), paint: Srgba<u8>) {
+        let paint = glam::ivec2(PAINT_SOLID_COLOR, self.push_color(paint));
+        let Self {
+            indices, vertices, ..
+        } = self;
+        self.paths.with_tesselated_path(path, |tesselated| {
+            let base_vertex = vertices.len() as u16;
+            for vertex in &tesselated.vertices {
+                vertices.push(Vertex {
+                    pos: *vertex,
+                    texcoord: Vec2::ZERO,
+                    paint,
+                });
+            }
+            for index in &tesselated.indices {
+                indices.push(*index + base_vertex);
+            }
+        });
     }
 
     fn push_color(&mut self, color: Srgba<u8>) -> i32 {

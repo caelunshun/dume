@@ -124,6 +124,14 @@ fn main() {
 
                 canvas.draw_paragraph(vec2(200.0, 200.0), &paragraph);
 
+                canvas
+                    .begin_path()
+                    .move_to(vec2(100.0, 100.0))
+                    .line_to(vec2(150.0, 150.0))
+                    .quad_to(vec2(250.0, 300.0), vec2(400.0, 150.0))
+                    .stroke_width(20.0)
+                    .stroke();
+
                 let mut encoder =
                     device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
                 let frame = swap_chain.get_current_frame().unwrap();

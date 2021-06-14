@@ -6,6 +6,7 @@ mod atlas;
 mod canvas;
 pub mod font;
 mod glyph;
+mod path;
 mod rect;
 mod renderer;
 mod sprite;

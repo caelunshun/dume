@@ -1,11 +1,15 @@
-use std::{iter, sync::Arc};
+use std::{iter, mem, sync::Arc};
 
 use fontdb::Database;
 use glam::{vec2, Mat4, Vec2};
+use palette::Srgba;
 
 use crate::{
-    glyph::GlyphKey, renderer::Renderer, text::layout::GlyphCharacter, Paragraph, SpriteId, Text,
-    TextLayout,
+    glyph::GlyphKey,
+    path::{Path, PathSegment, TesselateKind},
+    renderer::Renderer,
+    text::layout::GlyphCharacter,
+    Paragraph, SpriteId, Text, TextLayout,
 };
 
 #[derive(Debug)]
@@ -32,6 +36,10 @@ pub struct Canvas {
     renderer: Renderer,
 
     fonts: Database,
+
+    current_path: Path,
+    stroke_width: f32,
+    paint: Srgba<u8>,
 }
 
 impl Canvas {
@@ -42,6 +50,10 @@ impl Canvas {
 
             device,
             queue,
+
+            current_path: Path::default(),
+            stroke_width: 1.0,
+            paint: Srgba::new(u8::MAX, u8::MAX, u8::MAX, u8::MAX),
         }
     }
 
@@ -114,6 +126,63 @@ impl Canvas {
         }
 
         self
+    }
+
+    pub fn begin_path(&mut self) -> &mut Self {
+        self.current_path.segments.clear();
+        self
+    }
+
+    pub fn move_to(&mut self, pos: Vec2) -> &mut Self {
+        self.current_path.segments.push(PathSegment::MoveTo(pos));
+        self
+    }
+
+    pub fn line_to(&mut self, pos: Vec2) -> &mut Self {
+        self.current_path.segments.push(PathSegment::LineTo(pos));
+        self
+    }
+
+    pub fn quad_to(&mut self, control: Vec2, pos: Vec2) -> &mut Self {
+        self.current_path
+            .segments
+            .push(PathSegment::QuadTo(control, pos));
+        self
+    }
+
+    pub fn cubic_to(&mut self, control1: Vec2, control2: Vec2, pos: Vec2) -> &mut Self {
+        self.current_path
+            .segments
+            .push(PathSegment::CubicTo(control1, control2, pos));
+        self
+    }
+
+    pub fn stroke_width(&mut self, width: f32) -> &mut Self {
+        self.stroke_width = width;
+        self
+    }
+
+    pub fn solid_color(&mut self, color: Srgba<u8>) -> &mut Self {
+        self.paint = color;
+        self
+    }
+
+    pub fn stroke(&mut self) {
+        let path = mem::take(&mut self.current_path);
+        let kind = TesselateKind::Stroke {
+            width: (self.stroke_width * 100.) as u32,
+        };
+        let path = (path, kind);
+        self.renderer.record_path(&path, self.paint);
+        self.current_path = path.0;
+    }
+
+    pub fn fill(&mut self) {
+        let path = mem::take(&mut self.current_path);
+        let kind = TesselateKind::Fill;
+        let path = (path, kind);
+        self.renderer.record_path(&path, self.paint);
+        self.current_path = path.0;
     }
 
     pub fn render(
