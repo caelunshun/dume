@@ -1,10 +1,14 @@
 use std::{mem::size_of, sync::Arc};
 
 use bytemuck::{Pod, Zeroable};
-use glam::{IVec2, Mat4, Vec2, Vec4};
+use fontdb::Database;
+use glam::{vec2, IVec2, Mat4, Vec2, Vec4};
+use guillotiere::Allocation;
+use palette::Srgba;
 use wgpu::util::DeviceExt;
 
 use crate::{
+    glyph::{GlyphCache, GlyphKey},
     sprite::{SpriteId, Sprites},
     TARGET_FORMAT,
 };
@@ -44,6 +48,7 @@ pub struct PreparedRender {
 /// the sprites to be rendered.
 pub struct Renderer {
     sprites: Sprites,
+    glyphs: GlyphCache,
 
     device: Arc<wgpu::Device>,
     #[allow(unused)]
@@ -77,6 +82,7 @@ impl Renderer {
         });
         Self {
             sprites: Sprites::new(Arc::clone(&device), Arc::clone(&queue)),
+            glyphs: GlyphCache::new(Arc::clone(&device), Arc::clone(&queue)),
 
             device,
             queue,
@@ -109,6 +115,37 @@ impl Renderer {
 
         let paint = glam::ivec2(PAINT_SPRITE, 0);
 
+        self.push_quad(pos, size, texcoords, paint);
+    }
+
+    pub fn record_glyph(&mut self, key: GlyphKey, pos: Vec2, color: Srgba<u8>, fonts: &Database) {
+        if let Some(allocation) = self.glyphs.glyph_allocation(key, fonts) {
+            let texcoords = self.glyphs.atlas().texture_coordinates(allocation);
+
+            let paint = glam::ivec2(PAINT_ALPHA_TEXTURE, self.push_color(color));
+
+            let size = vec2(
+                allocation.rectangle.size().width as f32,
+                allocation.rectangle.size().height as f32,
+            );
+
+            self.push_quad(pos, size, texcoords, paint);
+        }
+    }
+
+    fn push_color(&mut self, color: Srgba<u8>) -> i32 {
+        let linear = color.into_format::<f32, f32>().into_linear();
+        self.colors.push(Vec4::new(
+            linear.red,
+            linear.green,
+            linear.blue,
+            linear.alpha,
+        ));
+
+        self.colors.len() as i32 - 1
+    }
+
+    fn push_quad(&mut self, pos: Vec2, size: Vec2, texcoords: [Vec2; 4], paint: IVec2) {
         let vertices = [
             Vertex {
                 pos,
@@ -182,8 +219,14 @@ impl Renderer {
         self.indices.clear();
         self.colors.clear();
 
-        let tv = self
+        let sprite_tv = self
             .sprites()
+            .atlas()
+            .texture()
+            .create_view(&Default::default());
+
+        let font_tv = self
+            .glyphs
             .atlas()
             .texture()
             .create_view(&Default::default());
@@ -206,11 +249,11 @@ impl Renderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: wgpu::BindingResource::TextureView(&tv),
+                    resource: wgpu::BindingResource::TextureView(&sprite_tv),
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
-                    resource: wgpu::BindingResource::TextureView(&tv), // TODO: use font atlas here. This is a placeholder.
+                    resource: wgpu::BindingResource::TextureView(&font_tv),
                 },
                 wgpu::BindGroupEntry {
                     binding: 4,

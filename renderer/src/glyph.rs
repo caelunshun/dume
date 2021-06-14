@@ -9,9 +9,9 @@ use crate::{atlas::TextureAtlas, text::FontId};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GlyphKey {
-    c: char,
-    font: FontId,
-    size: u64, // fixed point in 1/1000s of a pixel
+    pub c: char,
+    pub font: FontId,
+    pub size: u64, // fixed point in 1/1000s of a pixel
 }
 
 /// A cache of rendered glyphs stored on a GPU texture atlas.
@@ -49,9 +49,14 @@ impl GlyphCache {
                             fontdb::Source::Binary(b) => b.as_slice(),
                             fontdb::Source::File(_) => todo!(),
                         };
-                        let font =
-                            fontdue::Font::from_bytes(font_data, fontdue::FontSettings::default())
-                                .expect("malformed font");
+                        let font = fontdue::Font::from_bytes(
+                            font_data,
+                            fontdue::FontSettings {
+                                enable_offset_bounding_box: false,
+                                ..Default::default()
+                            },
+                        )
+                        .expect("malformed font");
                         entry.insert(font)
                     }
                 };

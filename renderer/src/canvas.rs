@@ -1,8 +1,12 @@
 use std::{iter, sync::Arc};
 
+use fontdb::Database;
 use glam::{Mat4, Vec2};
 
-use crate::{renderer::Renderer, SpriteId};
+use crate::{
+    glyph::GlyphKey, renderer::Renderer, text::layout::GlyphCharacter, Paragraph, SpriteId, Text,
+    TextLayout,
+};
 
 #[derive(Debug)]
 pub struct SpriteDescriptor<'a> {
@@ -26,16 +30,23 @@ pub struct Canvas {
     queue: Arc<wgpu::Queue>,
 
     renderer: Renderer,
+
+    fonts: Database,
 }
 
 impl Canvas {
     pub fn new(device: Arc<wgpu::Device>, queue: Arc<wgpu::Queue>) -> Self {
         Self {
             renderer: Renderer::new(Arc::clone(&device), Arc::clone(&queue)),
+            fonts: Database::new(),
 
             device,
             queue,
         }
+    }
+
+    pub fn load_font(&mut self, font_data: Vec<u8>) {
+        self.fonts.load_font_data(font_data);
     }
 
     pub fn create_sprite(&mut self, descriptor: SpriteDescriptor) -> SpriteId {
@@ -73,6 +84,31 @@ impl Canvas {
 
     pub fn draw_sprite(&mut self, sprite: SpriteId, pos: Vec2, width: f32) -> &mut Self {
         self.renderer.record_sprite(sprite, pos, width);
+        self
+    }
+
+    pub fn create_paragraph(&self, text: Text, layout: TextLayout) -> Paragraph {
+        Paragraph::new(text, layout, &self.fonts, self.renderer.sprites())
+    }
+
+    pub fn draw_paragraph(&mut self, pos: Vec2, paragraph: &Paragraph) -> &mut Self {
+        for glyph in paragraph.glyphs() {
+            match glyph.c {
+                GlyphCharacter::Char(c) => {
+                    let key = GlyphKey {
+                        c,
+                        font: glyph.font.unwrap(),
+                        size: (glyph.size * 1000.) as u64,
+                    };
+                    self.renderer
+                        .record_glyph(key, glyph.pos + pos, glyph.color, &self.fonts);
+                }
+                GlyphCharacter::Icon(sprite) => {
+                    self.draw_sprite(sprite, glyph.pos + pos, glyph.bbox.size.x);
+                }
+            }
+        }
+
         self
     }
 

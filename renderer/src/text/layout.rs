@@ -126,7 +126,7 @@ impl Paragraph {
 
     /// Updates the paragraph's maximum width and height, re-calculating
     /// layout (but not shaping) if needed.
-    pub fn update_max_dimensions(&mut self, fonts: &Database, new_max_dimensions: Vec2) {
+    pub(crate) fn update_max_dimensions(&mut self, fonts: &Database, new_max_dimensions: Vec2) {
         if new_max_dimensions == self.layout.max_dimensions {
             return;
         }

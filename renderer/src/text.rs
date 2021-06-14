@@ -2,7 +2,7 @@
 
 #![allow(clippy::clippy::derive_hash_xor_eq)]
 
-mod layout;
+pub mod layout;
 pub mod markup;
 
 use std::hash::Hash;
@@ -79,10 +79,10 @@ pub struct TextStyle {
 impl Default for TextStyle {
     fn default() -> Self {
         Self {
-            color: Srgba::new(0, 0, 0, u8::MAX),
+            color: Srgba::new(u8::MAX, u8::MAX, u8::MAX, u8::MAX),
             size: 12.0,
             font: Query {
-                family: "Times New Roman".to_owned(),
+                family: "Merriweather".to_owned(),
                 style: Style::Normal,
                 weight: Weight::Normal,
             },

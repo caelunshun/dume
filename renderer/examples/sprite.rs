@@ -1,7 +1,10 @@
 use std::{fs, iter, sync::Arc};
 
-use dume_renderer::{Canvas, SpriteData, SpriteDescriptor, TARGET_FORMAT};
-use glam::Vec2;
+use dume_renderer::{
+    markup, Align, Baseline, Canvas, SpriteData, SpriteDescriptor, TextLayout, TextStyle,
+    TARGET_FORMAT,
+};
+use glam::{vec2, Vec2};
 use pollster::block_on;
 use simple_logger::SimpleLogger;
 use winit::{
@@ -80,6 +83,27 @@ fn main() {
     .take(NUM_SPRITES)
     .collect();
 
+    canvas.load_font(
+        fs::read("/home/caelum/dev/riposte/assets/font/Merriweather-Regular.ttf").unwrap(),
+    );
+
+    let text = markup::parse(
+        "My name is @size{20}{Ozymandias}, King of Kings; look on my Works; ye Mighty,@icon{sprite1} and despair.",
+        TextStyle::default(),
+        |_| String::new(),
+    )
+    .unwrap();
+    let paragraph = canvas.create_paragraph(
+        text,
+        TextLayout {
+            max_dimensions: vec2(200.0, 400.0),
+            line_breaks: true,
+            baseline: Baseline::Alphabetic,
+            align_h: Align::Start,
+            align_v: Align::Start,
+        },
+    );
+
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
 
@@ -97,6 +121,8 @@ fn main() {
                 for (pos, _) in &sprites {
                     canvas.draw_sprite(sprite1, *pos, 50.0);
                 }
+
+                canvas.draw_paragraph(vec2(200.0, 200.0), &paragraph);
 
                 let mut encoder =
                     device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
