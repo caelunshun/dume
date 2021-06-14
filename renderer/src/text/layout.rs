@@ -187,7 +187,8 @@ fn shape(text: &Text, fonts: &Database, sprites: &Sprites) -> Vec<ShapedGlyph> {
                     .unwrap_or_else(|| panic!("no sprite with name '{}' or 'icon/{}'", name, name));
                 let allocation = sprites.sprite_allocation(sprite);
                 let sprite_size = allocation.rectangle.size();
-                let width = size * (sprite_size.width as f32 / sprite_size.height as f32);
+                let width =
+                    size * ((sprite_size.width - 2) as f32 / (sprite_size.height - 2) as f32);
 
                 glyphs.push(ShapedGlyph {
                     pos: Vec2::ZERO,

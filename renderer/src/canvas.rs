@@ -1,7 +1,7 @@
 use std::{iter, sync::Arc};
 
 use fontdb::Database;
-use glam::{Mat4, Vec2};
+use glam::{vec2, Mat4, Vec2};
 
 use crate::{
     glyph::GlyphKey, renderer::Renderer, text::layout::GlyphCharacter, Paragraph, SpriteId, Text,
@@ -104,7 +104,11 @@ impl Canvas {
                         .record_glyph(key, glyph.pos + pos, glyph.color, &self.fonts);
                 }
                 GlyphCharacter::Icon(sprite) => {
-                    self.draw_sprite(sprite, glyph.pos + pos, glyph.bbox.size.x);
+                    self.draw_sprite(
+                        sprite,
+                        glyph.pos + pos - vec2(0., glyph.bbox.size.y),
+                        glyph.bbox.size.x,
+                    );
                 }
             }
         }

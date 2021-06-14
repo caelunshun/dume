@@ -88,7 +88,7 @@ fn main() {
     );
 
     let text = markup::parse(
-        "My name is @size{20}{Ozymandias}, King of Kings; look on my Works; ye Mighty,@icon{sprite1} and despair.",
+        "My name is @size{40}{@color{rgb(255, 0, 0)}{Ozymandias}}, King of Kings; look on my Works, ye Mighty,@icon{sprite1} and despair!",
         TextStyle::default(),
         |_| String::new(),
     )
@@ -96,7 +96,7 @@ fn main() {
     let paragraph = canvas.create_paragraph(
         text,
         TextLayout {
-            max_dimensions: vec2(200.0, 400.0),
+            max_dimensions: vec2(600.0, 400.0),
             line_breaks: true,
             baseline: Baseline::Alphabetic,
             align_h: Align::Start,

@@ -60,13 +60,13 @@ impl TextureAtlas {
     pub fn insert(&mut self, texture: &[u8], width: u32, height: u32) -> Allocation {
         assert_ne!(width, 0, "width cannot be zero");
         assert_ne!(height, 0, "height cannot be zero");
-        let size = Size::new(width as i32, height as i32);
+        let size = Size::new(width as i32 + 2, height as i32 + 2);
         let allocation = match self.allocator.allocate(size) {
             Some(a) => a,
             None => {
                 self.grow(
-                    width + self.descriptor.size.width,
-                    height + self.descriptor.size.height,
+                    width + self.descriptor.size.width + 2,
+                    height + self.descriptor.size.height + 2,
                 );
                 self.allocator.allocate(size).expect("did not grow")
             }
@@ -88,12 +88,12 @@ impl TextureAtlas {
     /// Order: top-left, top-right, bottom-right, bottom-left
     pub fn texture_coordinates(&self, allocation: Allocation) -> [Vec2; 4] {
         let min = Vec2::new(
-            allocation.rectangle.min.x as f32 / self.descriptor.size.width as f32,
-            allocation.rectangle.min.y as f32 / self.descriptor.size.height as f32,
+            (allocation.rectangle.min.x as f32 + 1.) / self.descriptor.size.width as f32,
+            (allocation.rectangle.min.y as f32 + 1.) / self.descriptor.size.height as f32,
         );
         let max = Vec2::new(
-            allocation.rectangle.max.x as f32 / self.descriptor.size.width as f32,
-            allocation.rectangle.max.y as f32 / self.descriptor.size.height as f32,
+            (allocation.rectangle.max.x as f32 - 1.) / self.descriptor.size.width as f32,
+            (allocation.rectangle.max.y as f32 - 1.) / self.descriptor.size.height as f32,
         );
         [min, Vec2::new(max.x, min.y), max, Vec2::new(min.x, max.y)]
     }
@@ -113,8 +113,8 @@ impl TextureAtlas {
                 texture: &self.texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d {
-                    x: allocation.rectangle.min.x as u32,
-                    y: allocation.rectangle.min.y as u32,
+                    x: allocation.rectangle.min.x as u32 + 1,
+                    y: allocation.rectangle.min.y as u32 + 1,
                     z: 0,
                 },
             },

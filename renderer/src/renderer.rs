@@ -54,6 +54,7 @@ pub struct Renderer {
     #[allow(unused)]
     queue: Arc<wgpu::Queue>,
     sampler: wgpu::Sampler,
+    nearest_sampler: wgpu::Sampler,
     pipeline: wgpu::RenderPipeline,
     bg_layout: wgpu::BindGroupLayout,
 
@@ -80,6 +81,20 @@ impl Renderer {
             anisotropy_clamp: None,
             border_color: None,
         });
+        let nearest_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("font_sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            lod_min_clamp: 0.0,
+            lod_max_clamp: 100.0,
+            compare: None,
+            anisotropy_clamp: None,
+            border_color: None,
+        });
         Self {
             sprites: Sprites::new(Arc::clone(&device), Arc::clone(&queue)),
             glyphs: GlyphCache::new(Arc::clone(&device), Arc::clone(&queue)),
@@ -87,6 +102,7 @@ impl Renderer {
             device,
             queue,
             sampler,
+            nearest_sampler,
             pipeline,
             bg_layout,
 
@@ -125,8 +141,8 @@ impl Renderer {
             let paint = glam::ivec2(PAINT_ALPHA_TEXTURE, self.push_color(color));
 
             let size = vec2(
-                allocation.rectangle.size().width as f32,
-                allocation.rectangle.size().height as f32,
+                allocation.rectangle.size().width as f32 - 2.0,
+                allocation.rectangle.size().height as f32 - 2.0,
             );
 
             self.push_quad(pos, size, texcoords, paint);
@@ -249,14 +265,18 @@ impl Renderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: wgpu::BindingResource::TextureView(&sprite_tv),
+                    resource: wgpu::BindingResource::Sampler(&self.nearest_sampler),
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
-                    resource: wgpu::BindingResource::TextureView(&font_tv),
+                    resource: wgpu::BindingResource::TextureView(&sprite_tv),
                 },
                 wgpu::BindGroupEntry {
                     binding: 4,
+                    resource: wgpu::BindingResource::TextureView(&font_tv),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                         buffer: &color_buffer,
                         offset: 0,
@@ -324,10 +344,9 @@ fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGr
             wgpu::BindGroupLayoutEntry {
                 binding: 2,
                 visibility: wgpu::ShaderStage::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    multisampled: false,
+                ty: wgpu::BindingType::Sampler {
+                    filtering: false,
+                    comparison: false,
                 },
                 count: None,
             },
@@ -343,6 +362,16 @@ fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGr
             },
             wgpu::BindGroupLayoutEntry {
                 binding: 4,
+                visibility: wgpu::ShaderStage::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 5,
                 visibility: wgpu::ShaderStage::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Storage { read_only: true },
@@ -393,8 +422,16 @@ fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGr
             targets: &[wgpu::ColorTargetState {
                 format: TARGET_FORMAT,
                 blend: Some(wgpu::BlendState {
-                    color: wgpu::BlendComponent::OVER,
-                    alpha: wgpu::BlendComponent::OVER,
+                    color: wgpu::BlendComponent {
+                        src_factor: wgpu::BlendFactor::SrcAlpha,
+                        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                        operation: wgpu::BlendOperation::Add,
+                    },
+                    alpha: wgpu::BlendComponent {
+                        src_factor: wgpu::BlendFactor::One,
+                        dst_factor: wgpu::BlendFactor::One,
+                        operation: wgpu::BlendOperation::Add,
+                    }
                 }),
                 write_mask: wgpu::ColorWrite::ALL,
             }],
