@@ -2,9 +2,10 @@
 
 #![allow(clippy::missing_safety_doc)]
 
-use std::{ffi::c_void, os::raw::c_ulong, sync::Arc};
+use std::{ffi::c_void, os::raw::c_ulong, sync::Arc, u64};
 
 use glam::Vec2;
+use palette::Srgba;
 use pollster::block_on;
 use raw_window_handle::{unix::XlibHandle, HasRawWindowHandle, RawWindowHandle};
 use slotmap::{Key, KeyData};
@@ -154,6 +155,20 @@ pub unsafe extern "C" fn dume_create_sprite_from_rgba(
         .as_ffi()
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn dume_get_sprite_by_name(
+    ctx: *mut DumeCtx,
+    name: *const u8,
+    name_len: usize,
+) -> u64 {
+    canvas(ctx)
+        .sprite_by_name(std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+            name, name_len,
+        )))
+        .map(|k| k.data().as_ffi())
+        .unwrap_or(0)
+}
+
 #[repr(C)]
 pub struct Variable {
     pub value: *const u8,
@@ -224,6 +239,71 @@ pub unsafe extern "C" fn dume_draw_paragraph(
     paragraph: *const Paragraph,
 ) {
     canvas(ctx).draw_paragraph(pos, &*paragraph);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dume_stroke_width(ctx: *mut DumeCtx, width: f32) {
+    canvas(ctx).stroke_width(width);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dume_begin_path(ctx: *mut DumeCtx) {
+    canvas(ctx).begin_path();
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dume_move_to(ctx: *mut DumeCtx, pos: Vec2) {
+    canvas(ctx).move_to(pos);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dume_line_to(ctx: *mut DumeCtx, pos: Vec2) {
+    canvas(ctx).line_to(pos);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dume_quad_to(ctx: *mut DumeCtx, control: Vec2, pos: Vec2) {
+    canvas(ctx).quad_to(control, pos);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dume_cubic_to(
+    ctx: *mut DumeCtx,
+    control1: Vec2,
+    control2: Vec2,
+    pos: Vec2,
+) {
+    canvas(ctx).cubic_to(control1, control2, pos);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dume_solid_color(ctx: *mut DumeCtx, color: &[u8; 4]) {
+    canvas(ctx).solid_color(srgba(*color));
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dume_linear_gradient(
+    ctx: *mut DumeCtx,
+    point_a: Vec2,
+    point_b: Vec2,
+    color_a: &[u8; 4],
+    color_b: &[u8; 4],
+) {
+    canvas(ctx).linear_gradient(point_a, point_b, srgba(*color_a), srgba(*color_b));
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dume_stroke(ctx: *mut DumeCtx) {
+    canvas(ctx).stroke();
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dume_fill(ctx: *mut DumeCtx) {
+    canvas(ctx).fill();
+}
+
+fn srgba(a: [u8; 4]) -> Srgba<u8> {
+    Srgba::new(a[0], a[1], a[2], a[3])
 }
 
 #[no_mangle]

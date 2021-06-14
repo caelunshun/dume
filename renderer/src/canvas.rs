@@ -106,6 +106,10 @@ impl Canvas {
         self.renderer.sprites_mut().remove(id);
     }
 
+    pub fn sprite_by_name(&self, name: &str) -> Option<SpriteId> {
+        self.renderer.sprites().sprite_by_name(name)
+    }
+
     pub fn draw_sprite(&mut self, sprite: SpriteId, pos: Vec2, width: f32) -> &mut Self {
         self.renderer.record_sprite(sprite, pos, width);
         self

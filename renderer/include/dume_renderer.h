@@ -69,6 +69,8 @@ struct Variable {
 
 extern "C" {
 
+void dume_begin_path(DumeCtx *ctx);
+
 /// NB: consumes the text.
 Paragraph *dume_create_paragraph(DumeCtx *ctx, Text *text, TextLayout layout);
 
@@ -86,13 +88,29 @@ uint64_t dume_create_sprite_from_rgba(DumeCtx *ctx,
                                       uint32_t width,
                                       uint32_t height);
 
+void dume_cubic_to(DumeCtx *ctx, Vec2 control1, Vec2 control2, Vec2 pos);
+
 void dume_draw_paragraph(DumeCtx *ctx, Vec2 pos, const Paragraph *paragraph);
 
 void dume_draw_sprite(DumeCtx *ctx, Vec2 pos, float width, uint64_t sprite);
 
+void dume_fill(DumeCtx *ctx);
+
+uint64_t dume_get_sprite_by_name(DumeCtx *ctx, const uint8_t *name, size_t name_len);
+
 DumeCtx *dume_init(uint32_t width, uint32_t height, RawWindow window);
 
+void dume_line_to(DumeCtx *ctx, Vec2 pos);
+
+void dume_linear_gradient(DumeCtx *ctx,
+                          Vec2 point_a,
+                          Vec2 point_b,
+                          const uint8_t (*color_a)[4],
+                          const uint8_t (*color_b)[4]);
+
 void dume_load_font(DumeCtx *ctx, const uint8_t *font_data, size_t font_len);
+
+void dume_move_to(DumeCtx *ctx, Vec2 pos);
 
 void dume_paragraph_free(Paragraph *paragraph);
 
@@ -103,9 +121,17 @@ Text *dume_parse_markup(const uint8_t *markup,
                         void *userdata,
                         Variable (*resolve_variable)(void*, const uint8_t*, size_t));
 
+void dume_quad_to(DumeCtx *ctx, Vec2 control, Vec2 pos);
+
 void dume_render(DumeCtx *ctx);
 
 void dume_resize(DumeCtx *ctx, uint32_t new_width, uint32_t new_height);
+
+void dume_solid_color(DumeCtx *ctx, const uint8_t (*color)[4]);
+
+void dume_stroke(DumeCtx *ctx);
+
+void dume_stroke_width(DumeCtx *ctx, float width);
 
 void dume_text_free(Text *text);
 

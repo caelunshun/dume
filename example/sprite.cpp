@@ -45,6 +45,16 @@ int main() {
 
     while (!glfwWindowShouldClose(window)) {
         canvas.drawSprite(sprite, 30, 30, 600);
+
+        canvas.beginPath();
+        canvas.moveTo(0, 0);
+        canvas.lineTo(450, 450);
+        canvas.quadTo(500, 200, 600, 300);
+        uint8_t colorA[4] = {96, 45, 226, 255};
+        uint8_t colorB[4] = {255, 255, 255, 255};
+        canvas.linearGradient(0, 0, 1920 / 2, 1080 / 2, &colorA, &colorB);
+        canvas.fill();
+
         canvas.drawParagraph(paragraph, 0, 0);
 
         canvas.render();

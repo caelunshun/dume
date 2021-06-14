@@ -10,6 +10,7 @@
 #include <dume_renderer.h>
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
+#include <array>
 
 namespace dume {
     static Variable resolveDefaultVariable(void *userdata, const uint8_t *name, size_t len) {
@@ -66,6 +67,46 @@ namespace dume {
 
         void drawSprite(uint64_t sprite, float x, float y, float width) {
             dume_draw_sprite(ctx, Vec2 { .x = x, .y = y }, width, sprite);
+        }
+
+        void beginPath() {
+            dume_begin_path(ctx);
+        }
+
+        void moveTo(float x, float y) {
+            dume_move_to(ctx, Vec2 { .x = x, .y = y });
+        }
+
+        void lineTo(float x, float y) {
+            dume_line_to(ctx, Vec2 { .x = x, .y = y });
+        }
+
+        void quadTo(float cx, float cy, float x, float y) {
+            dume_quad_to(ctx, Vec2 { .x = cx, .y = cy }, Vec2 { .x = x, .y = y });
+        }
+
+        void cubicTo(float cx1, float cy1, float cx2, float cy2, float x, float y) {
+            dume_cubic_to(ctx, Vec2 { .x = cx1, .y = cy1 }, Vec2 { .x = cx2, .y = cy2 }, Vec2 { .x = x, .y = y });
+        }
+
+        void strokeWidth(float width) {
+            dume_stroke_width(ctx, width);
+        }
+
+        void solidColor(const uint8_t (*color)[4]) {
+            dume_solid_color(ctx, color);
+        }
+
+        void linearGradient(float ax, float ay, float bx, float by, const uint8_t (*colorA)[4], const uint8_t (*colorB)[4]) {
+            dume_linear_gradient(ctx, Vec2 { .x = ax, .y = ay }, Vec2 { .x = bx, .y = by }, colorA, colorB);
+        }
+
+        void stroke() {
+            dume_stroke(ctx);
+        }
+
+        void fill() {
+            dume_fill(ctx);
         }
 
         void render() {
