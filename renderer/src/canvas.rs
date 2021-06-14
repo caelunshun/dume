@@ -12,6 +12,17 @@ use crate::{
     Paragraph, SpriteId, Text, TextLayout,
 };
 
+#[derive(Debug, Copy, Clone)]
+pub enum Paint {
+    Solid(Srgba<u8>),
+    LinearGradient {
+        color_a: Srgba<u8>,
+        color_b: Srgba<u8>,
+        point_a: Vec2,
+        point_b: Vec2,
+    },
+}
+
 #[derive(Debug)]
 pub struct SpriteDescriptor<'a> {
     pub name: &'a str,
@@ -39,7 +50,7 @@ pub struct Canvas {
 
     current_path: Path,
     stroke_width: f32,
-    paint: Srgba<u8>,
+    paint: Paint,
 }
 
 impl Canvas {
@@ -53,7 +64,7 @@ impl Canvas {
 
             current_path: Path::default(),
             stroke_width: 1.0,
-            paint: Srgba::new(u8::MAX, u8::MAX, u8::MAX, u8::MAX),
+            paint: Paint::Solid(Srgba::new(u8::MAX, u8::MAX, u8::MAX, u8::MAX)),
         }
     }
 
@@ -163,7 +174,23 @@ impl Canvas {
     }
 
     pub fn solid_color(&mut self, color: Srgba<u8>) -> &mut Self {
-        self.paint = color;
+        self.paint = Paint::Solid(color);
+        self
+    }
+
+    pub fn linear_gradient(
+        &mut self,
+        point_a: Vec2,
+        point_b: Vec2,
+        color_a: Srgba<u8>,
+        color_b: Srgba<u8>,
+    ) -> &mut Self {
+        self.paint = Paint::LinearGradient {
+            color_a,
+            color_b,
+            point_a,
+            point_b,
+        };
         self
     }
 

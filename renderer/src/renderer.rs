@@ -8,6 +8,7 @@ use palette::Srgba;
 use wgpu::util::DeviceExt;
 
 use crate::{
+    canvas::Paint,
     glyph::{GlyphCache, GlyphKey},
     path::{Path, PathCache, TesselateKind},
     sprite::{SpriteId, Sprites},
@@ -18,6 +19,7 @@ use crate::{
 const PAINT_SOLID_COLOR: i32 = 0;
 const PAINT_SPRITE: i32 = 1;
 const PAINT_ALPHA_TEXTURE: i32 = 2;
+const PAINT_LINEAR_GRADIENT: i32 = 3;
 
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 #[repr(C)]
@@ -152,8 +154,24 @@ impl Renderer {
         }
     }
 
-    pub fn record_path(&mut self, path: &(Path, TesselateKind), paint: Srgba<u8>) {
-        let paint = glam::ivec2(PAINT_SOLID_COLOR, self.push_color(paint));
+    pub fn record_path(&mut self, path: &(Path, TesselateKind), paint: Paint) {
+        let paint = match paint {
+            Paint::Solid(color) => glam::ivec2(PAINT_SOLID_COLOR, self.push_color(color)),
+            Paint::LinearGradient {
+                color_a,
+                color_b,
+                point_a,
+                point_b,
+            } => {
+                let id = self.push_color(color_a);
+                self.push_color(color_b);
+                self.colors
+                    .push(Vec4::new(point_a.x, point_a.y, point_b.x, point_b.y));
+
+                glam::ivec2(PAINT_LINEAR_GRADIENT, id)
+            }
+        };
+
         let Self {
             indices, vertices, ..
         } = self;

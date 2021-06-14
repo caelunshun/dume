@@ -2,11 +2,13 @@
 
 layout (location = 0) in vec2 f_TexCoord;
 layout (location = 1) flat in ivec2 f_Paint;
+layout (location = 2) in vec2 f_WorldPos;
 
 // Shader constants stored in the `shader.x` vertex attribute.
 #define PAINT_SOLID 0
 #define PAINT_SPRITE 1
 #define PAINT_ALPHA_TEXTURE 2 // used for fonts
+#define PAINT_LINEAR_GRADIENT 3
 
 layout (set = 0, binding = 1) uniform sampler u_Sampler;
 layout (set = 0, binding = 2) uniform sampler u_NearestSampler;
@@ -37,5 +39,23 @@ void main() {
         o_Color = texture(sampler2D(u_SpriteAtlas, u_Sampler), f_TexCoord);
     } else if (paintType == PAINT_ALPHA_TEXTURE) {
         o_Color = vec4(colors[colorIndex].xyz, texture(sampler2D(u_FontAtlas, u_NearestSampler), f_TexCoord).x);
+    } else if (paintType == PAINT_LINEAR_GRADIENT) {
+        vec4 colorA = colors[colorIndex];
+        vec4 colorB = colors[colorIndex + 1];
+
+        vec4 point = colors[colorIndex + 2];
+        vec2 pointA = point.xy;
+        vec2 pointB = point.zw;
+
+        // https://stackoverflow.com/questions/1459368/snap-point-to-a-line
+        vec2 ap = f_WorldPos - pointA;
+        vec2 ab = pointB - pointA;
+
+        float ab2 = ab.x * ab.x + ab.y * ab.y;
+        float apAB = ap.x * ab.x + ab.y * ap.y;
+        float t = apAB / ab2;
+        t = clamp(t, 0.0, 1.0);
+
+        o_Color = colorA * (1 - t) + colorB * t;
     }
 }

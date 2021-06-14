@@ -130,7 +130,7 @@ fn main() {
                         vel.y = (fastrand::f32() - 0.5) * 1.1;
                     }
                     *pos += *vel;
-                    *vel *= 0.9999999;
+                    *vel *= 0.999;
                 }
 
                 for (pos, _) in &sprites {
@@ -147,6 +147,20 @@ fn main() {
                     .stroke_width(20.0)
                     .solid_color(Srgba::new(8, 127, 226, 128))
                     .stroke();
+
+                canvas
+                    .begin_path()
+                    .move_to(vec2(300.0, 300.0))
+                    .line_to(vec2(400.0, 300.0))
+                    .line_to(vec2(400.0, 400.0))
+                    .linear_gradient(
+                        vec2(300.0, 300.0),
+                        vec2(400.0, 400.0),
+                        Srgba::new(8, 127, 226, u8::MAX),
+                        Srgba::new(u8::MAX, u8::MAX, u8::MAX, u8::MAX),
+                    )
+                    //.solid_color(Srgba::new(8, 127, 226, 128))
+                    .fill();
 
                 let mut encoder =
                     device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
