@@ -11,6 +11,7 @@ use crate::{
     canvas::Paint,
     glyph::{GlyphCache, GlyphKey},
     path::{Path, PathCache, TesselateKind},
+    rect::Rect,
     sprite::{SpriteId, Sprites},
     SAMPLE_COUNT, TARGET_FORMAT,
 };
@@ -27,6 +28,7 @@ struct Vertex {
     pos: Vec2,
     texcoord: Vec2,
     paint: IVec2,
+    scissor: IVec2,
 }
 
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
@@ -66,6 +68,8 @@ pub struct Renderer {
     vertices: Vec<Vertex>,
     indices: Vec<u16>,
     colors: Vec<Vec4>,
+
+    scissor: Option<(Rect, i32)>,
 }
 
 impl Renderer {
@@ -114,7 +118,19 @@ impl Renderer {
             vertices: Vec::new(),
             indices: Vec::new(),
             colors: Vec::new(),
+
+            scissor: None,
         }
+    }
+
+    pub fn set_scissor(&mut self, rect: Rect) {
+        let rect_encoded = glam::vec4(rect.pos.x, rect.pos.y, rect.size.x, rect.size.y);
+        self.colors.push(rect_encoded);
+        self.scissor = Some((rect, self.colors.len() as i32 - 1));
+    }
+
+    pub fn clear_scissor(&mut self) {
+        self.scissor = None;
     }
 
     pub fn sprites(&self) -> &Sprites {
@@ -172,6 +188,7 @@ impl Renderer {
             }
         };
 
+        let scissor = self.scissor_vec();
         let Self {
             indices, vertices, ..
         } = self;
@@ -182,6 +199,7 @@ impl Renderer {
                     pos: *vertex,
                     texcoord: Vec2::ZERO,
                     paint,
+                    scissor,
                 });
             }
             for index in &tesselated.indices {
@@ -203,26 +221,31 @@ impl Renderer {
     }
 
     fn push_quad(&mut self, pos: Vec2, size: Vec2, texcoords: [Vec2; 4], paint: IVec2) {
+        let scissor = self.scissor_vec();
         let vertices = [
             Vertex {
                 pos,
                 texcoord: texcoords[0],
                 paint,
+                scissor,
             },
             Vertex {
                 pos: pos + Vec2::new(size.x, 0.0),
                 texcoord: texcoords[1],
                 paint,
+                scissor,
             },
             Vertex {
                 pos: pos + size,
                 texcoord: texcoords[2],
                 paint,
+                scissor,
             },
             Vertex {
                 pos: pos + Vec2::new(0.0, size.y),
                 texcoord: texcoords[3],
                 paint,
+                scissor,
             },
         ];
         let i = self.vertices.len() as u16;
@@ -233,8 +256,16 @@ impl Renderer {
         self.indices.extend_from_slice(&indices);
     }
 
+    fn scissor_vec(&self) -> IVec2 {
+        match self.scissor {
+            Some((rect, index)) => glam::ivec2(1, index),
+            None => glam::ivec2(0, 0),
+        }
+    }
+
     /// Prepares to render the current layer, and flushes the command buffer.
     pub fn prepare(&mut self, ortho: Mat4) -> PreparedRender {
+        self.scissor = None;
         let uniforms = Uniforms { ortho };
         let uniform_buffer = self
             .device
@@ -439,7 +470,7 @@ fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGr
             buffers: &[wgpu::VertexBufferLayout {
                 array_stride: size_of::<Vertex>() as _,
                 step_mode: wgpu::InputStepMode::Vertex,
-                attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Sint32x2],
+                attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Sint32x2, 3 => Sint32x2],
             }],
         },
         primitive: wgpu::PrimitiveState {

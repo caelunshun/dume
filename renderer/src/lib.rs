@@ -16,6 +16,7 @@ pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSr
 pub const SAMPLE_COUNT: u32 = 8;
 
 pub use canvas::{Canvas, SpriteData, SpriteDescriptor};
+pub use rect::Rect;
 pub use sprite::SpriteId;
 pub use text::{
     layout::{Align, Baseline, Paragraph, TextLayout},

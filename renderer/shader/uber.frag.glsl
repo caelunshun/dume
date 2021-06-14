@@ -1,8 +1,11 @@
 #version 450
 
+// All color inputs are in linear RGB. No sRGB.
+
 layout (location = 0) in vec2 f_TexCoord;
 layout (location = 1) flat in ivec2 f_Paint;
 layout (location = 2) in vec2 f_WorldPos;
+layout (location = 3) flat in ivec2 f_ScissorRect;
 
 // Shader constants stored in the `shader.x` vertex attribute.
 #define PAINT_SOLID 0
@@ -21,16 +24,18 @@ layout (set = 0, binding = 5) buffer Colors {
 
 layout (location = 0) out vec4 o_Color;
 
-// Converts a color from sRGB gamma to linear light gamma
-vec3 toLinear(vec3 sRGB) {
-    bvec3 cutoff = lessThan(sRGB, vec3(0.04045));
-    vec3 higher = pow((sRGB + vec3(0.055))/vec3(1.055), vec3(2.4));
-    vec3 lower = sRGB/vec3(12.92);
-
-    return mix(higher, lower, cutoff);
-}
-
 void main() {
+    if (f_ScissorRect.x == 1) {
+        vec4 encodedRect = colors[f_ScissorRect.y];
+        vec2 rectPos = encodedRect.xy;
+        vec2 rectSize = encodedRect.zw;
+
+        if (f_WorldPos.x < rectPos.x || f_WorldPos.y < rectPos.y
+            || f_WorldPos.x > rectPos.x + rectSize.x || f_WorldPos.y > rectPos.y + rectSize.y) {
+                discard;
+        }
+    }
+
     int paintType = f_Paint.x;
     int colorIndex = f_Paint.y;
     if (paintType == PAINT_SOLID) {

@@ -7,6 +7,7 @@ use palette::Srgba;
 use crate::{
     glyph::GlyphKey,
     path::{Path, PathSegment, TesselateKind},
+    rect::Rect,
     renderer::Renderer,
     text::layout::GlyphCharacter,
     Paragraph, SpriteId, Text, TextLayout,
@@ -210,6 +211,16 @@ impl Canvas {
         let path = (path, kind);
         self.renderer.record_path(&path, self.paint);
         self.current_path = path.0;
+    }
+
+    pub fn scissor_rect(&mut self, rect: Rect) -> &mut Self {
+        self.renderer.set_scissor(rect);
+        self
+    }
+
+    pub fn clear_scissor(&mut self) -> &mut Self {
+        self.renderer.clear_scissor();
+        self
     }
 
     pub fn render(

@@ -1,7 +1,7 @@
 use std::{fs, iter, sync::Arc};
 
 use dume_renderer::{
-    markup, Align, Baseline, Canvas, SpriteData, SpriteDescriptor, TextLayout, TextStyle,
+    markup, Align, Baseline, Canvas, Rect, SpriteData, SpriteDescriptor, TextLayout, TextStyle,
     SAMPLE_COUNT, TARGET_FORMAT,
 };
 use glam::{vec2, Vec2};
@@ -119,6 +119,23 @@ fn main() {
         },
     );
 
+    let text2 = markup::parse(
+        "@size{30}{Some text that will\nbe cut out....}",
+        TextStyle::default(),
+        |_| String::new(),
+    )
+    .unwrap();
+    let paragraph2 = canvas.create_paragraph(
+        text2,
+        TextLayout {
+            max_dimensions: vec2(600.0, 400.0),
+            line_breaks: true,
+            baseline: Baseline::Top,
+            align_h: Align::Start,
+            align_v: Align::Start,
+        },
+    );
+
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
 
@@ -138,6 +155,14 @@ fn main() {
                 }
 
                 canvas.draw_paragraph(vec2(200.0, 200.0), &paragraph);
+
+                canvas
+                    .scissor_rect(Rect {
+                        pos: vec2(230.0, 230.0),
+                        size: vec2(300.0, 65.0),
+                    })
+                    .draw_paragraph(vec2(230.0, 230.0), &paragraph2)
+                    .clear_scissor();
 
                 canvas
                     .begin_path()
