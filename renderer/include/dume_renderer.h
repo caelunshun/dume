@@ -96,6 +96,8 @@ void dume_draw_sprite(DumeCtx *ctx, Vec2 pos, float width, uint64_t sprite);
 
 void dume_fill(DumeCtx *ctx);
 
+void dume_free(DumeCtx *ctx);
+
 uint64_t dume_get_sprite_by_name(DumeCtx *ctx, const uint8_t *name, size_t name_len);
 
 DumeCtx *dume_init(uint32_t width, uint32_t height, RawWindow window);

@@ -33,6 +33,10 @@ namespace dume {
             });
         }
 
+        ~Canvas() {
+            dume_free(ctx);
+        }
+
         void resize(uint32_t newWidth, uint32_t newHeight) {
             dume_resize(ctx, newWidth, newHeight);
         }

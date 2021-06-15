@@ -357,6 +357,11 @@ pub unsafe extern "C" fn dume_render(ctx: *mut DumeCtx) {
     ctx.queue.submit(std::iter::once(encoder.finish()));
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn dume_free(ctx: *mut DumeCtx) {
+    drop(Box::from_raw(ctx));
+}
+
 fn create_sample_texture(
     device: &wgpu::Device,
     sc_desc: &wgpu::SwapChainDescriptor,
