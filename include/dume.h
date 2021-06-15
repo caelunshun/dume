@@ -11,8 +11,11 @@
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <array>
+#include <sol/sol.hpp>
 
 namespace dume {
+    void makeLuaBindings(sol::state &lua);
+
     static Variable resolveDefaultVariable(void *userdata, const uint8_t *name, size_t len) {
         return Variable{.value = nullptr, .len=0};
     }
@@ -43,6 +46,10 @@ namespace dume {
             return dume_create_sprite_from_rgba(ctx, reinterpret_cast<const uint8_t *>(name.data()), name.size(),
                                                    data, dataSize,
                                                    width, height);
+        }
+
+        uint64_t getSpriteByName(const std::string &name) {
+            return dume_get_sprite_by_name(ctx, reinterpret_cast<const uint8_t *>(name.data()), name.size());
         }
 
         void loadFont(std::string fontData) {

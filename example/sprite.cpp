@@ -1,6 +1,7 @@
 #include <dume.h>
 #include <vector>
 #include <fstream>
+#include <iostream>
 
 std::string loadFile(const std::string &path) {
     std::ifstream t(path);
@@ -13,7 +14,8 @@ int main() {
     glfwInit();
     auto *window = glfwCreateWindow(1920 / 2, 1080 / 2, "Dume", nullptr, nullptr);
 
-    dume::Canvas canvas(window);
+    auto canvas = std::make_shared<dume::Canvas>(window);
+
 
     std::vector<uint8_t> rgba(128 * 128 * 4);
     for (int x = 0; x < 128; x++) {
@@ -24,40 +26,24 @@ int main() {
             rgba[(x + y * 128) * 4 + 3] = 255;
         }
     }
-    auto sprite = canvas.createSpriteFromRGBA("sprite", rgba.data(), rgba.size(), 128, 128);
+    canvas->createSpriteFromRGBA("sprite", rgba.data(), rgba.size(), 128, 128);
 
-    canvas.loadFont(loadFile("/home/caelum/Downloads/Merriweather-Regular.ttf"));
-    canvas.loadFont(loadFile("/home/caelum/Downloads/Merriweather-Italic.ttf"));
-    canvas.loadFont(loadFile("/home/caelum/Downloads/Merriweather-Bold.ttf"));
-    canvas.loadFont(loadFile("/home/caelum/Downloads/Merriweather-BoldItalic.ttf"));
+    canvas->loadFont(loadFile("/home/caelum/Downloads/Merriweather-Regular.ttf"));
+    canvas->loadFont(loadFile("/home/caelum/Downloads/Merriweather-Italic.ttf"));
+    canvas->loadFont(loadFile("/home/caelum/Downloads/Merriweather-Bold.ttf"));
+    canvas->loadFont(loadFile("/home/caelum/Downloads/Merriweather-BoldItalic.ttf"));
 
-    auto text = canvas.parseTextMarkupDefault("@size{30}{I am @bold{Dume}. @italic{I am the Bendu.}}");
-    auto paragraph = canvas.createParagraph(text, TextLayout {
-            .max_dimensions = Vec2 {
-                    .x = 1920 / 2,
-                    .y = 1080 / 2,
-            },
-            .line_breaks = true,
-            .baseline = Baseline::Top,
-         .align_h = Align::Center,
-         .align_v = Align::Center,
-    });
+    sol::state lua;
+    dume::makeLuaBindings(lua);
+    lua["cv"] = canvas;
+    lua.script(loadFile("example/draw.lua"));
+
+    sol::function drawFunction = lua["draw"];
 
     while (!glfwWindowShouldClose(window)) {
-        canvas.drawSprite(sprite, 30, 30, 600);
+        drawFunction.call<void>();
 
-        canvas.beginPath();
-        canvas.moveTo(0, 0);
-        canvas.lineTo(450, 450);
-        canvas.quadTo(500, 200, 600, 300);
-        uint8_t colorA[4] = {96, 45, 226, 255};
-        uint8_t colorB[4] = {255, 255, 255, 255};
-        canvas.linearGradient(0, 0, 1920 / 2, 1080 / 2, &colorA, &colorB);
-        canvas.fill();
-
-        canvas.drawParagraph(paragraph, 0, 0);
-
-        canvas.render();
+        canvas->render();
         glfwPollEvents();
     }
 

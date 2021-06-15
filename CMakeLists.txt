@@ -3,6 +3,11 @@ project(dume)
 
 set(SOURCES src/dume.cpp)
 
+set(CMAKE_CXX_STANDARD 20)
+
+include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+conan_basic_setup()
+
 include(FetchContent)
 
 FetchContent_Declare(
@@ -19,7 +24,7 @@ find_package(glfw3 REQUIRED)
 
 add_library(dume ${SOURCES})
 target_include_directories(dume PUBLIC include/ renderer/include/)
-target_link_libraries(dume PUBLIC glfw dume-renderer)
+target_link_libraries(dume PUBLIC glfw dume-renderer ${CONAN_LIBS})
 
 add_executable(dume_example example/sprite.cpp)
 target_link_libraries(dume_example dume)

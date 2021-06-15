@@ -54,8 +54,8 @@ dume.Align = Align
 
 local Baseline = {
     Top = 0,
-    Alphabetic = 1,
-    Middle = 2,
+    Middle = 1,
+    Alphabetic = 2,
     Bottom = 3,
 }
 dume.Baseline = Baseline
