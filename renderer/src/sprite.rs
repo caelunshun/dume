@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use ahash::AHashMap;
+use glam::UVec2;
 use guillotiere::Allocation;
-use slotmap::SlotMap;
+use slotmap::{SecondaryMap, SlotMap};
 
 use crate::atlas::TextureAtlas;
 
@@ -17,6 +18,7 @@ pub struct Sprites {
     atlas: TextureAtlas,
     allocations: SlotMap<SpriteId, Allocation>,
     by_name: AHashMap<String, SpriteId>,
+    sizes: SecondaryMap<SpriteId, UVec2>,
 }
 
 impl Sprites {
@@ -30,6 +32,7 @@ impl Sprites {
             ),
             allocations: SlotMap::default(),
             by_name: AHashMap::new(),
+            sizes: SecondaryMap::default(),
         }
     }
 
@@ -53,6 +56,7 @@ impl Sprites {
         let sprite_id = self.allocations.insert(allocation);
 
         self.by_name.insert(name, sprite_id);
+        self.sizes.insert(sprite_id, glam::uvec2(width, height));
 
         sprite_id
     }
@@ -83,5 +87,9 @@ impl Sprites {
     /// Gets the sprite texture atlas.
     pub fn atlas(&self) -> &TextureAtlas {
         &self.atlas
+    }
+
+    pub fn sprite_size(&self, id: SpriteId) -> UVec2 {
+        self.sizes[id]
     }
 }

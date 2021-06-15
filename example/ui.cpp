@@ -27,6 +27,8 @@ int main() {
     }
     canvas->createSpriteFromRGBA("gradient", rgba.data(), rgba.size(), 128, 128);
 
+    canvas->createSpriteFromEncoded("smoke", loadFile("/home/caelum/Pictures/volume1.png"));
+
     canvas->loadFont(loadFile("/home/caelum/Downloads/Merriweather-Regular.ttf"));
     canvas->loadFont(loadFile("/home/caelum/Downloads/Merriweather-Italic.ttf"));
     canvas->loadFont(loadFile("/home/caelum/Downloads/Merriweather-Bold.ttf"));

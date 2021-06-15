@@ -144,6 +144,10 @@ namespace dume {
             dume_reset_transform(ctx);
         }
 
+        Vec2 getSpriteSize(uint64_t id) {
+            return dume_get_sprite_size(ctx, id);
+        }
+
         void render() {
             dume_render(ctx);
         }

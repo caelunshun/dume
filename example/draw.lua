@@ -5,6 +5,7 @@ local Vector = require("brinevector")
 local Text = require("widget/text")
 local Flex = require("widget/flex")
 local Container = require("widget/container")
+local Image = require("widget/image")
 
 local ui = dume.UI:new(cv)
 
@@ -33,6 +34,7 @@ local root = Flex:column()
 root:addFlexChild(text1, 1)
 root:addFlexChild(text2, 1)
 root:addFlexChild(Container:new(nested), 1)
+root:addFixedChild(Image:new("smoke", 600))
 
 ui:createWindow("main", Vector(0, 0), Vector(1920 / 2, 1080 / 2), root)
 

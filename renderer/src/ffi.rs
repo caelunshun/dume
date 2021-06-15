@@ -169,6 +169,15 @@ pub unsafe extern "C" fn dume_get_sprite_by_name(
         .unwrap_or(0)
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn dume_get_sprite_size(ctx: *mut DumeCtx, sprite: u64) -> Vec2 {
+    let size = canvas(ctx)
+        .renderer
+        .sprites()
+        .sprite_size(SpriteId::from(KeyData::from_ffi(sprite)));
+    Vec2::new(size.x as f32, size.y as f32)
+}
+
 #[repr(C)]
 pub struct Variable {
     pub value: *const u8,

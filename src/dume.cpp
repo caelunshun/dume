@@ -87,5 +87,11 @@ namespace dume {
         canvas_type["scale"] = &Canvas::scale;
 
         canvas_type["resetTransform"] = &Canvas::resetTransform;
+
+        canvas_type["getSpriteSize"] = [](Canvas &self, const std::string sprite, sol::table target) {
+            auto size = self.getSpriteSize(self.getSpriteByName(sprite));
+            target["x"] = size.x;
+            target["y"] = size.y;
+        };
     }
 }

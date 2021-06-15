@@ -45,7 +45,7 @@ pub struct Canvas {
     device: Arc<wgpu::Device>,
     queue: Arc<wgpu::Queue>,
 
-    renderer: Renderer,
+   pub(crate) renderer: Renderer,
 
     fonts: Database,
 
