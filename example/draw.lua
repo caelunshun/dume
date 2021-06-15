@@ -20,8 +20,8 @@ local text1 = Text:new("@size{30}{I am @bold{Dume}. @icon{gradient} I am the @it
 
 local text2 = Text:new("@size{14}{@italic{Q.E.D.}}", {})
 
-local text3 = Text:new("I have spoken.")
-local text4 = Text:new("@size{20}{@color{rgb(255,40,40)}{ I am you.}}")
+local text3 = Text:new("I have spoken.", {}, {baseline = dume.Baseline.Bottom})
+local text4 = Text:new("@size{20}{@color{rgb(255,40,40)}{ I am you.}}", {}, {baseline = dume.Baseline.Bottom})
 
 local nested = Flex:row()
 nested:setMainAlign(dume.Align.Center)

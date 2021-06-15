@@ -5,7 +5,7 @@ authors = ["caelunshun <caelunshun@gmail.com>"]
 edition = "2018"
 
 [lib]
-crate-type = ["rlib", "cdylib"]
+crate-type = ["rlib", "staticlib"]
 
 [dependencies]
 ahash = "0.7"
