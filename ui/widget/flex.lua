@@ -27,13 +27,13 @@ function Flex:new(mainAxis)
     return o
 end
 
-function Flex:mainAlign(mainAlign)
-    self.params.mainAlign = mainAlign
+function Flex:setMainAlign(mainAlign)
+    self.mainAlign = mainAlign
     return self
 end
 
-function Flex:crossAlign(crossAlign)
-    self.params.crossAlign = crossAlign
+function Flex:setCrossAlign(crossAlign)
+    self.crossAlign = crossAlign
     return self
 end
 
@@ -86,6 +86,26 @@ function Flex:layout(maxSize, cv)
             widget.pos = Vector(0, 0)
             widget.pos[self.mainAxis] = cursor
             cursor = cursor + widget.size[self.mainAxis]
+        end
+    end
+
+    -- Apply non-left alignment.
+    local totalSize = cursor
+    for _, widget in ipairs(self.children) do
+        if self.mainAlign == dume.Align.End then
+            local start = maxSize[self.mainAxis] - totalSize
+            widget.pos[self.mainAxis] = widget.pos[self.mainAxis] + start
+        elseif self.mainAlign == dume.Align.Center then
+            local mid = maxSize[self.mainAxis] / 2
+            local remapped = widget.pos[self.mainAxis] - totalSize / 2
+            widget.pos[self.mainAxis] = remapped + mid
+        end
+
+        if self.crossAlign == dume.Align.End then
+            widget.pos[self.crossAxis] = maxSize.y - widget.size[self.crossAxis]
+        elseif self.crossAlign == dume.Align.Center then
+            local mid = maxSize[self.crossAxis] / 2
+            widget.pos[self.crossAxis] = mid - widget.size[self.crossAxis] / 2
         end
     end
 
