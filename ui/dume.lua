@@ -156,7 +156,9 @@ function UI:inflate(widget, parent)
     end
 
     -- Initialize widget and inflate children
-    widget:init(self.cv)
+    if widget.init ~= nil then
+        widget:init(self.cv)
+    end
     for _, child in ipairs(widget.children) do
         self:inflate(child, widget)
     end

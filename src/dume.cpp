@@ -79,5 +79,13 @@ namespace dume {
         canvas_type["getParagraphHeight"] = [](Canvas &self, sol::light<Paragraph> p) {
             return self.getParagraphHeight(p);
         };
+
+        canvas_type["translate"] = [](Canvas &self, sol::table vector) {
+            self.translate(vector["x"], vector["y"]);
+        };
+
+        canvas_type["scale"] = &Canvas::scale;
+
+        canvas_type["resetTransform"] = &Canvas::resetTransform;
     }
 }

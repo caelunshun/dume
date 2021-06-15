@@ -128,6 +128,18 @@ namespace dume {
             return dume_paragraph_height(paragraph);
         }
 
+        void translate(float x, float y) {
+            dume_translate(ctx, Vec2 { .x = x, .y = y });
+        }
+
+        void scale(float scale) {
+            dume_scale(ctx, scale);
+        }
+
+        void resetTransform() {
+            dume_reset_transform(ctx);
+        }
+
         void render() {
             dume_render(ctx);
         }

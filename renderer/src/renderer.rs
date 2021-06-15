@@ -2,7 +2,7 @@ use std::{mem::size_of, sync::Arc};
 
 use bytemuck::{Pod, Zeroable};
 use fontdb::Database;
-use glam::{vec2, IVec2, Mat4, Vec2, Vec4};
+use glam::{vec2, Affine2, IVec2, Mat4, Vec2, Vec4};
 use guillotiere::Allocation;
 use palette::Srgba;
 use wgpu::util::DeviceExt;
@@ -70,6 +70,8 @@ pub struct Renderer {
     colors: Vec<Vec4>,
 
     scissor: Option<(Rect, i32)>,
+
+    pub transform: Affine2,
 }
 
 impl Renderer {
@@ -120,6 +122,7 @@ impl Renderer {
             colors: Vec::new(),
 
             scissor: None,
+            transform: Affine2::IDENTITY,
         }
     }
 
@@ -190,13 +193,16 @@ impl Renderer {
 
         let scissor = self.scissor_vec();
         let Self {
-            indices, vertices, ..
+            indices,
+            vertices,
+            transform,
+            ..
         } = self;
         self.paths.with_tesselated_path(path, |tesselated| {
             let base_vertex = vertices.len() as u16;
             for vertex in &tesselated.vertices {
                 vertices.push(Vertex {
-                    pos: *vertex,
+                    pos: transform.transform_point2(*vertex),
                     texcoord: Vec2::ZERO,
                     paint,
                     scissor,
@@ -224,25 +230,29 @@ impl Renderer {
         let scissor = self.scissor_vec();
         let vertices = [
             Vertex {
-                pos,
+                pos: self.transform.transform_point2(pos),
                 texcoord: texcoords[0],
                 paint,
                 scissor,
             },
             Vertex {
-                pos: pos + Vec2::new(size.x, 0.0),
+                pos: self
+                    .transform
+                    .transform_point2(pos + Vec2::new(size.x, 0.0)),
                 texcoord: texcoords[1],
                 paint,
                 scissor,
             },
             Vertex {
-                pos: pos + size,
+                pos: self.transform.transform_point2(pos + size),
                 texcoord: texcoords[2],
                 paint,
                 scissor,
             },
             Vertex {
-                pos: pos + Vec2::new(0.0, size.y),
+                pos: self
+                    .transform
+                    .transform_point2(pos + Vec2::new(0.0, size.y)),
                 texcoord: texcoords[3],
                 paint,
                 scissor,
@@ -266,6 +276,8 @@ impl Renderer {
     /// Prepares to render the current layer, and flushes the command buffer.
     pub fn prepare(&mut self, ortho: Mat4) -> PreparedRender {
         self.scissor = None;
+        self.transform = Affine2::IDENTITY;
+
         let uniforms = Uniforms { ortho };
         let uniform_buffer = self
             .device

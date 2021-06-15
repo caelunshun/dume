@@ -43,7 +43,7 @@ function Text:layout(maxSize, cv)
 end
 
 function Text:paint(cv)
-    cv:drawParagraph(self.state.paragraph, self.pos)
+    cv:drawParagraph(self.state.paragraph, Vector(0,0))
 end
 
 return Text

@@ -312,6 +312,21 @@ pub unsafe extern "C" fn dume_fill(ctx: *mut DumeCtx) {
     canvas(ctx).fill();
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn dume_translate(ctx: *mut DumeCtx, vector: Vec2) {
+    canvas(ctx).translate(vector);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dume_scale(ctx: *mut DumeCtx, scale: f32) {
+    canvas(ctx).scale(scale);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dume_reset_transform(ctx: *mut DumeCtx) {
+    canvas(ctx).reset_transform();
+}
+
 fn srgba(a: [u8; 4]) -> Srgba<u8> {
     Srgba::new(a[0], a[1], a[2], a[3])
 }

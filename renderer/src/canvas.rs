@@ -1,7 +1,7 @@
 use std::{iter, mem, sync::Arc};
 
 use fontdb::Database;
-use glam::{vec2, Mat4, Vec2};
+use glam::{vec2, Affine2, Mat4, Vec2};
 use palette::Srgba;
 
 use crate::{
@@ -229,6 +229,19 @@ impl Canvas {
     pub fn clear_scissor(&mut self) -> &mut Self {
         self.renderer.clear_scissor();
         self
+    }
+
+    pub fn translate(&mut self, vector: Vec2) {
+        self.renderer.transform.translation += vector;
+    }
+
+    pub fn scale(&mut self, scale: f32) {
+        self.renderer.transform =
+            self.renderer.transform * Affine2::from_scale(glam::vec2(scale, scale));
+    }
+
+    pub fn reset_transform(&mut self) {
+        self.renderer.transform = Affine2::IDENTITY;
     }
 
     pub fn render(

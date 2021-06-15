@@ -129,7 +129,11 @@ void dume_quad_to(DumeCtx *ctx, Vec2 control, Vec2 pos);
 
 void dume_render(DumeCtx *ctx);
 
+void dume_reset_transform(DumeCtx *ctx);
+
 void dume_resize(DumeCtx *ctx, uint32_t new_width, uint32_t new_height);
+
+void dume_scale(DumeCtx *ctx, float scale);
 
 void dume_solid_color(DumeCtx *ctx, const uint8_t (*color)[4]);
 
@@ -138,5 +142,7 @@ void dume_stroke(DumeCtx *ctx);
 void dume_stroke_width(DumeCtx *ctx, float width);
 
 void dume_text_free(Text *text);
+
+void dume_translate(DumeCtx *ctx, Vec2 vector);
 
 } // extern "C"

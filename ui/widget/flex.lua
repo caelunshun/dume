@@ -16,12 +16,10 @@ end
 
 function Flex:new(mainAxis)
     local o = {
-        params = {
-            mainAxis = mainAxis,
-            crossAxis = dume.cross(mainAxis),
-            mainAlign = dume.Align.Start,
-            crossAlign = dume.Align.Start
-        },
+        mainAxis = mainAxis,
+        crossAxis = dume.cross(mainAxis),
+        mainAlign = dume.Align.Start,
+        crossAlign = dume.Align.Start,
         children = {}
     }
     setmetatable(o, self)
@@ -55,14 +53,14 @@ function Flex:addFlexChild(child, flexAmount)
     child.flexAmount = flexAmount
 end
 
-function Flex:layout(maxSize)
+function Flex:layout(maxSize, cv)
     -- Compute available space for flex widgets,
     -- as well as the sum of flexAmounts.
     local flexSpace = maxSize[self.mainAxis]
     local flexAmountSum = 0
     for _, widget in ipairs(self.children) do
         if not widget.isFlex then
-            widget:layout(maxSize)
+            widget:layout(maxSize, cv)
             flexSpace = flexSpace - widget.size[self.mainAxis]
         else
             flexAmountSum = flexAmountSum + widget.flexAmount
@@ -73,13 +71,13 @@ function Flex:layout(maxSize)
     local cursor = 0
     for _, widget in ipairs(self.children) do
         if widget.isFlex then
-            local mainAxisSpace = widget.flexAmount / flexAmount * flexSpace
+            local mainAxisSpace = widget.flexAmount / flexAmountSum * flexSpace
 
             local maxWidgetSize = Vector(0, 0)
             maxWidgetSize[self.mainAxis] = mainAxisSpace
             maxWidgetSize[self.crossAxis] = maxSize[self.crossAxis]
 
-            widget:layout(maxWidgetSize)
+            widget:layout(maxWidgetSize, cv)
             widget.pos = Vector(0, 0)
             widget.pos[self.mainAxis] = cursor
 
@@ -91,7 +89,7 @@ function Flex:layout(maxSize)
         end
     end
 
-    self.bounds.size = maxSize
+    self.size = maxSize
 end
 
 return Flex
