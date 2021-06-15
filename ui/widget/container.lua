@@ -15,7 +15,7 @@ end
 
 function Container:paint(cv)
     cv:beginPath()
-    cv:rect(Vector(0, 0), self.size)
+    cv:roundedRect(Vector(0, 0), self.size, self.style.borderRadius or 0)
     if self.style.backgroundColor then
         cv:solidColor(self.style.backgroundColor)
         cv:fill()

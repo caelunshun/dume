@@ -181,4 +181,26 @@ function Canvas:rect(pos, size)
     self:lineTo(pos)
 end
 
+function Canvas:roundedRect(pos, size, radius)
+    if radius < 0.1 then
+        self:rect(pos, size)
+    end
+
+    local offsetX = Vector(radius, 0)
+    local offsetY = Vector(0, radius)
+
+    local sizeX = Vector(size.x, 0)
+    local sizeY = Vector(0, size.y)
+
+    self:moveTo(pos + offsetX)
+    self:lineTo(pos + sizeX - offsetX)
+    self:quadTo(pos + sizeX, pos + sizeX + offsetY)
+    self:lineTo(pos + size - offsetY)
+    self:quadTo(pos + size, pos + size - offsetX)
+    self:lineTo(pos + sizeY + offsetX)
+    self:quadTo(pos + sizeY, pos + sizeY - offsetY)
+    self:lineTo(pos + offsetY)
+    self:quadTo(pos, pos + offsetX)
+end
+
 return dume

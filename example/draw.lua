@@ -13,6 +13,7 @@ ui.style = {
     backgroundColor = dume.rgb(30, 30, 30),
     borderWidth = 2,
     borderColor = dume.rgb(80, 80, 80),
+    borderRadius = 5
 }
 
 local text1 = Text:new("@size{30}{I am @bold{Dume}. @icon{gradient} I am the @italic{%bendu}.}", { bendu = "Bendu" })
