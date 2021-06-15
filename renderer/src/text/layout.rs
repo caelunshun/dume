@@ -152,7 +152,7 @@ impl Paragraph {
     pub fn width(&self) -> f32 {
         self.glyphs
             .iter()
-            .map(|glyph| glyph.pos.x as u32)
+            .map(|glyph| (glyph.pos.x + glyph.advance.x) as u32)
             .max()
             .unwrap_or_default() as f32
     }
@@ -161,7 +161,7 @@ impl Paragraph {
     pub fn height(&self) -> f32 {
         self.glyphs
             .iter()
-            .map(|glyph| glyph.pos.y as u32)
+            .map(|glyph| (glyph.pos.y + glyph.bbox.size.y) as u32)
             .max()
             .unwrap_or_default() as f32
     }

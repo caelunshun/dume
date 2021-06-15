@@ -149,7 +149,7 @@ function UI:inflate(widget, parent)
         parentStyle = self.style
     end
 
-    for k, v in ipairs(parentStyle) do
+    for k, v in pairs(parentStyle) do
         if widget.style[k] == nil then
             widget.style[k] = v
         end
@@ -168,12 +168,7 @@ dume.UI = UI
 
 function dume.rgb(r, g, b, a)
     a = a or 255
-    return {
-        r = r,
-        g = g,
-        b = b,
-        a = a,
-    }
+    return { r, g, b, a }
 end
 
 -- Canvas extension methods for drawing high-level primitives.

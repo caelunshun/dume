@@ -41,12 +41,12 @@ namespace dume {
         canvas_type["stroke"] = &Canvas::stroke;
         canvas_type["fill"] = &Canvas::fill;
         canvas_type["solidColor"] = [](Canvas &self, sol::table color) {
-            uint8_t col[4] = {color[0], color[1], color[2], color[3]};
+            uint8_t col[4] = {color[1], color[2], color[3], color[4]};
             self.solidColor(&col);
         };
         canvas_type["linearGradient"] = [](Canvas &self, sol::table pointA, sol::table pointB, sol::table colorA, sol::table colorB) {
-            uint8_t colA[4] = {colorA[0], colorA[1], colorA[2], colorA[3]};
-            uint8_t colB[4] = {colorB[0], colorB[1], colorB[2], colorB[3]};
+            uint8_t colA[4] = {colorA[1], colorA[2], colorA[3], colorA[4]};
+            uint8_t colB[4] = {colorB[1], colorB[2], colorB[3], colorB[4]};
             self.linearGradient(pointA["x"], pointA["y"], pointB["x"], pointB["y"], &colA, &colB);
         };
 
