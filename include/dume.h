@@ -148,6 +148,14 @@ namespace dume {
             return dume_get_sprite_size(ctx, id);
         }
 
+        uint32_t getWidth() {
+            return dume_get_width(ctx);
+        }
+
+        uint32_t getHeight() {
+            return dume_get_height(ctx);
+        }
+
         void render() {
             dume_render(ctx);
         }

@@ -93,5 +93,8 @@ namespace dume {
             target["x"] = size.x;
             target["y"] = size.y;
         };
+
+        canvas_type["getWidth"] = &Canvas::getWidth;
+        canvas_type["getHeight"] = &Canvas::getHeight;
     }
 }

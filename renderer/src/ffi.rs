@@ -178,6 +178,16 @@ pub unsafe extern "C" fn dume_get_sprite_size(ctx: *mut DumeCtx, sprite: u64) ->
     Vec2::new(size.x as f32, size.y as f32)
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn dume_get_width(ctx: *mut DumeCtx) -> u32 {
+    unpointer(ctx).swap_chain_desc.width
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dume_get_height(ctx: *mut DumeCtx) -> u32 {
+    unpointer(ctx).swap_chain_desc.height
+}
+
 #[repr(C)]
 pub struct Variable {
     pub value: *const u8,
