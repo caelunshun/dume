@@ -242,6 +242,16 @@ pub unsafe extern "C" fn dume_draw_paragraph(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn dume_paragraph_width(p: *const Paragraph) -> f32 {
+    (&*p).width()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dume_paragraph_height(p: *const Paragraph) -> f32 {
+    (&*p).height()
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn dume_stroke_width(ctx: *mut DumeCtx, width: f32) {
     canvas(ctx).stroke_width(width);
 }

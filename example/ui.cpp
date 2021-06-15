@@ -16,7 +16,6 @@ int main() {
 
     auto canvas = std::make_shared<dume::Canvas>(window);
 
-
     std::vector<uint8_t> rgba(128 * 128 * 4);
     for (int x = 0; x < 128; x++) {
         for (int y = 0; y < 128; y++) {
@@ -26,7 +25,7 @@ int main() {
             rgba[(x + y * 128) * 4 + 3] = 255;
         }
     }
-    canvas->createSpriteFromRGBA("sprite", rgba.data(), rgba.size(), 128, 128);
+    canvas->createSpriteFromRGBA("gradient", rgba.data(), rgba.size(), 128, 128);
 
     canvas->loadFont(loadFile("/home/caelum/Downloads/Merriweather-Regular.ttf"));
     canvas->loadFont(loadFile("/home/caelum/Downloads/Merriweather-Italic.ttf"));
@@ -34,6 +33,7 @@ int main() {
     canvas->loadFont(loadFile("/home/caelum/Downloads/Merriweather-BoldItalic.ttf"));
 
     sol::state lua;
+    lua.open_libraries(sol::lib::base, sol::lib::package, sol::lib::string, sol::lib::math, sol::lib::table);
     dume::makeLuaBindings(lua);
     lua["cv"] = canvas;
     lua.script(loadFile("example/draw.lua"));

@@ -147,6 +147,24 @@ impl Paragraph {
     pub fn lines(&self) -> &[LineMetrics] {
         &self.lines
     }
+
+    /// Gets the width of the paragraph.
+    pub fn width(&self) -> f32 {
+        self.glyphs
+            .iter()
+            .map(|glyph| glyph.pos.x as u32)
+            .max()
+            .unwrap_or_default() as f32
+    }
+
+    /// Gets the height of the paragraph.
+    pub fn height(&self) -> f32 {
+        self.glyphs
+            .iter()
+            .map(|glyph| glyph.pos.y as u32)
+            .max()
+            .unwrap_or_default() as f32
+    }
 }
 
 /// Shapes a text without calculating line breaks.

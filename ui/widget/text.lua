@@ -24,7 +24,8 @@ function Text:new(markup, variables, layout)
             markup = markup,
             variables = variables,
             layout = layout
-        }
+        },
+        state = {}
     }
     setmetatable(o, self)
     self.__index = self
@@ -32,17 +33,17 @@ function Text:new(markup, variables, layout)
 end
 
 function Text:init(cv)
-    self.state.text = cv:createTextFromMarkup(self.params.markup, self.params.variables)
+    self.state.text = cv:parseTextMarkup(self.params.markup, self.params.variables)
     self.state.paragraph = cv:createParagraph(self.state.text, self.params.layout)
 end
 
-function Text:layout(maxSize)
-    self.state.paragraph:updateMaxSize(maxSize)
-    self.size = Vector(self.state.paragraph:width(), self.state.paragraph:height())
+function Text:layout(maxSize, cv)
+    cv:resizeParagraph(self.state.paragraph, maxSize)
+    self.size = Vector(cv:getParagraphWidth(self.state.paragraph), cv:getParagraphHeight(self.state.paragraph))
 end
 
 function Text:paint(cv)
-    cv:drawParagraph(self.pos, self.state.paragraph)
+    cv:drawParagraph(self.state.paragraph, self.pos)
 end
 
 return Text

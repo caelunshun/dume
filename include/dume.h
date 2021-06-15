@@ -116,6 +116,18 @@ namespace dume {
             dume_fill(ctx);
         }
 
+        void resizeParagraph(Paragraph *paragraph, float newWidth, float newHeight) {
+            dume_paragraph_resize(ctx, paragraph, Vec2 { .x = newWidth, .y = newHeight });
+        }
+
+        float getParagraphWidth(const Paragraph *paragraph) {
+            return dume_paragraph_width(paragraph);
+        }
+
+        float getParagraphHeight(const Paragraph *paragraph) {
+            return dume_paragraph_height(paragraph);
+        }
+
         void render() {
             dume_render(ctx);
         }

@@ -68,5 +68,16 @@ namespace dume {
         canvas_type["drawParagraph"] = [](Canvas &self, sol::light<Paragraph> paragraph, sol::table pos) {
             self.drawParagraph(paragraph, pos["x"], pos["y"]);
         };
+
+        canvas_type["resizeParagraph"] = [](Canvas &self, sol::light<Paragraph> paragraph, sol::table newSize) {
+            self.resizeParagraph(paragraph, newSize["x"], newSize["y"]);
+        };
+
+        canvas_type["getParagraphWidth"] = [](Canvas &self, sol::light<Paragraph> p) {
+            return self.getParagraphWidth(p);
+        };
+        canvas_type["getParagraphHeight"] = [](Canvas &self, sol::light<Paragraph> p) {
+            return self.getParagraphHeight(p);
+        };
     }
 }

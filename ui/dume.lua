@@ -85,11 +85,12 @@ end
 function UI:createWindow(name, pos, size, rootWidget)
     self:inflate(rootWidget)
 
-    self.windows[name] = {
+    table.insert(self.windows, {
+        name = name,
         pos = pos,
         size = size,
         rootWidget = rootWidget,
-    }
+    })
 end
 
 function UI:deleteWindow(name)
@@ -115,9 +116,7 @@ function UI:paintWidgets()
 end
 
 function UI:inflate(widget, parent)
-    self.widgets[#self.widgets + 1] = widget
-
-    window.children = window.children or {}
+    widget.children = widget.children or {}
 
     -- Set default methods
     widget.paintChildren = function(self, cv)
@@ -173,6 +172,16 @@ function dume.rgb(r, g, b, a)
         b = b,
         a = a,
     }
+end
+
+-- Canvas extension methods for drawing high-level primitives.
+
+function Canvas:rect(pos, size)
+    self:moveTo(pos)
+    self:lineTo(pos + Vector(size.x, 0))
+    self:lineTo(pos + size)
+    self:lineTo(pos + Vector(0, size.y))
+    self:lineTo(pos)
 end
 
 return dume

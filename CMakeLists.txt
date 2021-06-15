@@ -26,5 +26,5 @@ add_library(dume ${SOURCES})
 target_include_directories(dume PUBLIC include/ renderer/include/)
 target_link_libraries(dume PUBLIC glfw dume-renderer ${CONAN_LIBS})
 
-add_executable(dume_example example/sprite.cpp)
+add_executable(dume_example example/ui.cpp)
 target_link_libraries(dume_example dume)

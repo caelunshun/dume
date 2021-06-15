@@ -114,7 +114,11 @@ void dume_move_to(DumeCtx *ctx, Vec2 pos);
 
 void dume_paragraph_free(Paragraph *paragraph);
 
+float dume_paragraph_height(const Paragraph *p);
+
 void dume_paragraph_resize(DumeCtx *ctx, Paragraph *paragraph, Vec2 new_max_dimensions);
+
+float dume_paragraph_width(const Paragraph *p);
 
 Text *dume_parse_markup(const uint8_t *markup,
                         size_t markup_len,
