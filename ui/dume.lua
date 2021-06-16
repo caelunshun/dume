@@ -20,11 +20,16 @@
 -- paint(cv) - paints the widget to a canvas. should paint children too
 -- layout(maxSize, cv) - lays out the widget's children by setting their `pos` and `size` fields. Should set `self.size`
 -- to the size of the widget.
+-- handleEvent(event, cv) - handles an event.
+--
+-- Widget auto-members:
+-- contains(pos: Vector) -> bool - returns whether the given position is inside the widget's rectangle bounds.
 --
 -- `init` is optional and defaults to a no-op
 -- `paint` is optional and defaults to painting all children.
 -- `layout` is optional and defaults to laying out all children at the
 -- same position as their parent. (Best for single-child or zero-child widgets.)
+-- `handleEvent` is optional and defaults to calling handleEvent on all children.
 --
 -- size - the computed layout size
 -- pos - the computed position relative to the parent
@@ -36,7 +41,27 @@
 -- Widgets should not add more fields; they should keep their state within the `state` table.
 --
 -- In painting and layout, all widgets operate in a coordinate space
--- where their own origin is the origin.
+-- where their position is the origin.
+--
+-- # Events
+-- An event is a table with a `type` field. The type determines
+-- the remaining fields and can have one of the following values:
+-- * "key"
+--    * key: Key
+--    * action: Action
+--    * modifers: Modifiers (table)
+-- * "char"
+--    * char: number (UTF32)
+-- * "cursorMove"
+--   * pos: Vector
+-- * "mouseClick"
+--   * pos: Vector
+--   * mouse: Mouse
+--   * action: Action
+--   * modifiers: Modifiers (table)
+--  * "scroll"
+--    * offset: Vector
+
 
 local dume = {}
 
@@ -65,6 +90,116 @@ local Axis = {
     Vertical = "y",
 }
 dume.Axis = Axis
+
+local EventType = {
+    Key = "key",
+    Char = "char",
+    CursorMove = "cursorMove",
+    MouseClick = "mouseClick",
+    Scroll = "scroll",
+}
+dume.EventType = EventType
+
+local Key = {
+    -- These values intentionally match GLTF keycodes.
+    Space = 32,
+    Apostrophe = 39,
+    Comma = 44,
+    Minus = 45,
+    Period = 46,
+    Slash = 47,
+    N0 = 48,
+    N1 = 49,
+    N2 = 50,
+    N3 = 51,
+    N4 = 52,
+    N5 = 53,
+    N6 = 54,
+    N7 = 55,
+    N8 = 56,
+    N9 = 57,
+    Semicolon = 59,
+    Equal = 61,
+    A = 65,
+    B = 66,
+    C = 67,
+    D = 68,
+    E = 69,
+    F = 70,
+    G = 71,
+    H = 72,
+    I = 73,
+    J = 74,
+    K = 75,
+    L = 76,
+    M = 77,
+    N = 78,
+    O = 79,
+    P = 80,
+    Q = 81,
+    R = 82,
+    S = 83,
+    T = 84,
+    U = 85,
+    V = 86,
+    W = 87,
+    X = 88,
+    Y = 89,
+    Z = 90,
+    LeftBracket = 91,
+    Backslash = 92,
+    RightBracket = 93,
+    Backtick = 96, -- `
+    Escape = 256,
+    Enter = 257,
+    Tab = 258,
+    Backspace = 259,
+    Insert = 260,
+    Delete = 261,
+    Right = 262,
+    Left = 263,
+    Down = 264,
+    Up = 265,
+    PageUp = 266,
+    PageDown = 267,
+    Home =  268,
+    End = 269,
+    CapsLock = 280,
+    ScrollLock = 281,
+    NumLock = 282,
+    PrintScreen = 283,
+    Pause = 284,
+    F1 = 290,
+    F2 = 291,
+    F3 = 292,
+    F4 = 293,
+    F5 = 294,
+    F6 = 295,
+    F7 = 296,
+    F8 = 297,
+    F9 = 298,
+    F10 = 299,
+    F11 = 300,
+    F12 = 301,
+    LShift = 340,
+    LControl = 341,
+    LAlt = 342,
+}
+dume.Key = Key
+
+local Action = {
+    Release = 0,
+    Press = 1,
+    Repeat = 2,
+}
+dume.Action = Action
+
+local Mouse = {
+    Left = 0,
+    Right = 1,
+    Middle = 2,
+}
+dume.Mouse = Mouse
 
 local function cross(axis)
     if axis == Axis.Horizontal then return Axis.Vertical
@@ -97,6 +232,18 @@ function UI:deleteWindow(name)
     self.windows[name] = nil
 end
 
+function UI:handleEvent(event)
+    for _, window in ipairs(self.windows) do
+        if event.pos ~= nil then
+            event.pos = event.pos - window.pos
+        end
+        window.rootWidget:handleEvent(event, self.cv)
+        if event.pos ~= nil then
+            event.pos = event.pos + window.pos
+        end
+    end
+end
+
 function UI:render()
     self:computeWidgetLayouts()
     self:paintWidgets()
@@ -111,7 +258,9 @@ end
 
 function UI:paintWidgets()
     for _, window in ipairs(self.windows) do
+        self.cv:translate(window.pos)
         window.rootWidget:paint(self.cv)
+        self.cv:translate(-window.pos)
     end
 end
 
@@ -119,6 +268,10 @@ function UI:inflate(widget, parent)
     widget.children = widget.children or {}
 
     -- Set default methods
+    widget.contains = function(self, pos)
+        return pos.x >= 0 and pos.y >= 0 and pos.x < self.size.x and pos.y < self.size.y
+    end
+
     widget.paintChildren = function(self, cv)
         for _, child in ipairs(self.children) do
             cv:translate(child.pos)
@@ -132,12 +285,29 @@ function UI:inflate(widget, parent)
     end
 
     widget.layout = widget.layout or function(self, maxSize, cv)
+        local biggestSize = Vector(0, 0)
         for _, child in ipairs(self.children) do
             child:layout(maxSize, cv)
             child.pos = Vector(0, 0)
+
+            if child.size.x > biggestSize.x then biggestSize.x = child.size.x end
+            if child.size.y > biggestSize.y then biggestSize.y = child.size.y end
         end
-        self.size = maxSize
+        self.size = biggestSize
     end
+
+    widget.invokeChildrenEvents = function(self, event, cv)
+        for _, child in ipairs(self.children) do
+            -- Transform event position to child space
+            if event.pos ~= nil then event.pos = event.pos - child.pos end
+
+            child:handleEvent(event, cv)
+
+            if event.pos ~= nil then event.pos = event.pos + child.pos end
+        end
+    end
+
+    widget.handleEvent = widget.handleEvent or widget.invokeChildrenEvents
 
     -- Style inheritance
     widget.style = widget.style or {}

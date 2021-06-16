@@ -8,6 +8,7 @@ use glam::Vec2;
 use palette::Srgba;
 use pollster::block_on;
 use raw_window_handle::{unix::XlibHandle, HasRawWindowHandle, RawWindowHandle};
+use simple_logger::SimpleLogger;
 use slotmap::{Key, KeyData};
 
 use crate::{
@@ -43,6 +44,10 @@ unsafe impl HasRawWindowHandle for RawWindow {
 
 #[no_mangle]
 pub extern "C" fn dume_init(width: u32, height: u32, window: RawWindow) -> *mut DumeCtx {
+    SimpleLogger::new()
+        .with_level(log::LevelFilter::Warn)
+        .init()
+        .unwrap();
     let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
 
     let surface = unsafe { instance.create_surface(&window) };

@@ -12,6 +12,7 @@
 #include <GLFW/glfw3native.h>
 #include <array>
 #include <sol/sol.hpp>
+#include <utility>
 
 namespace dume {
     void makeLuaBindings(sol::state &lua);
@@ -20,11 +21,74 @@ namespace dume {
         return Variable{.value = nullptr, .len=0};
     }
 
+    static std::unique_ptr<sol::function> luaEventCallback;
+    static std::shared_ptr<sol::state> lua;
+
+    static sol::table convertMods(int mods) {
+        bool control = mods & GLFW_MOD_CONTROL;
+        bool alt = mods & GLFW_MOD_ALT;
+        bool shift = mods & GLFW_MOD_SHIFT;
+
+        return lua->create_table_with("control", control, "alt", alt, "shift", shift);
+    }
+
+    static void invokeEvent(sol::table event) {
+        luaEventCallback->call<void>(event);
+    }
+
+    static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+        auto table = lua->create_table_with(
+                    "type", "key",
+                    "action", action,
+                    "key", key,
+                    "modifiers", convertMods(mods)
+                );
+        invokeEvent(table);
+    }
+
+    static void charCallback(GLFWwindow* window, unsigned int codepoint) {
+        auto table = lua->create_table_with(
+                "type", "char",
+                "char", codepoint
+                );
+        invokeEvent(table);
+    }
+
+    static void cursorPositionCallback(GLFWwindow* window, double xpos, double ypos) {
+        auto table = lua->create_table_with(
+                "type", "cursorMove",
+                "pos", lua->create_table_with("x", xpos, "y", ypos)
+                );
+        invokeEvent(table);
+    }
+
+    static void mousePressCallback(GLFWwindow* window, int mouse, int action, int mods) {
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
+        auto table = lua->create_table_with(
+                "type", "mouseClick",
+                "mouse", mouse,
+                "action", action,
+                "modifiers", convertMods(mods),
+                "pos", lua->create_table_with("x", xpos, "y", ypos)
+                );
+        invokeEvent(table);
+    }
+
+    static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
+        auto table = lua->create_table_with(
+                "type", "scroll",
+                "offset", lua->create_table_with("x", xoffset, "y", yoffset)
+                );
+        invokeEvent(table);
+    }
+
     class Canvas {
         DumeCtx *ctx;
+        GLFWwindow *window;
 
     public:
-        explicit Canvas(GLFWwindow *window) {
+        explicit Canvas(GLFWwindow *window) : window(window) {
             int width, height;
             glfwGetWindowSize(window, &width, &height);
             ctx = dume_init(width, height, RawWindow {
@@ -35,6 +99,7 @@ namespace dume {
 
         ~Canvas() {
             dume_free(ctx);
+            glfwTerminate();
         }
 
         void resize(uint32_t newWidth, uint32_t newHeight) {
@@ -154,6 +219,17 @@ namespace dume {
 
         uint32_t getHeight() {
             return dume_get_height(ctx);
+        }
+
+        void setGlfwCallbacks(std::shared_ptr<sol::state> lua_, sol::function callback) {
+            luaEventCallback = std::make_unique<sol::function>(callback);
+            lua = std::move(lua_);
+
+            glfwSetScrollCallback(window, scrollCallback);
+            glfwSetKeyCallback(window, keyCallback);
+            glfwSetCharCallback(window, charCallback);
+            glfwSetMouseButtonCallback(window, mousePressCallback);
+            glfwSetCursorPosCallback(window, cursorPositionCallback);
         }
 
         void render() {

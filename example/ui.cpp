@@ -34,13 +34,16 @@ int main() {
     canvas->loadFont(loadFile("/home/caelum/Downloads/Merriweather-Bold.ttf"));
     canvas->loadFont(loadFile("/home/caelum/Downloads/Merriweather-BoldItalic.ttf"));
 
-    sol::state lua;
-    lua.open_libraries(sol::lib::base, sol::lib::package, sol::lib::string, sol::lib::math, sol::lib::table);
-    dume::makeLuaBindings(lua);
-    lua["cv"] = canvas;
-    lua.script(loadFile("example/draw.lua"));
+    auto lua = std::make_shared<sol::state>();
+    lua->open_libraries(sol::lib::base, sol::lib::package, sol::lib::string, sol::lib::math, sol::lib::table);
+    dume::makeLuaBindings(*lua);
+    (*lua)["cv"] = canvas;
+    lua->script(loadFile("example/draw.lua"));
 
-    sol::function drawFunction = lua["draw"];
+    sol::function drawFunction = (*lua)["draw"];
+    sol::function eventFunction = (*lua)["handleEvent"];
+
+    canvas->setGlfwCallbacks(lua, eventFunction);
 
     while (!glfwWindowShouldClose(window)) {
         drawFunction.call<void>();
@@ -49,6 +52,5 @@ int main() {
         glfwPollEvents();
     }
 
-    glfwTerminate();
     return 0;
 }

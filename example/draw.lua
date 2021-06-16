@@ -6,6 +6,7 @@ local Text = require("widget/text")
 local Flex = require("widget/flex")
 local Container = require("widget/container")
 local Image = require("widget/image")
+local Clickable = require("widget/clickable")
 
 local ui = dume.UI:new(cv)
 
@@ -31,7 +32,9 @@ nested:addFixedChild(text4)
 
 local root = Flex:column()
 root:setCrossAlign(dume.Align.Center)
-root:addFlexChild(text1, 1)
+root:addFlexChild(Clickable:new(text1, function()
+    print("Clicked!")
+end), 1)
 root:addFlexChild(text2, 1)
 root:addFlexChild(Container:new(nested), 1)
 root:addFixedChild(Image:new("smoke", 600))
@@ -40,4 +43,16 @@ ui:createWindow("main", Vector(0, 0), Vector(1920 / 2, 1080 / 2), root)
 
 function draw()
     ui:render()
+end
+
+function handleEvent(event)
+    -- convert tables to Vector
+    if event.pos ~= nil then
+        event.pos = Vector(event.pos.x, event.pos.y)
+    end
+    if event.offset ~= nil then
+        event.offset = Vector(event.offset.x, event.offset.y)
+    end
+
+    ui:handleEvent(event)
 end

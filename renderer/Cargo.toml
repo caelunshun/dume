@@ -16,11 +16,13 @@ fontdue = "0.4"
 glam = { version = "0.16", features = [ "bytemuck" ] }
 guillotiere = "0.6"
 image = { version = "0.23", default-features = false, features = [ "png", "jpeg" ] }
+log = "0.4"
 logos = "0.12"
 lru = "0.6"
 lyon = "0.17"
 palette = "0.5"
 pollster = "0.2"
+simple_logger = "1"
 slotmap = "1"
 raw-window-handle = "0.3"
 rustybuzz = "0.3"
@@ -32,5 +34,3 @@ wgpu = "0.8"
 [dev-dependencies]
 fastrand = "1"
 winit = { version = "0.25", default-features = false, features = [ "x11" ] }
-simple_logger = "1"
-log = "0.4"
