@@ -6,7 +6,7 @@ local Text = require("widget/text")
 local Flex = require("widget/flex")
 local Container = require("widget/container")
 local Image = require("widget/image")
-local Clickable = require("widget/clickable")
+local Button = require("widget/button")
 local StyleModifier = require("widget/style_modifier")
 
 local ui = dume.UI:new(cv)
@@ -17,7 +17,11 @@ ui.style = {
     borderColor = dume.rgb(80, 80, 80),
     borderRadius = 5,
     hovered = {
-        borderWidth = 5
+        backgroundColor = dume.rgb(40, 40, 40),
+    },
+    pressed = {
+        backgroundColor = dume.rgb(50, 50, 50),
+        borderColor = dume.rgb(0, 169, 206),
     }
 }
 
@@ -36,11 +40,11 @@ nested:addFixedChild(text4)
 
 local root = Flex:column()
 root:setCrossAlign(dume.Align.Center)
-root:addFlexChild(Clickable:new(text1, function()
+root:addFlexChild(Button:new(text1, function()
     print("Clicked!")
 end), 1)
 root:addFlexChild(text2, 1)
-root:addFlexChild(StyleModifier:new(Container:new(nested)), 1)
+root:addFlexChild(Container:new(nested), 1)
 root:addFixedChild(Image:new("smoke", 600))
 
 ui:createWindow("main", Vector(0, 0), Vector(1920 / 2, 1080 / 2), root)
