@@ -71,6 +71,8 @@ extern "C" {
 
 void dume_begin_path(DumeCtx *ctx);
 
+void dume_clear_scissor(DumeCtx *ctx);
+
 /// NB: consumes the text.
 Paragraph *dume_create_paragraph(DumeCtx *ctx, Text *text, TextLayout layout);
 
@@ -142,6 +144,8 @@ void dume_reset_transform(DumeCtx *ctx);
 void dume_resize(DumeCtx *ctx, uint32_t new_width, uint32_t new_height);
 
 void dume_scale(DumeCtx *ctx, float scale);
+
+void dume_scissor_rect(DumeCtx *ctx, Vec2 pos, Vec2 size);
 
 void dume_solid_color(DumeCtx *ctx, const uint8_t (*color)[4]);
 

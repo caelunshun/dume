@@ -12,8 +12,8 @@ use simple_logger::SimpleLogger;
 use slotmap::{Key, KeyData};
 
 use crate::{
-    markup, Canvas, Paragraph, SpriteData, SpriteDescriptor, SpriteId, Text, TextLayout, TextStyle,
-    SAMPLE_COUNT, TARGET_FORMAT,
+    markup, Canvas, Paragraph, Rect, SpriteData, SpriteDescriptor, SpriteId, Text, TextLayout,
+    TextStyle, SAMPLE_COUNT, TARGET_FORMAT,
 };
 
 pub struct DumeCtx {
@@ -278,6 +278,16 @@ pub unsafe extern "C" fn dume_paragraph_height(p: *const Paragraph) -> f32 {
 #[no_mangle]
 pub unsafe extern "C" fn dume_stroke_width(ctx: *mut DumeCtx, width: f32) {
     canvas(ctx).stroke_width(width);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dume_scissor_rect(ctx: *mut DumeCtx, pos: Vec2, size: Vec2) {
+    canvas(ctx).scissor_rect(Rect { pos, size });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dume_clear_scissor(ctx: *mut DumeCtx) {
+    canvas(ctx).clear_scissor();
 }
 
 #[no_mangle]

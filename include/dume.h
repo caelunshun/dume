@@ -209,6 +209,14 @@ namespace dume {
             dume_reset_transform(ctx);
         }
 
+        void setScissorRect(float px, float py, float sx, float sy) {
+            dume_scissor_rect(ctx, Vec2 { .x = px, .y = py }, Vec2 { .x = sx, .y = sy });
+        }
+
+        void clearScissor() {
+            dume_clear_scissor(ctx);
+        }
+
         Vec2 getSpriteSize(uint64_t id) {
             return dume_get_sprite_size(ctx, id);
         }

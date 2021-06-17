@@ -96,5 +96,10 @@ namespace dume {
 
         canvas_type["getWidth"] = &Canvas::getWidth;
         canvas_type["getHeight"] = &Canvas::getHeight;
+
+        canvas_type["setScissorRect"] = [](Canvas &self, sol::table pos, sol::table size) {
+            self.setScissorRect(pos["x"], pos["y"], size["x"], size["y"]);
+        };
+        canvas_type["clearScissor"] = &Canvas::clearScissor;
     }
 }
