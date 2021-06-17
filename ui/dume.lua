@@ -312,17 +312,21 @@ function UI:inflate(widget, parent)
     -- Style inheritance
     widget.style = widget.style or {}
 
-    local parentStyle = nil
+    local parentForStyle = nil
     if parent ~= nil then
-        parentStyle = parent.style
+        parentForStyle = parent
     else
-        parentStyle = self.style
+        parentForStyle = self
     end
 
-    for k, v in pairs(parentStyle) do
-        if widget.style[k] == nil then
-            widget.style[k] = v
-        end
+    local metatable = getmetatable(widget.style)
+    if metatable == nil then
+        metatable = {}
+        setmetatable(widget.style, metatable)
+    end
+
+    metatable.__index = function(table, key)
+        return rawget(table, key) or parentForStyle.style[key]
     end
 
     -- Initialize widget and inflate children
