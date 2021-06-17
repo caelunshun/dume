@@ -8,6 +8,7 @@ local Container = require("widget/container")
 local Image = require("widget/image")
 local Button = require("widget/button")
 local ProgressBar = require("widget/progress_bar")
+local Scrollable = require("widget/scrollable")
 
 local ui = dume.UI:new(cv)
 
@@ -31,6 +32,11 @@ ui.style = {
         progressColor = dume.rgb(151, 215, 0),
         positivePredictedProgressColor = dume.rgb(39, 159, 0),
         negativePredictedProgressColor = dume.rgb(207, 69, 32)
+    },
+    scrollable = {
+        barColor = dume.rgb(30, 30, 30),
+        hoveredBarColor = dume.rgb(50, 50, 50),
+        grabbedBarColor = dume.rgb(80, 80, 80),
     }
 }
 
@@ -54,11 +60,17 @@ end, function()
     return math.min(math.max(math.cos(os.clock()) / 2 + (math.sin(os.clock()) + 1) / 2, 0), 1)
 end, Text:new("@size{20}{Progress}"))
 
+local list = Flex:column()
+for i=1,20 do
+    list:addFixedChild(Text:new("Number %i", {i=i}))
+end
+
 local root = Flex:column()
 root:setCrossAlign(dume.Align.Center)
 root:addFlexChild(Button:new(text1, function()
     print("Clicked!")
 end), 1)
+root:addFlexChild(Scrollable:new(dume.Axis.Vertical, list), 2)
 root:addFlexChild(text2, 1)
 root:addFlexChild(Container:new(nested), 1)
 root:addFixedChild(progress)

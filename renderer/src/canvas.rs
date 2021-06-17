@@ -45,7 +45,7 @@ pub struct Canvas {
     device: Arc<wgpu::Device>,
     queue: Arc<wgpu::Queue>,
 
-   pub(crate) renderer: Renderer,
+    pub(crate) renderer: Renderer,
 
     fonts: Database,
 
@@ -221,7 +221,9 @@ impl Canvas {
         self.current_path = path.0;
     }
 
-    pub fn scissor_rect(&mut self, rect: Rect) -> &mut Self {
+    pub fn scissor_rect(&mut self, mut rect: Rect) -> &mut Self {
+        rect.pos = self.renderer.transform.transform_point2(rect.pos);
+        rect.size = self.renderer.transform.transform_vector2(rect.size);
         self.renderer.set_scissor(rect);
         self
     }

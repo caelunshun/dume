@@ -269,7 +269,7 @@ function UI:inflate(widget, parent)
 
     -- Set default methods
     widget.contains = function(self, pos)
-        return pos.x >= 0 and pos.y >= 0 and pos.x < self.size.x and pos.y < self.size.y
+        return dume.rectContains(self.pos, self.size, pos)
     end
 
     widget.paintChildren = function(self, cv)
@@ -381,6 +381,12 @@ function Canvas:roundedRect(pos, size, radius)
     self:quadTo(pos + sizeY, pos + sizeY - offsetY)
     self:lineTo(pos + offsetY)
     self:quadTo(pos, pos + offsetX)
+end
+
+function dume.rectContains(rectPos, rectSize, pos)
+    local rectEnd = rectPos + rectSize
+    return pos.x >= rectPos.x and pos.y >= rectPos.y
+        and pos.x <= rectEnd.x and pos.y <= rectEnd.y
 end
 
 return dume
