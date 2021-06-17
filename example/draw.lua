@@ -7,7 +7,7 @@ local Flex = require("widget/flex")
 local Container = require("widget/container")
 local Image = require("widget/image")
 local Button = require("widget/button")
-local StyleModifier = require("widget/style_modifier")
+local ProgressBar = require("widget/progress_bar")
 
 local ui = dume.UI:new(cv)
 
@@ -22,6 +22,15 @@ ui.style = {
     pressed = {
         backgroundColor = dume.rgb(50, 50, 50),
         borderColor = dume.rgb(0, 169, 206),
+    },
+    progressBar = {
+        backgroundColor = dume.rgb(0, 0, 0),
+        borderColor = dume.rgb(30, 30, 30),
+        borderRadius = 0,
+        borderWidth = 1,
+        progressColor = dume.rgb(151, 215, 0),
+        positivePredictedProgressColor = dume.rgb(39, 159, 0),
+        negativePredictedProgressColor = dume.rgb(207, 69, 32)
     }
 }
 
@@ -38,6 +47,13 @@ nested:setCrossAlign(dume.Align.Center)
 nested:addFixedChild(text3)
 nested:addFixedChild(text4)
 
+local progress = ProgressBar:new(Vector(600, 30), function()
+    return (math.sin(os.clock()) + 1) / 2
+end, function()
+    -- derivative of progress function
+    return math.min(math.max(math.cos(os.clock()) / 2 + (math.sin(os.clock()) + 1) / 2, 0), 1)
+end, Text:new("@size{20}{Progress}"))
+
 local root = Flex:column()
 root:setCrossAlign(dume.Align.Center)
 root:addFlexChild(Button:new(text1, function()
@@ -45,6 +61,7 @@ root:addFlexChild(Button:new(text1, function()
 end), 1)
 root:addFlexChild(text2, 1)
 root:addFlexChild(Container:new(nested), 1)
+root:addFixedChild(progress)
 root:addFixedChild(Image:new("smoke", 600))
 
 ui:createWindow("main", Vector(0, 0), Vector(1920 / 2, 1080 / 2), root)

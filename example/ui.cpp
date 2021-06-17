@@ -35,7 +35,7 @@ int main() {
     canvas->loadFont(loadFile("/home/caelum/Downloads/Merriweather-BoldItalic.ttf"));
 
     auto lua = std::make_shared<sol::state>();
-    lua->open_libraries(sol::lib::base, sol::lib::package, sol::lib::string, sol::lib::math, sol::lib::table);
+    lua->open_libraries(sol::lib::base, sol::lib::package, sol::lib::string, sol::lib::math, sol::lib::table, sol::lib::os);
     dume::makeLuaBindings(*lua);
     (*lua)["cv"] = canvas;
     lua->script(loadFile("example/draw.lua"));

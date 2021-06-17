@@ -284,7 +284,7 @@ function UI:inflate(widget, parent)
         self:paintChildren(cv)
     end
 
-    widget.layout = widget.layout or function(self, maxSize, cv)
+    widget.layoutChildren = function(self, maxSize, cv)
         local biggestSize = Vector(0, 0)
         for _, child in ipairs(self.children) do
             child:layout(maxSize, cv)
@@ -293,6 +293,11 @@ function UI:inflate(widget, parent)
             if child.size.x > biggestSize.x then biggestSize.x = child.size.x end
             if child.size.y > biggestSize.y then biggestSize.y = child.size.y end
         end
+        return biggestSize
+    end
+
+    widget.layout = widget.layout or function(self, maxSize, cv)
+        local biggestSize = self:layoutChildren(maxSize, cv)
         self.size = biggestSize
     end
 
@@ -358,6 +363,7 @@ end
 function Canvas:roundedRect(pos, size, radius)
     if radius < 0.1 then
         self:rect(pos, size)
+        return
     end
 
     local offsetX = Vector(radius, 0)
