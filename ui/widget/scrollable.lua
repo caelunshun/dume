@@ -5,6 +5,8 @@ local Scrollable = {}
 local Vector = require("brinevector")
 local dume = require("dume")
 
+local scrollSensitivity = 10
+
 function Scrollable:new(scrollAxis, child, barWidth)
     barWidth = barWidth or 5
     local o = {
@@ -52,8 +54,13 @@ function Scrollable:handleEvent(event, cv)
 
     if event.type == dume.EventType.CursorMove and self.state.grabbed then
         self.state.scrollPos = event.pos[self.scrollAxis]
-        self.state.scrollPos = math.clamp(self.state.scrollPos, 0, self.child.size[self.scrollAxis] - self.size[self.scrollAxis])
     end
+
+    if event.type == dume.EventType.Scroll and self:contains(event.pos) then
+        self.state.scrollPos = self.state.scrollPos - scrollSensitivity * event.offset[self.scrollAxis]
+    end
+
+    self.state.scrollPos = math.clamp(self.state.scrollPos, 0, self.child.size[self.scrollAxis] - self.size[self.scrollAxis])
 
     if event.type == dume.EventType.CursorMove then
         self.state.hovered = self:barContains(event.pos)

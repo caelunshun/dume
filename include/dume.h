@@ -76,9 +76,12 @@ namespace dume {
     }
 
     static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
         auto table = lua->create_table_with(
                 "type", "scroll",
-                "offset", lua->create_table_with("x", xoffset, "y", yoffset)
+                "offset", lua->create_table_with("x", xoffset, "y", yoffset),
+                "pos", lua->create_table_with("x", xpos, "y", ypos)
                 );
         invokeEvent(table);
     }

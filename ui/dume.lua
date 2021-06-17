@@ -275,7 +275,7 @@ function UI:inflate(widget, parent)
 
     -- Set default methods
     widget.contains = function(self, pos)
-        return dume.rectContains(self.pos, self.size, pos)
+        return dume.rectContains(Vector(0, 0), self.size, pos)
     end
 
     widget.paintChildren = function(self, cv)
