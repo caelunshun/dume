@@ -90,6 +90,7 @@ function Flex:layout(maxSize, cv)
     end
 
     -- Apply non-left alignment.
+    local biggestCrossSize = 0
     local totalSize = cursor
     for _, widget in ipairs(self.children) do
         if self.mainAlign == dume.Align.End then
@@ -107,9 +108,15 @@ function Flex:layout(maxSize, cv)
             local mid = maxSize[self.crossAxis] / 2
             widget.pos[self.crossAxis] = mid - widget.size[self.crossAxis] / 2
         end
+
+        if widget.size[self.crossAxis] > biggestCrossSize then
+            biggestCrossSize = widget.size[self.crossAxis]
+        end
     end
 
-    self.size = maxSize
+    self.size = Vector(0, 0)
+    self.size[self.crossAxis] = biggestCrossSize
+    self.size[self.mainAxis] = totalSize
 end
 
 return Flex

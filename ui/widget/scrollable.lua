@@ -25,15 +25,17 @@ function Scrollable:new(scrollAxis, child, barWidth)
 end
 
 function Scrollable:getBarRect()
+    local barLength = (self.size[self.scrollAxis] / self.child.size[self.scrollAxis]) * self.size[self.scrollAxis]
+    local barPos = (self.state.scrollPos / self.child.size[self.scrollAxis]) * self.size[self.scrollAxis]
     if self.scrollAxis == dume.Axis.Vertical then
         return {
-            pos = Vector(self.size.x - self.barWidth, 0),
-            size = Vector(self.barWidth, self.size.y),
+            pos = Vector(self.size.x - self.barWidth, barPos),
+            size = Vector(self.barWidth, barLength),
         }
     else
         return {
-            pos = Vector(0, self.size.y - self.barWidth),
-            size = Vector(self.size.x, self.barWidth)
+            pos = Vector(barPos, self.size.y - self.barWidth),
+            size = Vector(barLength, self.barWidth)
         }
     end
 end
@@ -50,6 +52,7 @@ function Scrollable:handleEvent(event, cv)
 
     if event.type == dume.EventType.CursorMove and self.state.grabbed then
         self.state.scrollPos = event.pos[self.scrollAxis]
+        self.state.scrollPos = math.clamp(self.state.scrollPos, 0, self.child.size[self.scrollAxis] - self.size[self.scrollAxis])
     end
 
     if event.type == dume.EventType.CursorMove then
