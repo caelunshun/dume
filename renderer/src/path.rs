@@ -101,7 +101,7 @@ impl GeometryBuilder for TesselatedPath {
     }
 
     fn abort_geometry(&mut self) {
-        todo!()
+        
     }
 }
 
