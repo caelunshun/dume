@@ -12,6 +12,7 @@ local Scrollable = require("widget/scrollable")
 local Padding = require("widget/padding")
 local Tooltip = require("widget/tooltip")
 local Container = require("widget/container")
+local Navigator = require("widget/navigator")
 
 local ui = dume.UI:new(cv)
 
@@ -66,18 +67,31 @@ for i=1,20 do
     list:addFixedChild(Text:new("Number %i", {i=i}))
 end
 
+local imageOverlayText = Text:new("@size{24}{Some smoke.}")
+local imageOverlay = Tooltip:new(imageOverlayText, Container:new(Text:new("Some text over an image!")))
+local image = Image:new("smoke", 300, Center:new(imageOverlay))
+
+local text3 = Text:new("@size{50}{DUME}")
+
+local nav = Navigator:new({
+    image = image,
+    text = text3,
+}, "image")
+
 local root = Flex:column()
 root:setCrossAlign(dume.Align.Center)
 root:addFlexChild(Button:new(text1, function()
     print("Clicked!")
+    if nav:getPage() == "image" then
+        nav:setPage("text")
+    else
+        nav:setPage("image")
+    end
 end), 1)
 root:addFlexChild(Scrollable:new(dume.Axis.Vertical, Padding:new(list, 20)), 2)
 root:addFlexChild(text2, 1)
 root:addFixedChild(progress)
-
-local imageOverlayText = Text:new("@size{24}{Some smoke.}")
-local imageOverlay = Tooltip:new(imageOverlayText, Container:new(Text:new("Some text over an image!")))
-root:addFixedChild(Image:new("smoke", 300, Center:new(imageOverlay)))
+root:addFixedChild(nav)
 
 ui:createWindow("main", Vector(0, 0), Vector(1920 / 2, 1080 / 2), root)
 
