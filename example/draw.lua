@@ -69,7 +69,7 @@ end
 
 local imageOverlayText = Text:new("@size{24}{Some smoke.}")
 local imageOverlay = Tooltip:new(imageOverlayText, Container:new(Text:new("Some text over an image!")))
-local image = Image:new("smoke", 300, Center:new(imageOverlay))
+local image = Image:new("smoke", nil, Center:new(imageOverlay))
 
 local text3 = Text:new("@size{50}{DUME}")
 
@@ -91,7 +91,7 @@ end), 1)
 root:addFlexChild(Scrollable:new(dume.Axis.Vertical, Padding:new(list, 20)), 2)
 root:addFlexChild(text2, 1)
 root:addFixedChild(progress)
-root:addFixedChild(nav)
+root:addFlexChild(nav, 2)
 
 ui:createWindow("main", Vector(0, 0), Vector(1920 / 2, 1080 / 2), root)
 
