@@ -10,6 +10,8 @@ local Button = require("widget/button")
 local ProgressBar = require("widget/progress_bar")
 local Scrollable = require("widget/scrollable")
 local Padding = require("widget/padding")
+local Tooltip = require("widget/tooltip")
+local Container = require("widget/container")
 
 local ui = dume.UI:new(cv)
 
@@ -43,7 +45,7 @@ ui.style = {
 
 local text1 = Text:new("@size{30}{I am @bold{Dume}. @icon{gradient} I am the @italic{%bendu}.}", { bendu = "Bendu" })
 
-local text2 = Text:new("@size{14}{@italic{Q.E.D.}}", {})
+local text2 = Text:new("@size{14}{@italic{Q.E.D.}}", {}, { alignV = dume.Align.Center })
 
 local progress = ProgressBar:new(Vector(600, 30), function()
     return (math.sin(os.clock()) + 1) / 2
@@ -67,7 +69,8 @@ root:addFlexChild(text2, 1)
 root:addFixedChild(progress)
 
 local imageOverlayText = Text:new("@size{24}{Some smoke.}")
-root:addFixedChild(Image:new("smoke", 300, Center:new(imageOverlayText)))
+local imageOverlay = Tooltip:new(imageOverlayText, Container:new(Text:new("Some text over an image!")))
+root:addFixedChild(Image:new("smoke", 300, Center:new(imageOverlay)))
 
 ui:createWindow("main", Vector(0, 0), Vector(1920 / 2, 1080 / 2), root)
 
