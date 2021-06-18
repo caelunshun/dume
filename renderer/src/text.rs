@@ -69,11 +69,11 @@ impl Hash for TextSection {
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextStyle {
     /// Text color.
-    color: Srgba<u8>,
+    pub color: Srgba<u8>,
     /// Font size in logical pixels.
-    size: f32,
+    pub size: f32,
     /// The font to use. Accounts for bold and italics too.
-    font: Query,
+    pub font: Query,
 }
 
 impl Default for TextStyle {

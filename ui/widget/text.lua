@@ -33,7 +33,7 @@ function Text:new(markup, variables, layout)
 end
 
 function Text:init(cv)
-    self.state.text = cv:parseTextMarkup(self.params.markup, self.params.variables)
+    self.state.text = cv:parseTextMarkup(self.params.markup, self.style.defaultTextStyle, self.params.variables)
     self.state.paragraph = cv:createParagraph(self.state.text, self.params.layout)
 end
 

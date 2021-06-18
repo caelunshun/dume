@@ -26,6 +26,26 @@ enum class Baseline {
   Bottom,
 };
 
+/// Font style: normal or italic. We do not support
+/// oblique fonts.
+enum class Style {
+  Normal,
+  Italic,
+};
+
+/// A font weight, indicating how dark it appears.
+enum class Weight {
+  Thin,
+  ExtraLight,
+  Light,
+  Normal,
+  Medium,
+  SemiBold,
+  Bold,
+  ExtraBold,
+  Black,
+};
+
 struct DumeCtx;
 
 /// A paragraph of rich text that has been layed
@@ -59,6 +79,15 @@ struct TextLayout {
 struct RawWindow {
   unsigned long window;
   void *display;
+};
+
+struct CTextStyle {
+  const char *family_name;
+  size_t family_name_len;
+  Weight weight;
+  Style style;
+  float size;
+  const uint8_t *color;
 };
 
 struct Variable {
@@ -132,6 +161,7 @@ float dume_paragraph_width(const Paragraph *p);
 
 Text *dume_parse_markup(const uint8_t *markup,
                         size_t markup_len,
+                        CTextStyle default_style,
                         void *userdata,
                         Variable (*resolve_variable)(void*, const uint8_t*, size_t));
 

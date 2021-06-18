@@ -50,8 +50,19 @@ namespace dume {
             self.linearGradient(pointA["x"], pointA["y"], pointB["x"], pointB["y"], &colA, &colB);
         };
 
-        canvas_type["parseTextMarkup"] = [](Canvas &self, std::string markup, sol::table variables) {
-            return sol::light<Text>(self.parseTextMarkup(markup, &variables, luaResolveVariable));
+        canvas_type["parseTextMarkup"] = [](Canvas &self, std::string markup, sol::table defaultStyle, sol::table variables) {
+            auto family = defaultStyle.get<std::string>("family");
+            auto colorTable = defaultStyle.get<sol::table>("color");
+            uint8_t color[4] = {colorTable[1], colorTable[2], colorTable[3], colorTable[4]};
+            auto style = CTextStyle {
+                .family_name = family.data(),
+                .family_name_len = family.size(),
+                .weight = defaultStyle["weight"],
+                .style = defaultStyle["style"],
+                .size = defaultStyle["size"],
+                .color = reinterpret_cast<const uint8_t *>(&color),
+            };
+            return sol::light<Text>(self.parseTextMarkup(markup, style, &variables, luaResolveVariable));
         };
 
         canvas_type["createParagraph"] = [](Canvas &self, sol::light<Text> text, sol::table layout) {

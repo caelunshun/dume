@@ -16,6 +16,13 @@ local Container = require("widget/container")
 local ui = dume.UI:new(cv)
 
 ui.style = {
+    defaultTextStyle = {
+        family = "Merriweather",
+        size = 12,
+        weight = dume.FontWeight.Normal,
+        style = dume.FontStyle.Normal,
+        color = dume.rgb(255, 255, 255),
+    },
     backgroundColor = dume.rgb(30, 30, 30),
     borderWidth = 2,
     borderColor = dume.rgb(80, 80, 80),

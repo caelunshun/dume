@@ -17,10 +17,6 @@
 namespace dume {
     void makeLuaBindings(sol::state &lua);
 
-    static Variable resolveDefaultVariable(void *userdata, const uint8_t *name, size_t len) {
-        return Variable{.value = nullptr, .len=0};
-    }
-
     static std::unique_ptr<sol::function> luaEventCallback;
     static std::shared_ptr<sol::state> lua;
 
@@ -128,12 +124,8 @@ namespace dume {
             dume_load_font(ctx, reinterpret_cast<const uint8_t *>(fontData.data()), fontData.size());
         }
 
-        Text *parseTextMarkup(const std::string &markup, void *userdata, Variable(*resolveVariable) (void *, const uint8_t *, size_t)) {
-            return dume_parse_markup(reinterpret_cast<const uint8_t *>(markup.data()), markup.size(), userdata, resolveVariable);
-        }
-
-        Text *parseTextMarkupDefault(const std::string &markup) {
-            return parseTextMarkup(markup, nullptr, resolveDefaultVariable);
+        Text *parseTextMarkup(const std::string &markup, CTextStyle defaultStyle, void *userdata, Variable(*resolveVariable) (void *, const uint8_t *, size_t)) {
+            return dume_parse_markup(reinterpret_cast<const uint8_t *>(markup.data()), markup.size(), defaultStyle, userdata, resolveVariable);
         }
 
         Paragraph *createParagraph(Text *text, TextLayout layout) {

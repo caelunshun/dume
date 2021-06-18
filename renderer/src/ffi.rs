@@ -2,7 +2,12 @@
 
 #![allow(clippy::missing_safety_doc)]
 
-use std::{ffi::c_void, os::raw::c_ulong, sync::Arc, u64};
+use std::{
+    ffi::c_void,
+    os::raw::{c_char, c_ulong},
+    sync::Arc,
+    u64,
+};
 
 use glam::Vec2;
 use palette::Srgba;
@@ -12,6 +17,7 @@ use simple_logger::SimpleLogger;
 use slotmap::{Key, KeyData};
 
 use crate::{
+    font::{Query, Style, Weight},
     markup, Canvas, Paragraph, Rect, SpriteData, SpriteDescriptor, SpriteId, Text, TextLayout,
     TextStyle, SAMPLE_COUNT, TARGET_FORMAT,
 };
@@ -199,16 +205,50 @@ pub struct Variable {
     pub len: usize,
 }
 
+#[repr(C)]
+pub struct CTextStyle {
+    pub family_name: *const c_char,
+    pub family_name_len: usize,
+    pub weight: Weight,
+    pub style: Style,
+    pub size: f32,
+    pub color: *const u8,
+}
+
+impl CTextStyle {
+    pub unsafe fn to_text_style(&self) -> TextStyle {
+        TextStyle {
+            color: Srgba::new(
+                *self.color,
+                *self.color.add(1),
+                *self.color.add(2),
+                *self.color.add(3),
+            ),
+            size: self.size,
+            font: Query {
+                family: std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+                    self.family_name.cast(),
+                    self.family_name_len,
+                ))
+                .to_owned(),
+                style: self.style,
+                weight: self.weight,
+            },
+        }
+    }
+}
+
 // TEXT
 #[no_mangle]
 pub unsafe extern "C" fn dume_parse_markup(
     markup: *const u8,
     markup_len: usize,
+    default_style: CTextStyle,
     userdata: *mut c_void,
     resolve_variable: extern "C" fn(*mut c_void, *const u8, usize) -> Variable,
 ) -> *mut Text {
     let markup = std::str::from_utf8_unchecked(std::slice::from_raw_parts(markup, markup_len));
-    let text = markup::parse(markup, TextStyle::default(), |var| {
+    let text = markup::parse(markup, default_style.to_text_style(), |var| {
         let v = resolve_variable(userdata, var.as_ptr(), var.len());
         if v.value.is_null() {
             panic!("unknown variable '{}'", var);

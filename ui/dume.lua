@@ -207,6 +207,25 @@ local Mouse = {
 }
 dume.Mouse = Mouse
 
+local FontWeight = {
+    Thin = 0,
+    ExtraLight = 1,
+    Light = 2,
+    Normal = 3,
+    Medium = 4,
+    SemiBold = 5,
+    Bold = 6,
+    ExtraBold = 7,
+    Black = 8,
+}
+dume.FontWeight = FontWeight
+
+local FontStyle = {
+    Normal = 0,
+    Italic = 1,
+}
+dume.FontStyle = FontStyle
+
 local function cross(axis)
     if axis == Axis.Horizontal then return Axis.Vertical
     else return Axis.Horizontal
