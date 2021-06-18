@@ -21,7 +21,6 @@ function Image:new(name, size, child)
 end
 
 function Image:paint(cv)
-    print(self.size)
     cv:drawSprite(self.params.name, Vector(0, 0), self.size.x)
     self:paintChildren(cv)
 end
