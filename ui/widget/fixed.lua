@@ -1,6 +1,8 @@
 -- Sets the size of a child.
 local Fixed = {}
 
+local Vector = require("brinevector")
+
 function Fixed:new(child, size)
     local o = { child = child, children = {child}, params = { size = size } }
     setmetatable(o, self)
