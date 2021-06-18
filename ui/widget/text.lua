@@ -35,9 +35,14 @@ end
 function Text:init(cv)
     self.state.text = cv:parseTextMarkup(self.params.markup, self.style.defaultTextStyle, self.params.variables)
     self.state.paragraph = cv:createParagraph(self.state.text, self.params.layout)
+    self.styleBuiltWith = self.style.defaultTextStyle
 end
 
 function Text:layout(maxSize, cv)
+    if self.styleBuiltWith ~= self.style.defaultTextStyle then
+        self:init(cv)
+    end
+
     cv:resizeParagraph(self.state.paragraph, maxSize)
     self.size = Vector(cv:getParagraphWidth(self.state.paragraph), cv:getParagraphHeight(self.state.paragraph))
 end

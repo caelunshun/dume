@@ -42,8 +42,9 @@ int main() {
 
     sol::function drawFunction = (*lua)["draw"];
     sol::function eventFunction = (*lua)["handleEvent"];
+    sol::function resizeFunction = (*lua)["resize"];
 
-    canvas->setGlfwCallbacks(lua, eventFunction);
+    canvas->setGlfwCallbacks(canvas, lua, eventFunction, resizeFunction);
 
     while (!glfwWindowShouldClose(window)) {
         drawFunction.call<void>();

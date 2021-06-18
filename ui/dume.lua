@@ -368,6 +368,13 @@ function UI:inflate(widget, parent)
     end
 end
 
+function UI:resize(oldCanvasSize, newCanvasSize)
+    for _, window in pairs(self.windows) do
+        window.size.x = window.size.x * newCanvasSize.x / oldCanvasSize.x
+        window.size.y = window.size.y * newCanvasSize.y / oldCanvasSize.y
+    end
+end
+
 dume.UI = UI
 
 function dume.rgb(r, g, b, a)

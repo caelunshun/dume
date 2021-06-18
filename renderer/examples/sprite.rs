@@ -27,7 +27,6 @@ fn main() {
     let window = WindowBuilder::new()
         .with_title("Dume")
         .with_inner_size(LogicalSize::new(width, height))
-        .with_resizable(false)
         .build(&event_loop)
         .unwrap();
 
@@ -51,16 +50,14 @@ fn main() {
     let device = Arc::new(device);
     let queue = Arc::new(queue);
 
-    let swap_chain = device.create_swap_chain(
-        &surface,
-        &wgpu::SwapChainDescriptor {
-            usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
-            format: TARGET_FORMAT,
-            width: width as u32,
-            height: height as u32,
-            present_mode: wgpu::PresentMode::Fifo,
-        },
-    );
+    let mut sc_desc = wgpu::SwapChainDescriptor {
+        usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
+        format: TARGET_FORMAT,
+        width: width as u32,
+        height: height as u32,
+        present_mode: wgpu::PresentMode::Fifo,
+    };
+    let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
     let sample_texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("sample"),
         size: wgpu::Extent3d {
@@ -74,7 +71,7 @@ fn main() {
         format: TARGET_FORMAT,
         usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
     });
-    let sample_texture = sample_texture.create_view(&Default::default());
+    let mut sample_texture = sample_texture.create_view(&Default::default());
 
     let mut canvas = Canvas::new(Arc::clone(&device), Arc::clone(&queue));
 
@@ -214,7 +211,7 @@ fn main() {
                     &sample_texture,
                     &frame.output.view,
                     &mut encoder,
-                    Vec2::new(width as f32, height as f32),
+                    Vec2::new(window.inner_size().width as f32, window.inner_size().height as f32),
                 );
                 queue.submit(iter::once(encoder.finish()));
             }
@@ -223,6 +220,29 @@ fn main() {
                 event: WindowEvent::CloseRequested,
                 ..
             } => *control_flow = ControlFlow::Exit,
+            Event::WindowEvent {
+                event: WindowEvent::Resized(new_size),
+                ..
+            } => {
+                sc_desc.width = new_size.width;
+                sc_desc.height = new_size.height;
+                swap_chain = device.create_swap_chain(&surface, &sc_desc);
+                sample_texture = device
+                    .create_texture(&wgpu::TextureDescriptor {
+                        label: Some("sample"),
+                        size: wgpu::Extent3d {
+                            width: new_size.width,
+                            height: new_size.height,
+                            depth_or_array_layers: 1,
+                        },
+                        mip_level_count: 1,
+                        sample_count: SAMPLE_COUNT,
+                        dimension: wgpu::TextureDimension::D2,
+                        format: TARGET_FORMAT,
+                        usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
+                    })
+                    .create_view(&Default::default());
+            }
             _ => (),
         }
     });

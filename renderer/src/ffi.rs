@@ -51,7 +51,7 @@ unsafe impl HasRawWindowHandle for RawWindow {
 #[no_mangle]
 pub extern "C" fn dume_init(width: u32, height: u32, window: RawWindow) -> *mut DumeCtx {
     SimpleLogger::new()
-        .with_level(log::LevelFilter::Warn)
+        .with_level(log::LevelFilter::Debug)
         .init()
         .unwrap();
     let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);

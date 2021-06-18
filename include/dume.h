@@ -15,10 +15,14 @@
 #include <utility>
 
 namespace dume {
+    class Canvas;
+
     void makeLuaBindings(sol::state &lua);
 
     static std::unique_ptr<sol::function> luaEventCallback;
+    static std::unique_ptr<sol::function> luaResizeCallback;
     static std::shared_ptr<sol::state> lua;
+    static std::shared_ptr<Canvas> cv;
 
     static sol::table convertMods(int mods) {
         bool control = mods & GLFW_MOD_CONTROL;
@@ -31,6 +35,8 @@ namespace dume {
     static void invokeEvent(sol::table event) {
         luaEventCallback->call<void>(event);
     }
+
+    static void resizeCallback(GLFWwindow *window, int width, int height);
 
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
         auto table = lua->create_table_with(
@@ -98,7 +104,6 @@ namespace dume {
 
         ~Canvas() {
             dume_free(ctx);
-            glfwTerminate();
         }
 
         void resize(uint32_t newWidth, uint32_t newHeight) {
@@ -224,10 +229,13 @@ namespace dume {
             return dume_get_height(ctx);
         }
 
-        void setGlfwCallbacks(std::shared_ptr<sol::state> lua_, sol::function callback) {
-            luaEventCallback = std::make_unique<sol::function>(callback);
+        void setGlfwCallbacks(std::shared_ptr<Canvas> self, std::shared_ptr<sol::state> lua_, sol::function eventCallback, sol::function resizeCallbackFn) {
+            luaEventCallback = std::make_unique<sol::function>(eventCallback);
+            luaResizeCallback = std::make_unique<sol::function>(resizeCallbackFn);
             lua = std::move(lua_);
+            cv = std::move(self);
 
+            glfwSetWindowSizeCallback(window, resizeCallback);
             glfwSetScrollCallback(window, scrollCallback);
             glfwSetKeyCallback(window, keyCallback);
             glfwSetCharCallback(window, charCallback);
@@ -239,6 +247,11 @@ namespace dume {
             dume_render(ctx);
         }
     };
+
+    void resizeCallback(GLFWwindow *window, int width, int height) {
+        luaResizeCallback->call<void>(lua->create_table_with("x", width, "y", height));
+        cv->resize(width, height);
+    }
 }
 
 #endif //DUME_DUME_H

@@ -20,6 +20,7 @@ function Flex:new(mainAxis)
         crossAxis = dume.cross(mainAxis),
         mainAlign = dume.Align.Start,
         crossAlign = dume.Align.Start,
+        spacing = 0,
         children = {}
     }
     setmetatable(o, self)
@@ -35,6 +36,10 @@ end
 function Flex:setCrossAlign(crossAlign)
     self.crossAlign = crossAlign
     return self
+end
+
+function Flex:setSpacing(spacing)
+    self.spacing = spacing
 end
 
 -- Adds a child whose size is fixed.
@@ -61,7 +66,7 @@ function Flex:layout(maxSize, cv)
     for _, widget in ipairs(self.children) do
         if not widget.isFlex then
             widget:layout(maxSize, cv)
-            flexSpace = flexSpace - widget.size[self.mainAxis]
+            flexSpace = flexSpace - widget.size[self.mainAxis] - self.spacing
         else
             flexAmountSum = flexAmountSum + widget.flexAmount
         end
@@ -71,7 +76,7 @@ function Flex:layout(maxSize, cv)
     local cursor = 0
     for _, widget in ipairs(self.children) do
         if widget.isFlex then
-            local mainAxisSpace = widget.flexAmount / flexAmountSum * flexSpace
+            local mainAxisSpace = widget.flexAmount / flexAmountSum * flexSpace - self.spacing
 
             local maxWidgetSize = Vector(0, 0)
             maxWidgetSize[self.mainAxis] = mainAxisSpace
@@ -81,11 +86,11 @@ function Flex:layout(maxSize, cv)
             widget.pos = Vector(0, 0)
             widget.pos[self.mainAxis] = cursor
 
-            cursor = cursor + mainAxisSpace
+            cursor = cursor + mainAxisSpace + self.spacing
         else
             widget.pos = Vector(0, 0)
             widget.pos[self.mainAxis] = cursor
-            cursor = cursor + widget.size[self.mainAxis]
+            cursor = cursor + widget.size[self.mainAxis] + self.spacing
         end
     end
 

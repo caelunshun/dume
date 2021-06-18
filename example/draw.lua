@@ -64,7 +64,7 @@ end, Text:new("@size{20}{Progress}", {}, {alignH = dume.Align.Center}))
 
 local list = Flex:column()
 for i=1,20 do
-    list:addFixedChild(Text:new("Number %i", {i=i}))
+    list:addFixedChild(Text:new("Number %i", {i=tostring(i)}))
 end
 
 local imageOverlayText = Text:new("@size{24}{Some smoke.}")
@@ -109,4 +109,8 @@ function handleEvent(event)
     end
 
     ui:handleEvent(event)
+end
+
+function resize(newSize)
+    ui:resize(Vector(cv:getWidth(), cv:getHeight()), newSize)
 end
