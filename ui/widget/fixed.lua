@@ -3,6 +3,9 @@ local Fixed = {}
 
 function Fixed:new(child, size)
     local o = { child = child, children = {child}, params = { size = size } }
+    setmetatable(o, self)
+    self.__index = self
+    return o
 end
 
 function Fixed:layout(maxSize, cv)
