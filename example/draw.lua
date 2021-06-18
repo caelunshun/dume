@@ -9,6 +9,7 @@ local Image = require("widget/image")
 local Button = require("widget/button")
 local ProgressBar = require("widget/progress_bar")
 local Scrollable = require("widget/scrollable")
+local Padding = require("widget/padding")
 
 local ui = dume.UI:new(cv)
 
@@ -47,12 +48,6 @@ local text2 = Text:new("@size{14}{@italic{Q.E.D.}}", {})
 local text3 = Text:new("I have spoken.", {}, {baseline = dume.Baseline.Bottom})
 local text4 = Text:new("@size{20}{@color{rgb(255,40,40)}{ I am you.}}", {}, {baseline = dume.Baseline.Bottom})
 
-local nested = Flex:row()
-nested:setMainAlign(dume.Align.Center)
-nested:setCrossAlign(dume.Align.Center)
-nested:addFixedChild(text3)
-nested:addFixedChild(text4)
-
 local progress = ProgressBar:new(Vector(600, 30), function()
     return (math.sin(os.clock()) + 1) / 2
 end, function()
@@ -70,11 +65,10 @@ root:setCrossAlign(dume.Align.Center)
 root:addFlexChild(Button:new(text1, function()
     print("Clicked!")
 end), 1)
-root:addFlexChild(Scrollable:new(dume.Axis.Vertical, list), 2)
+root:addFlexChild(Scrollable:new(dume.Axis.Vertical, Padding:new(list, 20)), 2)
 root:addFlexChild(text2, 1)
-root:addFlexChild(Container:new(nested), 1)
 root:addFixedChild(progress)
-root:addFixedChild(Image:new("smoke", 600))
+root:addFixedChild(Image:new("smoke", 300))
 
 ui:createWindow("main", Vector(0, 0), Vector(1920 / 2, 1080 / 2), root)
 
