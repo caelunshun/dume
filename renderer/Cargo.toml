@@ -29,7 +29,7 @@ rustybuzz = "0.3"
 thiserror = "1"
 ttf-parser = "0.12"
 unicode-bidi = "0.3"
-wgpu = "0.8"
+wgpu = "0.9"
 
 [dev-dependencies]
 fastrand = "1"
