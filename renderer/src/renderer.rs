@@ -66,7 +66,7 @@ pub struct Renderer {
 
     /// Buffered for the current layer.
     vertices: Vec<Vertex>,
-    indices: Vec<u16>,
+    indices: Vec<u32>,
     colors: Vec<Vec4>,
 
     scissor: Option<(Rect, i32)>,
@@ -199,7 +199,7 @@ impl Renderer {
             ..
         } = self;
         self.paths.with_tesselated_path(path, |tesselated| {
-            let base_vertex = vertices.len() as u16;
+            let base_vertex = vertices.len() as u32;
             for vertex in &tesselated.vertices {
                 vertices.push(Vertex {
                     pos: transform.transform_point2(*vertex),
@@ -258,7 +258,7 @@ impl Renderer {
                 scissor,
             },
         ];
-        let i = self.vertices.len() as u16;
+        let i = self.vertices.len() as u32;
         assert!(i.checked_add(4).is_some(), "too many sprites in one layer");
         let indices = [i, i + 1, i + 2, i + 2, i + 3, i];
 
@@ -386,7 +386,7 @@ impl Renderer {
     ) {
         pass.set_pipeline(&self.pipeline);
         pass.set_vertex_buffer(0, data.vertex_buffer.slice(..));
-        pass.set_index_buffer(data.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        pass.set_index_buffer(data.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         pass.set_bind_group(0, &data.bind_group, &[]);
         pass.draw_indexed(0..data.num_indices, 0, 0..1);
     }

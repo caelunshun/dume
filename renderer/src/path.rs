@@ -100,7 +100,7 @@ const CACHE_CAPACITY: usize = 16384;
 #[derive(Debug, Clone, Default)]
 pub struct TesselatedPath {
     pub vertices: Vec<Vec2>,
-    pub indices: Vec<u16>,
+    pub indices: Vec<u32>,
 }
 
 impl GeometryBuilder for TesselatedPath {
@@ -117,9 +117,9 @@ impl GeometryBuilder for TesselatedPath {
     }
 
     fn add_triangle(&mut self, a: VertexId, b: VertexId, c: VertexId) {
-        self.indices.push(a.0 as u16);
-        self.indices.push(b.0 as u16);
-        self.indices.push(c.0 as u16);
+        self.indices.push(a.0);
+        self.indices.push(b.0);
+        self.indices.push(c.0);
     }
 
     fn abort_geometry(&mut self) {}
