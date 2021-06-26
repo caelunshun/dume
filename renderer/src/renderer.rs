@@ -72,6 +72,7 @@ pub struct Renderer {
     scissor: Option<(Rect, i32)>,
 
     pub transform: Affine2,
+    pub scale: f32,
 }
 
 impl Renderer {
@@ -123,6 +124,7 @@ impl Renderer {
 
             scissor: None,
             transform: Affine2::IDENTITY,
+            scale: 1.0,
         }
     }
 
@@ -158,7 +160,17 @@ impl Renderer {
         self.push_quad(pos, size, texcoords, paint);
     }
 
-    pub fn record_glyph(&mut self, key: GlyphKey, pos: Vec2, color: Srgba<u8>, fonts: &Database) {
+    pub fn record_glyph(
+        &mut self,
+        mut key: GlyphKey,
+        pos: Vec2,
+        color: Srgba<u8>,
+        fonts: &Database,
+    ) {
+        // Apply the current scale factor so glyphs
+        // are rasterized at the precise correct scale.
+        key.size = ((key.size as f32 / 1000.0 * self.scale) * 1000.0) as u64;
+
         if let Some(allocation) = self.glyphs.glyph_allocation(key, fonts) {
             let texcoords = self.glyphs.atlas().texture_coordinates(allocation);
 
@@ -167,7 +179,7 @@ impl Renderer {
             let size = vec2(
                 allocation.rectangle.size().width as f32 - 2.0,
                 allocation.rectangle.size().height as f32 - 2.0,
-            );
+            ) / self.scale;
 
             self.push_quad(pos, size, texcoords, paint);
         }
@@ -277,6 +289,7 @@ impl Renderer {
     pub fn prepare(&mut self, ortho: Mat4) -> PreparedRender {
         self.scissor = None;
         self.transform = Affine2::IDENTITY;
+        self.scale = 1.0;
 
         let uniforms = Uniforms { ortho };
         let uniform_buffer = self

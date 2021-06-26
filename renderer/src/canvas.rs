@@ -253,6 +253,7 @@ impl Canvas {
     pub fn scale(&mut self, scale: f32) {
         self.renderer.transform =
             self.renderer.transform * Affine2::from_scale(glam::vec2(scale, scale));
+        self.renderer.scale = scale;
     }
 
     pub fn reset_transform(&mut self) {
