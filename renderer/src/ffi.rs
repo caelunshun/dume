@@ -361,6 +361,17 @@ pub unsafe extern "C" fn dume_cubic_to(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn dume_arc(
+    ctx: *mut DumeCtx,
+    center: Vec2,
+    radius: f32,
+    start_angle: f32,
+    end_angle: f32,
+) {
+    canvas(ctx).arc(center, radius, start_angle, end_angle);
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn dume_solid_color(ctx: *mut DumeCtx, color: &[u8; 4]) {
     canvas(ctx).solid_color(srgba(*color));
 }

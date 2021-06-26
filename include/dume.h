@@ -165,6 +165,10 @@ namespace dume {
             dume_cubic_to(ctx, Vec2 { .x = cx1, .y = cy1 }, Vec2 { .x = cx2, .y = cy2 }, Vec2 { .x = x, .y = y });
         }
 
+        void arc(float cx, float cy, float radius, float startAngle, float endAngle) {
+            dume_arc(ctx, Vec2 { .x = cx, .y = cy }, radius, startAngle, endAngle);
+        }
+
         void strokeWidth(float width) {
             dume_stroke_width(ctx, width);
         }

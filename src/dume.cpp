@@ -37,6 +37,10 @@ namespace dume {
         canvas_type["cubicTo"] = [](Canvas &self, sol::table control1, sol::table control2, sol::table pos) {
             self.cubicTo(control1["x"], control1["y"], control2["x"], control2["y"], pos["x"], pos["y"]);
         };
+        canvas_type["arc"] = [](Canvas &self, sol::table center, float radius, float startAngle, float endAngle) {
+            self.arc(center["x"], center["y"], radius, startAngle, endAngle);
+        };
+
         canvas_type["strokeWidth"] = &Canvas::strokeWidth;
         canvas_type["stroke"] = &Canvas::stroke;
         canvas_type["fill"] = &Canvas::fill;

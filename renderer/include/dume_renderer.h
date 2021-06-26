@@ -98,6 +98,8 @@ struct Variable {
 
 extern "C" {
 
+void dume_arc(DumeCtx *ctx, Vec2 center, float radius, float start_angle, float end_angle);
+
 void dume_begin_path(DumeCtx *ctx);
 
 void dume_clear_scissor(DumeCtx *ctx);

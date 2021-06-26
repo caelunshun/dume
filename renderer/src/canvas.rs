@@ -177,6 +177,19 @@ impl Canvas {
         self
     }
 
+    pub fn arc(
+        &mut self,
+        center: Vec2,
+        radius: f32,
+        start_angle: f32,
+        end_angle: f32,
+    ) -> &mut Self {
+        self.current_path
+            .segments
+            .push(PathSegment::Arc(center, radius, start_angle, end_angle));
+        self
+    }
+
     pub fn stroke_width(&mut self, width: f32) -> &mut Self {
         self.stroke_width = width;
         self

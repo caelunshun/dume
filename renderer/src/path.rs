@@ -11,6 +11,7 @@ use lyon::{
         GeometryBuilderError, StrokeGeometryBuilder, StrokeOptions, StrokeTessellator,
         StrokeVertex, VertexId,
     },
+    math::{Angle, Vector},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -20,18 +21,32 @@ pub struct Path {
 
 impl Path {
     pub fn to_lyon(&self, close: bool) -> lyon::path::Path {
-        let mut builder = lyon::path::Path::builder();
+        let mut builder = lyon::path::Path::builder().with_svg();
         for (i, segment) in self.segments.iter().enumerate() {
             match segment {
-                PathSegment::MoveTo(p) => builder.begin(point(*p)),
-                PathSegment::LineTo(p) => builder.line_to(point(*p)),
-                PathSegment::QuadTo(c, p) => builder.quadratic_bezier_to(point(*c), point(*p)),
-                PathSegment::CubicTo(c1, c2, p) => {
-                    builder.cubic_bezier_to(point(*c1), point(*c2), point(*p))
+                PathSegment::MoveTo(p) => {
+                    builder.move_to(point(*p));
                 }
+                PathSegment::LineTo(p) => {
+                    builder.line_to(point(*p));
+                }
+                PathSegment::QuadTo(c, p) => {
+                    builder.quadratic_bezier_to(point(*c), point(*p));
+                }
+                PathSegment::CubicTo(c1, c2, p) => {
+                    builder.cubic_bezier_to(point(*c1), point(*c2), point(*p));
+                }
+                PathSegment::Arc(center, radius, start_angle, end_angle) => builder.arc(
+                    point(*center),
+                    Vector::splat(*radius),
+                    Angle::radians(start_angle - end_angle),
+                    Angle::radians(*start_angle),
+                ),
             };
         }
-        builder.end(close);
+        if close {
+            builder.close();
+        }
         builder.build()
     }
 }
@@ -42,6 +57,7 @@ pub enum PathSegment {
     LineTo(Vec2),
     QuadTo(Vec2, Vec2),
     CubicTo(Vec2, Vec2, Vec2),
+    Arc(Vec2, f32, f32, f32),
 }
 
 impl Eq for PathSegment {}
@@ -59,6 +75,12 @@ impl Hash for PathSegment {
                 hash_vec(state, *c1);
                 hash_vec(state, *c2);
                 hash_vec(state, *p);
+            }
+            PathSegment::Arc(center, radius, start_angle, end_angle) => {
+                hash_vec(state, *center);
+                radius.to_bits().hash(state);
+                start_angle.to_bits().hash(state);
+                end_angle.to_bits().hash(state);
             }
         }
     }
@@ -100,9 +122,7 @@ impl GeometryBuilder for TesselatedPath {
         self.indices.push(c.0 as u16);
     }
 
-    fn abort_geometry(&mut self) {
-        
-    }
+    fn abort_geometry(&mut self) {}
 }
 
 impl FillGeometryBuilder for TesselatedPath {
