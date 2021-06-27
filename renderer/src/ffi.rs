@@ -81,7 +81,7 @@ pub extern "C" fn dume_init(width: u32, height: u32, window: RawWindow) -> *mut 
         format: TARGET_FORMAT,
         width,
         height,
-        present_mode: wgpu::PresentMode::Immediate,
+        present_mode: wgpu::PresentMode::Mailbox,
     };
     let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
     let sample_texture = create_sample_texture(&device, &swap_chain_desc);

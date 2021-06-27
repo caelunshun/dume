@@ -258,6 +258,7 @@ impl Canvas {
 
     pub fn reset_transform(&mut self) {
         self.renderer.transform = Affine2::IDENTITY;
+        self.renderer.scale = 1.0;
     }
 
     pub fn render(

@@ -148,9 +148,12 @@ impl Renderer {
 
     /// Draws a sprite on the current layer.
     pub fn record_sprite(&mut self, id: SpriteId, pos: Vec2, width: f32) {
-        let allocation = self.sprites.sprite_allocation(id);
-        let height =
-            width * allocation.rectangle.height() as f32 / allocation.rectangle.width() as f32;
+        let info = self.sprites.sprite_info(id);
+        let mipmap_level = self.sprites.mipmap_level_for_scale(id, width * self.scale);
+        let allocation = info.mipmap_allocations[mipmap_level];
+
+        let height = width * info.mipmap_sizes[mipmap_level].y as f32
+            / info.mipmap_sizes[mipmap_level].x as f32;
         let size = Vec2::new(width, height);
 
         let texcoords = self.sprites().atlas().texture_coordinates(allocation);

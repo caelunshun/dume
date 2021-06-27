@@ -212,10 +212,8 @@ fn shape(text: &Text, fonts: &Database, sprites: &Sprites) -> Vec<ShapedGlyph> {
                     .sprite_by_name(name)
                     .or_else(|| sprites.sprite_by_name(&format!("icon/{}", name)))
                     .unwrap_or_else(|| panic!("no sprite with name '{}' or 'icon/{}'", name, name));
-                let allocation = sprites.sprite_allocation(sprite);
-                let sprite_size = allocation.rectangle.size();
-                let width =
-                    size * ((sprite_size.width - 2) as f32 / (sprite_size.height - 2) as f32);
+                let info = sprites.sprite_info(sprite);
+                let width = size * info.size.x as f32 / info.size.y as f32;
 
                 glyphs.push(ShapedGlyph {
                     pos: Vec2::ZERO,

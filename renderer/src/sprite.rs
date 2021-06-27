@@ -3,9 +3,15 @@ use std::sync::Arc;
 use ahash::AHashMap;
 use glam::UVec2;
 use guillotiere::Allocation;
+use image::{
+    imageops::{self, FilterType},
+    Bgra, ImageBuffer,
+};
 use slotmap::{SecondaryMap, SlotMap};
 
 use crate::atlas::TextureAtlas;
+
+const MIPMAP_LEVELS: u32 = 4;
 
 slotmap::new_key_type! {
     /// Unique ID of a sprite.
@@ -13,12 +19,23 @@ slotmap::new_key_type! {
     pub struct SpriteId;
 }
 
+#[derive(Debug, Clone)]
+pub struct SpriteInfo {
+    /// Size in pixels.
+    pub size: UVec2,
+    // One entry for each mipmap level, where
+    // level 0 is the largest. mipmap_sizes[0] == size
+    pub mipmap_sizes: Vec<UVec2>,
+
+    /// The atlas allocation storing each mipmap level.
+    pub mipmap_allocations: Vec<Allocation>,
+}
+
 /// Stores available sprite textures.
 pub struct Sprites {
     atlas: TextureAtlas,
-    allocations: SlotMap<SpriteId, Allocation>,
+    infos: SlotMap<SpriteId, SpriteInfo>,
     by_name: AHashMap<String, SpriteId>,
-    sizes: SecondaryMap<SpriteId, UVec2>,
 }
 
 impl Sprites {
@@ -30,9 +47,8 @@ impl Sprites {
                 wgpu::TextureFormat::Bgra8UnormSrgb,
                 "sprite_atlas",
             ),
-            allocations: SlotMap::default(),
+            infos: SlotMap::default(),
             by_name: AHashMap::new(),
-            sizes: SecondaryMap::default(),
         }
     }
 
@@ -52,19 +68,42 @@ impl Sprites {
         });
         let bgra_data = rgba_data;
 
-        let allocation = self.atlas.insert(bgra_data, width, height);
-        let sprite_id = self.allocations.insert(allocation);
+        let mut current_image: ImageBuffer<Bgra<u8>, _> =
+            ImageBuffer::from_raw(width, height, bgra_data.to_vec()).unwrap();
+        let mut current_size = UVec2::new(width, height);
 
+        // Write each mipmap level.
+        let mut info = SpriteInfo {
+            size: current_size,
+            mipmap_sizes: Vec::new(),
+            mipmap_allocations: Vec::new(),
+        };
+
+        for _ in 0..MIPMAP_LEVELS {
+            let allocation =
+                self.atlas
+                    .insert(current_image.as_raw(), current_size.x, current_size.y);
+            info.mipmap_allocations.push(allocation);
+            info.mipmap_sizes.push(current_size);
+
+            // Downscale to next mipmap level.
+            current_size = UVec2::new((current_size.x / 2).max(1), (current_size.y / 2).max(1));
+            current_image = imageops::resize(
+                &current_image,
+                current_size.x,
+                current_size.y,
+                FilterType::Triangle,
+            );
+        }
+
+        let sprite_id = self.infos.insert(info);
         self.by_name.insert(name, sprite_id);
-        self.sizes.insert(sprite_id, glam::uvec2(width, height));
-
         sprite_id
     }
 
     pub fn remove(&mut self, id: SpriteId) {
-        if let Some(allocation) = self.allocations.remove(id) {
-            self.atlas.remove(allocation);
-
+        let info = self.infos.remove(id);
+        if let Some(info) = info {
             let name = self
                 .by_name
                 .iter()
@@ -73,11 +112,28 @@ impl Sprites {
                 .0
                 .clone();
             self.by_name.remove(&name);
+
+            for mipmap_allocation in info.mipmap_allocations {
+                self.atlas.remove(mipmap_allocation);
+            }
         }
     }
 
-    pub fn sprite_allocation(&self, id: SpriteId) -> Allocation {
-        self.allocations[id]
+    pub fn sprite_info(&self, id: SpriteId) -> &SpriteInfo {
+        &self.infos[id]
+    }
+
+    /// Determines the mipmap level to use when a
+    /// sprite is rendered at the given width.
+    pub fn mipmap_level_for_scale(&self, id: SpriteId, target_width: f32) -> usize {
+        let info = self.sprite_info(id);
+        let width = info.size.x as f32;
+
+        let width_ratio = width / target_width;
+        width_ratio
+            .log2()
+            .floor()
+            .clamp(0.0, MIPMAP_LEVELS as f32 - 1.0) as usize
     }
 
     pub fn sprite_by_name(&self, name: &str) -> Option<SpriteId> {
@@ -90,6 +146,6 @@ impl Sprites {
     }
 
     pub fn sprite_size(&self, id: SpriteId) -> UVec2 {
-        self.sizes[id]
+        self.sprite_info(id).size
     }
 }

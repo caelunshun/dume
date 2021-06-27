@@ -415,6 +415,10 @@ function Canvas:roundedRect(pos, size, radius)
     self:quadTo(pos, pos + offsetX)
 end
 
+function Canvas:circle(center, radius)
+    self:arc(center, radius, 0, 2 * math.pi)
+end
+
 function dume.rectContains(rectPos, rectSize, pos)
     local rectEnd = rectPos + rectSize
     return pos.x >= rectPos.x and pos.y >= rectPos.y
