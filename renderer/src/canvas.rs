@@ -125,6 +125,9 @@ impl Canvas {
 
     pub fn draw_paragraph(&mut self, pos: Vec2, paragraph: &Paragraph) -> &mut Self {
         for glyph in paragraph.glyphs() {
+            if !glyph.visible {
+                continue;
+            }
             match glyph.c {
                 GlyphCharacter::Char(c) => {
                     let key = GlyphKey {
