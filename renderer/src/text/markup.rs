@@ -82,18 +82,18 @@ fn apply_variables(
 
         let mut cursor = 0;
         while let Some(var_start) = (&text[cursor..]).chars().position(|c| c == '%') {
-            let var_end = (&text[var_start + 1..])
+            let var_end = (&text[cursor + var_start + 1..])
                 .chars()
                 .position(|c| !c.is_alphanumeric() && c != '_')
-                .map(|pos| pos + var_start + 1)
+                .map(|pos| pos + cursor + var_start + 1)
                 .unwrap_or_else(|| text.len());
-            let var = &text[var_start + 1..var_end];
+            let var = &text[cursor + var_start + 1..var_end];
 
             let new_value = resolve_variable(var);
 
-            *text = String::from(&text[..var_start]) + (&new_value) + &text[var_end..];
+            *text = String::from(&text[..cursor + var_start]) + (&new_value) + &text[var_end..];
 
-            cursor = var_start + new_value.len();
+            cursor = cursor + var_start + new_value.len();
         }
     }
 }
