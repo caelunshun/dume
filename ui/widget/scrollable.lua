@@ -19,7 +19,8 @@ function Scrollable:new(scrollAxis, child, barWidth)
             scrollPos = 0,
             grabbed = false,
             hovered = false,
-        }
+        },
+        classes = { "scrollable" }
     }
     setmetatable(o, self)
     self.__index = self
@@ -82,7 +83,7 @@ function Scrollable:layout(maxSize, cv)
 end
 
 function Scrollable:paint(cv)
-    local style = self.style.scrollable
+    local style = self.style
 
     cv:setScissorRect(Vector(0, 0), self.size)
     self:paintChildren(cv)

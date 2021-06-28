@@ -9,7 +9,8 @@ function Tooltip:new(child, tooltip)
         children = {child, tooltip},
         child = child,
         tooltip = tooltip,
-        state = { showing = false, cursorPos = Vector(0, 0) }
+        state = { showing = false, cursorPos = Vector(0, 0) },
+        classes = { "tooltip" }
     }
     setmetatable(o, self)
     self.__index = self

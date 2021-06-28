@@ -95,6 +95,7 @@ function Flex:layout(maxSize, cv)
     end
 
     -- Apply non-left alignment.
+    self.offsetFromParent = Vector(math.huge, math.huge)
     local biggestCrossSize = 0
     local totalSize = cursor
     for _, widget in ipairs(self.children) do
@@ -117,6 +118,11 @@ function Flex:layout(maxSize, cv)
         if widget.size[self.crossAxis] > biggestCrossSize then
             biggestCrossSize = widget.size[self.crossAxis]
         end
+
+        widget.size[self.crossAxis] = maxSize[self.crossAxis]
+
+        if widget.pos.x < self.offsetFromParent.x then self.offsetFromParent.x = widget.pos.x end
+        if widget.pos.y < self.offsetFromParent.y then self.offsetFromParent.y = widget.pos.y end
     end
 
     self.size = Vector(0, 0)

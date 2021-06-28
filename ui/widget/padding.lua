@@ -19,6 +19,7 @@ function Padding:layout(maxSize, cv)
     self.child:layout(childSize, cv)
     self.child.pos = Vector(self.params.amount, self.params.amount)
     self.size = self.child.size + Vector(self.params.amount * 2, self.params.amount * 2)
+    self.offsetFromParent = self.child.offsetFromParent
 end
 
 return Padding

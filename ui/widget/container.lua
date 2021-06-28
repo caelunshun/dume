@@ -6,7 +6,7 @@ local Vector = require("brinevector")
 
 function Container:new(child)
     local o = {
-        children = {child}
+        children = {child}, child = child, classes = { "container" }
     }
     setmetatable(o, self)
     self.__index = self
@@ -15,7 +15,7 @@ end
 
 function Container:paint(cv)
     cv:beginPath()
-    cv:roundedRect(Vector(0, 0), self.size, self.style.borderRadius or 0)
+    cv:roundedRect(self.offsetFromParent, self.size, self.style.borderRadius or 0)
     if self.style.backgroundColor then
         cv:solidColor(self.style.backgroundColor)
         cv:fill()

@@ -36,7 +36,9 @@
 -- children - a list of widget children
 -- params - provided when the widget is built
 -- state - persistent state
--- style - style for painting
+-- style - current style for painting
+-- classes - list of strings containing style classes for the widget
+-- pressed, hovered - booleans indicating these states. They determine widget styling.
 --
 -- Widgets should not add more fields; they should keep their state within the `state` table.
 --
@@ -233,8 +235,12 @@ local function cross(axis)
 end
 dume.cross = cross
 
-function UI:new(cv)
-    local o = { cv = cv, style = {}, windows = {} }
+-- Creates a new UI.
+--
+-- `style` should be a table with members default, hovered, and pressed,
+-- and each of those fields should contain a mapping from class name => applied style parameters.
+function UI:new(cv, style)
+    local o = { cv = cv, style = style, windows = {} }
 
     setmetatable(o, self)
     self.__index = self
@@ -245,12 +251,12 @@ end
 function UI:createWindow(name, pos, size, rootWidget)
     self:inflate(rootWidget)
 
-    table.insert(self.windows, {
+    self.windows[name] = {
         name = name,
         pos = pos,
         size = size,
         rootWidget = rootWidget,
-    })
+    }
 end
 
 function UI:deleteWindow(name)
@@ -258,7 +264,7 @@ function UI:deleteWindow(name)
 end
 
 function UI:handleEvent(event)
-    for _, window in ipairs(self.windows) do
+    for _, window in pairs(self.windows) do
         if event.pos ~= nil then
             event.pos = event.pos - window.pos
         end
@@ -275,14 +281,14 @@ function UI:render()
 end
 
 function UI:computeWidgetLayouts()
-    for _, window in ipairs(self.windows) do
+    for _, window in pairs(self.windows) do
         window.rootWidget.pos = window.pos
         window.rootWidget:layout(window.size, self.cv)
     end
 end
 
 function UI:paintWidgets()
-    for _, window in ipairs(self.windows) do
+    for _, window in pairs(self.windows) do
         self.cv:translate(window.pos)
         window.rootWidget:paint(self.cv)
         self.cv:translate(-window.pos)
@@ -291,6 +297,7 @@ end
 
 function UI:inflate(widget, parent)
     widget.children = widget.children or {}
+    widget.offsetFromParent = widget.offsetFromParent or Vector(0, 0)
 
     -- Set default methods
     widget.contains = function(self, pos)
@@ -317,17 +324,32 @@ function UI:inflate(widget, parent)
 
             if child.size.x > biggestSize.x then biggestSize.x = child.size.x end
             if child.size.y > biggestSize.y then biggestSize.y = child.size.y end
+
+            self.offsetFromParent = child.offsetFromParent
         end
         return biggestSize
     end
 
     widget.layout = widget.layout or function(self, maxSize, cv)
-        local biggestSize = self:layoutChildren(maxSize, cv)
-        self.size = biggestSize
+        local biggestSize = self:layoutChildren(self.style.minSize or maxSize, cv)
+
+        if self.fillParent then
+            -- grow to the maximum possible size
+            self.size = maxSize
+        elseif self.style.minSize ~= nil then
+            -- shrink to child size but with a minimum size
+            self.size = Vector(
+                    math.max(self.style.minSize.x, biggestSize.x),
+                    math.max(self.style.minSize.y, biggestSize.y)
+            )
+        else
+            -- shrink to child size
+            self.size = biggestSize
+        end
     end
 
     widget.invokeChildrenEvents = function(self, event, cv)
-        for _, child in ipairs(self.children) do
+        for _, child in ipairs(self.children or {}) do
             -- Transform event position to child space
             if event.pos ~= nil then event.pos = event.pos - child.pos end
 
@@ -338,26 +360,60 @@ function UI:inflate(widget, parent)
     end
 
     widget.handleEvent = widget.handleEvent or widget.invokeChildrenEvents
+    local handler = widget.handleEvent
 
-    -- Style inheritance
-    widget.style = widget.style or {}
+    widget.handleEvent = function(self, event, cv)
+        handler(self, event, cv)
 
-    local parentForStyle = nil
-    if parent ~= nil then
-        parentForStyle = parent
-    else
-        parentForStyle = self
+        if event.type == dume.EventType.CursorMove then
+            self.hovered = self:contains(event.pos)
+        end
+        if event.type == dume.EventType.MouseClick then
+            if (event.action == dume.Action.Press or event.action == dume.Action.Repeat) and self:contains(event.pos) then
+                self.pressed = true
+            else
+                self.pressed = false
+            end
+        end
+
+        if self.pressed then
+            self.style = self._dumePressedStyle
+        elseif self.hovered then
+            self.style = self._dumeHoveredStyle
+        else
+            self.style = self._dumeDefaultStyle
+        end
     end
 
-    local metatable = getmetatable(widget.style)
-    if metatable == nil then
-        metatable = {}
-        setmetatable(widget.style, metatable)
+    -- Styling
+    local defaultStyle = {}
+    local hoveredStyle = {}
+    local pressedStyle = {}
+    for _, class in ipairs(widget.classes or {}) do
+        for k, v in pairs(self.style.default[class] or {}) do
+            defaultStyle[k] = v
+        end
+        for k, v in pairs(self.style.hovered[class] or {}) do
+            hoveredStyle[k] = v
+        end
+        for k, v in pairs(self.style.pressed[class] or {}) do
+            pressedStyle[k] = v
+        end
     end
 
-    metatable.__index = function(table, key)
-        return rawget(table, key) or parentForStyle.style[key]
+    -- Inherit styling
+    setmetatable(hoveredStyle, hoveredStyle)
+    hoveredStyle.__index = function(t, k)
+        return rawget(t, k) or defaultStyle[k]
     end
+    setmetatable(pressedStyle, pressedStyle)
+    pressedStyle.__index = function(t, k)
+        return rawget(t, k) or hoveredStyle[k]
+    end
+    widget._dumeDefaultStyle = defaultStyle
+    widget._dumeHoveredStyle = hoveredStyle
+    widget._dumePressedStyle = pressedStyle
+    widget.style = defaultStyle -- changed by handleEvent
 
     -- Initialize widget and inflate children
     if widget.init ~= nil then

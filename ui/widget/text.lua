@@ -25,7 +25,8 @@ function Text:new(markup, variables, layout)
             variables = variables,
             layout = layout
         },
-        state = {}
+        state = {},
+        classes = { "text" }
     }
     setmetatable(o, self)
     self.__index = self

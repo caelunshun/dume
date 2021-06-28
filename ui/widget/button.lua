@@ -3,18 +3,18 @@ local Button = {}
 
 local Container = require("widget/container")
 local Clickable = require("widget/clickable")
-local StyleModifier = require("widget/style_modifier")
+local Center = require("widget/center")
 
 function Button:new(child, pressedCallback)
+    local container = Container:new(Center:new(child))
+    container.fillParent = true
+    local clickable = Clickable:new(container, pressedCallback)
+    clickable.fillParent = true
     local o = {
         children = {
-            StyleModifier:new(
-                    Clickable:new(
-                            Container:new(child),
-                            pressedCallback
-                    )
-            )
-        }
+            clickable
+        },
+        classes = { "button" }
     }
     setmetatable(o, self)
     self.__index = self

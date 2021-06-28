@@ -16,7 +16,8 @@ function ProgressBar:new(size, progressFunction, predictedProgressFunction, chil
             progressFunction = progressFunction,
             predictedProgressFunction = predictedProgressFunction,
             size = size,
-        }
+        },
+        classes = { "progressBar" }
     }
     if child ~= nil then o.children[1] = child end
     setmetatable(o, self)
@@ -25,7 +26,7 @@ function ProgressBar:new(size, progressFunction, predictedProgressFunction, chil
 end
 
 function ProgressBar:paint(cv)
-    local style = self.style.progressBar
+    local style = self.style
     local progress = self.params.progressFunction()
     local predictedProgress = 0
     if self.params.predictedProgressFunction ~= nil then
