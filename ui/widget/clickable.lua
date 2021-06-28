@@ -15,7 +15,7 @@ function Clickable:handleEvent(event, cv)
     if event.type == dume.EventType.MouseClick
             and event.action == dume.Action.Press and event.mouse == dume.Mouse.Left
             and self:contains(event.pos) then
-        self.params.callback()
+        self.params.callback(event.modifiers)
     else
         self:invokeChildrenEvents(event, cv)
     end

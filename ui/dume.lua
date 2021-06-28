@@ -257,6 +257,8 @@ function UI:createWindow(name, pos, size, rootWidget)
         size = size,
         rootWidget = rootWidget,
     }
+
+    self:computeWidgetLayouts()
 end
 
 function UI:deleteWindow(name)
@@ -273,6 +275,15 @@ function UI:handleEvent(event)
             event.pos = event.pos + window.pos
         end
     end
+
+    if event.pos ~= nil then
+        for _, window in pairs(self.windows) do
+            if dume.rectContains(window.pos, window.size, event.pos) then
+                return true -- event may have affected this window
+            end
+        end
+    end
+    return false -- didn't handle event
 end
 
 function UI:render()
