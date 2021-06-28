@@ -40,7 +40,7 @@ function Image:layout(maxSize, cv)
         self.size.x = realMaxSize.x
     end
     self.size.y = self.size.x * aspect
-    self:layoutChildren(self.size, cv)
+    self:layoutChildren(self.size.copy, cv)
 end
 
 return Image

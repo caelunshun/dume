@@ -172,12 +172,11 @@ pub unsafe extern "C" fn dume_get_sprite_by_name(
     name: *const u8,
     name_len: usize,
 ) -> u64 {
+    let name = std::str::from_utf8_unchecked(std::slice::from_raw_parts(name, name_len));
     canvas(ctx)
-        .sprite_by_name(std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            name, name_len,
-        )))
+        .sprite_by_name(name)
         .map(|k| k.data().as_ffi())
-        .unwrap_or(0)
+        .unwrap_or_else(|| panic!("missing sprite with ID '{}'", name))
 }
 
 #[no_mangle]

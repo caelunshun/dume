@@ -6,21 +6,22 @@ local Flex = {}
 local dume = require("dume")
 local Vector = require("brinevector")
 
-function Flex:row()
-    return self:new(dume.Axis.Horizontal)
+function Flex:row(spacing)
+    return self:new(dume.Axis.Horizontal, spacing)
 end
 
-function Flex:column()
-    return self:new(dume.Axis.Vertical)
+function Flex:column(spacing)
+    return self:new(dume.Axis.Vertical, spacing)
 end
 
-function Flex:new(mainAxis)
+function Flex:new(mainAxis, spacing)
+    spacing = spacing or 5
     local o = {
         mainAxis = mainAxis,
         crossAxis = dume.cross(mainAxis),
         mainAlign = dume.Align.Start,
         crossAlign = dume.Align.Start,
-        spacing = 0,
+        spacing = spacing,
         children = {}
     }
     setmetatable(o, self)
@@ -118,8 +119,6 @@ function Flex:layout(maxSize, cv)
         if widget.size[self.crossAxis] > biggestCrossSize then
             biggestCrossSize = widget.size[self.crossAxis]
         end
-
-        widget.size[self.crossAxis] = maxSize[self.crossAxis]
 
         if widget.pos.x < self.offsetFromParent.x then self.offsetFromParent.x = widget.pos.x end
         if widget.pos.y < self.offsetFromParent.y then self.offsetFromParent.y = widget.pos.y end
