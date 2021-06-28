@@ -125,6 +125,9 @@ function Flex:layout(maxSize, cv)
         if widget.pos.y < self.offsetFromParent.y then self.offsetFromParent.y = widget.pos.y end
     end
 
+    if self.offsetFromParent.x == math.huge then self.offsetFromParent.x = 0 end
+    if self.offsetFromParent.y == math.huge then self.offsetFromParent.y = 0 end
+
     self.size = Vector(0, 0)
     self.size[self.crossAxis] = biggestCrossSize
     self.size[self.mainAxis] = totalSize
