@@ -43,7 +43,9 @@ void main() {
     } else if (paintType == PAINT_SPRITE) {
         o_Color = texture(sampler2D(u_SpriteAtlas, u_Sampler), f_TexCoord);
     } else if (paintType == PAINT_ALPHA_TEXTURE) {
-        o_Color = vec4(colors[colorIndex].xyz, texture(sampler2D(u_FontAtlas, u_NearestSampler), f_TexCoord).x);
+        vec4 color = colors[colorIndex];
+        o_Color = vec4(color.rgb, texture(sampler2D(u_FontAtlas, u_NearestSampler), f_TexCoord).x);
+        o_Color.a *= color.a;
     } else if (paintType == PAINT_LINEAR_GRADIENT) {
         vec4 colorA = colors[colorIndex];
         vec4 colorB = colors[colorIndex + 1];
