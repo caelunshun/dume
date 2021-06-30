@@ -15,7 +15,13 @@ end
 
 function Container:paint(cv)
     cv:beginPath()
-    cv:roundedRect(self.offsetFromParent, self.size, self.style.borderRadius or 0)
+    local pos
+    if self.fillParent then
+        pos = Vector(0, 0)
+    else
+        pos = self.offsetFromParent
+    end
+    cv:roundedRect(pos, self.size, self.style.borderRadius or 0)
     if self.style.backgroundColor then
         cv:solidColor(self.style.backgroundColor)
         cv:fill()

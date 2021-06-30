@@ -8,14 +8,15 @@ local Center = require("widget/center")
 function Button:new(child, pressedCallback)
     local container = Container:new(Center:new(child))
     container.fillParent = true
-    table.insert(container.classes, "button")
+    local classes = { "button", "container" }
+    container.classes = classes
     local clickable = Clickable:new(container, pressedCallback)
     clickable.fillParent = true
     local o = {
         children = {
             clickable
         },
-        classes = { "button" }
+        classes = classes,
     }
     setmetatable(o, self)
     self.__index = self
