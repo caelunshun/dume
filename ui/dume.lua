@@ -329,14 +329,19 @@ function UI:new(cv, style)
     return o
 end
 
-function UI:createWindow(name, pos, size, rootWidget)
+function UI:createWindow(name, pos, size, rootWidget, flexibleSize, flexiblePos)
     self:inflate(rootWidget)
+
+    if flexibleSize == nil then flexibleSize = false end
+    if flexiblePos == nil then flexiblePos = true end
 
     self.windows[name] = {
         name = name,
         pos = pos,
         size = size,
         rootWidget = rootWidget,
+        flexibleSize = flexibleSize,
+        flexiblePos = flexiblePos,
     }
 
     self:computeWidgetLayouts()
@@ -526,8 +531,15 @@ end
 
 function UI:resize(oldCanvasSize, newCanvasSize)
     for _, window in pairs(self.windows) do
-        window.size.x = window.size.x * newCanvasSize.x / oldCanvasSize.x
-        window.size.y = window.size.y * newCanvasSize.y / oldCanvasSize.y
+        if window.flexibleSize then
+            window.size.x = window.size.x * newCanvasSize.x / oldCanvasSize.x
+            window.size.y = window.size.y * newCanvasSize.y / oldCanvasSize.y
+        end
+
+        if window.flexiblePos then
+            window.pos.x = window.pos.x * newCanvasSize.x / oldCanvasSize.x
+            window.pos.y = window.pos.y * newCanvasSize.y / oldCanvasSize.y
+        end
     end
 end
 
