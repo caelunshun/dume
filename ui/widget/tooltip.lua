@@ -17,7 +17,8 @@ function Tooltip:new(child, tooltip)
     return o
 end
 
-function Tooltip:handleEvent(event)
+function Tooltip:handleEvent(event, cv)
+    self:invokeChildrenEvents(event, cv)
     if event.type == dume.EventType.CursorMove then
         self.state.showing = self:contains(event.pos)
         self.state.cursorPos = event.pos
@@ -26,6 +27,7 @@ end
 
 function Tooltip:layout(maxSize, cv)
     self.child:layout(maxSize, cv)
+    self.child.pos = Vector(0, 0)
     self.size = self.child.size
 
     self.tooltip:layout(Vector(cv:getWidth(), cv:getHeight()), cv)
