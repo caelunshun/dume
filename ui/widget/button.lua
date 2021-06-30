@@ -8,6 +8,7 @@ local Center = require("widget/center")
 function Button:new(child, pressedCallback)
     local container = Container:new(Center:new(child))
     container.fillParent = true
+    table.insert(container.classes, "button")
     local clickable = Clickable:new(container, pressedCallback)
     clickable.fillParent = true
     local o = {

@@ -340,6 +340,10 @@ function UI:createWindow(name, pos, size, rootWidget)
     }
 
     self:computeWidgetLayouts()
+    self:handleEvent({
+        type = EventType.CursorMove,
+        pos = self.cursorPos or Vector(0, 0),
+    })
 end
 
 function UI:deleteWindow(name)
@@ -347,6 +351,10 @@ function UI:deleteWindow(name)
 end
 
 function UI:handleEvent(event)
+    if event.type == EventType.CursorMove then
+        self.cursorPos = event.pos.copy
+    end
+
     for _, window in pairs(self.windows) do
         if event.pos ~= nil then
             event.pos = event.pos - window.pos
@@ -425,15 +433,15 @@ function UI:inflate(widget, parent)
     widget.layout = widget.layout or function(self, maxSize, cv)
         local biggestSize = self:layoutChildren(self.style.minSize or maxSize, cv)
 
-        if self.fillParent then
-            -- grow to the maximum possible size
-            self.size = maxSize
-        elseif self.style.minSize ~= nil then
+        if self.style.minSize ~= nil then
             -- shrink to child size but with a minimum size
             self.size = Vector(
                     math.max(self.style.minSize.x, biggestSize.x),
                     math.max(self.style.minSize.y, biggestSize.y)
             )
+        elseif self.fillParent then
+            -- grow to the maximum possible size
+            self.size = maxSize
         else
             -- shrink to child size
             self.size = biggestSize
@@ -463,7 +471,7 @@ function UI:inflate(widget, parent)
         if event.type == dume.EventType.MouseClick then
             if (event.action == dume.Action.Press or event.action == dume.Action.Repeat) and self:contains(event.pos) then
                 self.pressed = true
-            else
+            elseif event.action == dume.Action.Release then
                 self.pressed = false
             end
         end
