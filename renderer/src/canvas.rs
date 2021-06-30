@@ -205,11 +205,13 @@ impl Canvas {
 
     pub fn linear_gradient(
         &mut self,
-        point_a: Vec2,
-        point_b: Vec2,
+       mut  point_a: Vec2,
+        mut point_b: Vec2,
         color_a: Srgba<u8>,
         color_b: Srgba<u8>,
     ) -> &mut Self {
+        point_a = self.renderer.transform.transform_point2(point_a);
+        point_b = self.renderer.transform.transform_point2(point_b);
         self.paint = Paint::LinearGradient {
             color_a,
             color_b,
