@@ -15,12 +15,15 @@ use pollster::block_on;
 use raw_window_handle::{unix::XlibHandle, HasRawWindowHandle, RawWindowHandle};
 use simple_logger::SimpleLogger;
 use slotmap::{Key, KeyData};
+use winit::{dpi::PhysicalSize, window::Window};
 
 use crate::{
     font::{Query, Style, Weight},
     markup, Canvas, Paragraph, Rect, SpriteData, SpriteDescriptor, SpriteId, Text, TextLayout,
     TextStyle, SAMPLE_COUNT, TARGET_FORMAT,
 };
+
+pub mod window;
 
 pub struct DumeCtx {
     canvas: Canvas,
@@ -32,31 +35,16 @@ pub struct DumeCtx {
     sample_texture: wgpu::TextureView,
 }
 
-#[repr(C)]
-pub struct RawWindow {
-    window: c_ulong,
-    display: *mut c_void,
-}
-
-unsafe impl HasRawWindowHandle for RawWindow {
-    fn raw_window_handle(&self) -> RawWindowHandle {
-        RawWindowHandle::Xlib(XlibHandle {
-            window: self.window,
-            display: self.display,
-            ..XlibHandle::empty()
-        })
-    }
-}
-
 #[no_mangle]
-pub extern "C" fn dume_init(width: u32, height: u32, window: RawWindow) -> *mut DumeCtx {
+pub unsafe extern "C" fn dume_init(window: *const Window) -> *mut DumeCtx {
     SimpleLogger::new()
         .with_level(log::LevelFilter::Warn)
         .init()
         .unwrap();
+    let PhysicalSize { width, height } = (*window).inner_size();
     let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
 
-    let surface = unsafe { instance.create_surface(&window) };
+    let surface = unsafe { instance.create_surface(&*window) };
 
     let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::HighPerformance,
@@ -81,7 +69,7 @@ pub extern "C" fn dume_init(width: u32, height: u32, window: RawWindow) -> *mut 
         format: TARGET_FORMAT,
         width,
         height,
-        present_mode: wgpu::PresentMode::Mailbox,
+        present_mode: wgpu::PresentMode::Immediate,
     };
     let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
     let sample_texture = create_sample_texture(&device, &swap_chain_desc);

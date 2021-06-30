@@ -9,6 +9,11 @@
 
 static const uint32_t SAMPLE_COUNT = 8;
 
+enum class Action {
+  Press,
+  Release,
+};
+
 enum class Align {
   /// Top or left
   Start,
@@ -24,6 +29,23 @@ enum class Baseline {
   Middle,
   Alphabetic,
   Bottom,
+};
+
+enum class CControlFlow {
+  Poll,
+  Exit,
+};
+
+enum class EventKind {
+  CloseRequested,
+  RedrawRequested,
+  MainEventsCleared,
+  Resized,
+  Character,
+  Keyboard,
+  Mouse,
+  CursorMove,
+  Scroll,
 };
 
 /// Font style: normal or italic. We do not support
@@ -76,11 +98,6 @@ struct TextLayout {
   Align align_v;
 };
 
-struct RawWindow {
-  unsigned long window;
-  void *display;
-};
-
 struct CTextStyle {
   const char *family_name;
   size_t family_name_len;
@@ -93,6 +110,45 @@ struct CTextStyle {
 struct Variable {
   const uint8_t *value;
   size_t len;
+};
+
+struct Modifiers {
+  bool control;
+  bool alt;
+  bool shift;
+};
+
+struct KeyboardEvent {
+  uint32_t key;
+  Action action;
+  Modifiers modifiers;
+};
+
+struct MouseEvent {
+  uint32_t mouse;
+  Action action;
+  Modifiers modifiers;
+};
+
+union EventData {
+  uint8_t empty;
+  uint32_t new_size[2];
+  uint32_t c;
+  KeyboardEvent keyboard;
+  MouseEvent mouse;
+  float cursor_pos[2];
+  float scroll_delta[2];
+};
+
+struct Event {
+  EventKind kind;
+  EventData data;
+};
+
+struct WindowOptions {
+  const char *title;
+  uint32_t width;
+  uint32_t height;
 };
 
 
@@ -139,7 +195,7 @@ Vec2 dume_get_sprite_size(DumeCtx *ctx, uint64_t sprite);
 
 uint32_t dume_get_width(DumeCtx *ctx);
 
-DumeCtx *dume_init(uint32_t width, uint32_t height, RawWindow window);
+DumeCtx *dume_init(const Window *window);
 
 void dume_line_to(DumeCtx *ctx, Vec2 pos);
 
@@ -188,5 +244,23 @@ void dume_stroke_width(DumeCtx *ctx, float width);
 void dume_text_free(Text *text);
 
 void dume_translate(DumeCtx *ctx, Vec2 vector);
+
+EventLoop *winit_event_loop_new();
+
+void winit_event_loop_run(EventLoop *event_loop,
+                          CControlFlow (*callback)(void*, Event),
+                          void *userdata);
+
+double winit_get_time();
+
+void winit_window_free(Window *window);
+
+void winit_window_grab_cursor(const Window *window, bool grabbed);
+
+Window *winit_window_new(const WindowOptions *options, const EventLoop *event_loop);
+
+void winit_window_request_redraw(const Window *window);
+
+void winit_window_set_cursor_pos(const Window *window, float x, float y);
 
 } // extern "C"
