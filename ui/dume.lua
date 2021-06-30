@@ -277,8 +277,8 @@ local Key = {
 dume.Key = Key
 
 local Action = {
-    Release = 0,
-    Press = 1,
+    Press = 0,
+    Release = 1,
     Repeat = 2,
 }
 dume.Action = Action
