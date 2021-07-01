@@ -33,6 +33,9 @@ function ProgressBar:paint(cv)
         predictedProgress = self.params.predictedProgressFunction()
     end
 
+    progress = math.clamp(progress, 0, 1)
+    predictedProgress = math.clamp(predictedProgress, 0, 1)
+
     cv:beginPath()
     cv:roundedRect(Vector(0, 0), self.size, style.borderRadius)
 
