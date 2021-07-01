@@ -12,7 +12,6 @@ use std::{
 use glam::Vec2;
 use palette::Srgba;
 use pollster::block_on;
-use raw_window_handle::{unix::XlibHandle, HasRawWindowHandle, RawWindowHandle};
 use simple_logger::SimpleLogger;
 use slotmap::{Key, KeyData};
 use winit::{dpi::PhysicalSize, window::Window};
