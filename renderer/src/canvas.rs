@@ -205,7 +205,7 @@ impl Canvas {
 
     pub fn linear_gradient(
         &mut self,
-       mut  point_a: Vec2,
+        mut point_a: Vec2,
         mut point_b: Vec2,
         color_a: Srgba<u8>,
         color_b: Srgba<u8>,
@@ -275,7 +275,6 @@ impl Canvas {
     ) {
         let ortho = Mat4::orthographic_lh(0.0, window_size.x, window_size.y, 0.0, -1.0, 1.0);
         let mut prepared_sprites = self.renderer.prepare(ortho);
-
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("doom"),

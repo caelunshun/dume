@@ -587,7 +587,7 @@ function Canvas:roundedRect(pos, size, radius)
 end
 
 function Canvas:circle(center, radius)
-    self:arc(center, radius, 0, 2 * math.pi)
+    self:arc(center, radius, 0, 2 * math.pi + 0.1)
 end
 
 function dume.rectContains(rectPos, rectSize, pos)
