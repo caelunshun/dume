@@ -360,6 +360,15 @@ function UI:handleEvent(event)
         self.cursorPos = event.pos.copy
     end
 
+    local affected = false
+    if event.pos ~= nil then
+        for _, window in pairs(self.windows) do
+            if dume.rectContains(window.pos, window.size, event.pos) then
+                affected = true -- event may have affected this window
+            end
+        end
+    end
+
     for _, window in pairs(self.windows) do
         if event.pos ~= nil then
             event.pos = event.pos - window.pos
@@ -370,14 +379,8 @@ function UI:handleEvent(event)
         end
     end
 
-    if event.pos ~= nil then
-        for _, window in pairs(self.windows) do
-            if dume.rectContains(window.pos, window.size, event.pos) then
-                return true -- event may have affected this window
-            end
-        end
-    end
-    return false -- didn't handle event
+
+    return affected
 end
 
 function UI:render()
