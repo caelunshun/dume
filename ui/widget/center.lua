@@ -11,7 +11,8 @@ end
 function Center:layout(maxSize, cv)
     self.child:layout(maxSize, cv)
     self.child.pos = (maxSize - self.child.size) / 2
-    self.size = maxSize
+    self.offsetFromParent = self.child.pos
+    self.size = self.child.size
 end
 
 return Center

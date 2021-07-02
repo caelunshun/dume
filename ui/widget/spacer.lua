@@ -17,7 +17,7 @@ function Spacer:new(axis, amount)
 end
 
 function Spacer:layout(maxSize)
-    self.size = maxSize
+    self.size = Vector(0, 0)
     self.size[self.params.axis] = self.params.amount
 end
 
