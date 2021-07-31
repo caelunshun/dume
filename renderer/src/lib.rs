@@ -4,6 +4,7 @@
 
 mod atlas;
 mod canvas;
+pub mod ffi;
 pub mod font;
 mod glyph;
 mod path;
@@ -11,10 +12,9 @@ mod rect;
 mod renderer;
 mod sprite;
 mod text;
-pub mod ffi;
 
 pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
-pub const SAMPLE_COUNT: u32 = 8;
+pub const SAMPLE_COUNT: u32 = 4;
 
 pub use canvas::{Canvas, SpriteData, SpriteDescriptor};
 pub use rect::Rect;
