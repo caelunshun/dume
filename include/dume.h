@@ -38,8 +38,8 @@ namespace dume {
             winit_window_free(window);
         }
 
-        void resize(uint32_t newWidth, uint32_t newHeight) {
-            dume_resize(ctx, newWidth, newHeight);
+        void resize(uint32_t newWidth, uint32_t newHeight, double newScaleFactor) {
+            dume_resize(ctx, newWidth, newHeight, newScaleFactor);
         }
 
         uint64_t createSpriteFromEncoded(std::string name, std::string data) {
@@ -201,7 +201,7 @@ namespace dume {
                             ));
                     break;
                 case EventKind::Resized:
-                    resize(event.data.new_size[0], event.data.new_size[1]);
+                    resize(event.data.new_size.dims[0], event.data.new_size.dims[1], event.data.new_size.scale_factor);
                     break;
                 case EventKind::CloseRequested:
                 case EventKind::RedrawRequested:

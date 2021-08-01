@@ -7,7 +7,7 @@
 #include "glam.h"
 
 
-static const uint32_t SAMPLE_COUNT = 8;
+static const uint32_t SAMPLE_COUNT = 4;
 
 enum class Action {
   Press,
@@ -112,6 +112,11 @@ struct Variable {
   size_t len;
 };
 
+struct NewSize {
+  uint32_t dims[2];
+  double scale_factor;
+};
+
 struct Modifiers {
   bool control;
   bool alt;
@@ -132,7 +137,7 @@ struct MouseEvent {
 
 union EventData {
   uint8_t empty;
-  uint32_t new_size[2];
+  NewSize new_size;
   uint32_t c;
   KeyboardEvent keyboard;
   MouseEvent mouse;
@@ -229,7 +234,7 @@ void dume_render(DumeCtx *ctx);
 
 void dume_reset_transform(DumeCtx *ctx);
 
-void dume_resize(DumeCtx *ctx, uint32_t new_width, uint32_t new_height);
+void dume_resize(DumeCtx *ctx, uint32_t new_width, uint32_t new_height, double new_scale_factor);
 
 void dume_scale(DumeCtx *ctx, float scale);
 
@@ -249,7 +254,8 @@ EventLoop *winit_event_loop_new();
 
 void winit_event_loop_run(EventLoop *event_loop,
                           CControlFlow (*callback)(void*, Event),
-                          void *userdata);
+                          void *userdata,
+                          const Window *window);
 
 double winit_get_time();
 

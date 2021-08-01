@@ -106,9 +106,16 @@ pub struct MouseEvent {
 }
 
 #[repr(C)]
+#[derive(Copy, Clone)]
+pub struct NewSize {
+    dims: [u32; 2],
+    scale_factor: f64,
+}
+
+#[repr(C)]
 pub union EventData {
     pub empty: u8,
-    pub new_size: [u32; 2],
+    pub new_size: NewSize,
     pub c: u32,
     pub keyboard: KeyboardEvent,
     pub mouse: MouseEvent,
@@ -163,12 +170,16 @@ pub unsafe extern "C" fn winit_event_loop_run(
     event_loop: *mut EventLoop<()>,
     callback: extern "C" fn(*mut c_void, Event) -> CControlFlow,
     userdata: *mut c_void,
+    window: *const Window,
 ) {
+    let window = &*window;
     let mut modifiers = ModifiersState::default();
 
     let event_loop = ptr::read(event_loop);
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
+
+        let scale_factor = window.scale_factor();
 
         let (kind, data) = match event {
             WinitEvent::RedrawRequested(_) => (EventKind::RedrawRequested, EventData::empty()),
@@ -177,7 +188,10 @@ pub unsafe extern "C" fn winit_event_loop_run(
                 WindowEvent::Resized(new_size) => (
                     EventKind::Resized,
                     EventData {
-                        new_size: [new_size.width, new_size.height],
+                        new_size: NewSize {
+                            dims: [new_size.width, new_size.height],
+                            scale_factor: window.scale_factor(),
+                        },
                     },
                 ),
 
@@ -211,7 +225,10 @@ pub unsafe extern "C" fn winit_event_loop_run(
                 WindowEvent::CursorMoved { position, .. } => (
                     EventKind::CursorMove,
                     EventData {
-                        cursor_pos: [position.x as f32, position.y as f32],
+                        cursor_pos: [
+                            position.to_logical(scale_factor).x,
+                            position.to_logical(scale_factor).y,
+                        ],
                     },
                 ),
                 WindowEvent::MouseWheel { delta, .. } => match delta {
@@ -224,7 +241,10 @@ pub unsafe extern "C" fn winit_event_loop_run(
                     winit::event::MouseScrollDelta::PixelDelta(delta) => (
                         EventKind::Scroll,
                         EventData {
-                            scroll_delta: [delta.x as f32, delta.y as f32],
+                            scroll_delta: [
+                                delta.to_logical(scale_factor).x,
+                                delta.to_logical(scale_factor).y,
+                            ],
                         },
                     ),
                 },

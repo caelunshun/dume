@@ -14,7 +14,10 @@ use palette::Srgba;
 use pollster::block_on;
 use simple_logger::SimpleLogger;
 use slotmap::{Key, KeyData};
-use winit::{dpi::PhysicalSize, window::Window};
+use winit::{
+    dpi::{LogicalSize, PhysicalSize},
+    window::Window,
+};
 
 use crate::{
     font::{Query, Style, Weight},
@@ -32,6 +35,7 @@ pub struct DumeCtx {
     swap_chain: wgpu::SwapChain,
     swap_chain_desc: wgpu::SwapChainDescriptor,
     sample_texture: wgpu::TextureView,
+    logical_size: LogicalSize<u32>,
 }
 
 #[no_mangle]
@@ -41,6 +45,7 @@ pub unsafe extern "C" fn dume_init(window: *const Window) -> *mut DumeCtx {
         .init()
         .unwrap();
     let PhysicalSize { width, height } = (*window).inner_size();
+    let logical_size = (*window).inner_size().to_logical((*window).scale_factor());
     let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
 
     let surface = unsafe { instance.create_surface(&*window) };
@@ -83,12 +88,18 @@ pub unsafe extern "C" fn dume_init(window: *const Window) -> *mut DumeCtx {
         swap_chain,
         swap_chain_desc,
         sample_texture,
+        logical_size,
     };
     Box::leak(Box::new(ctx)) as *mut _
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dume_resize(ctx: *mut DumeCtx, new_width: u32, new_height: u32) {
+pub unsafe extern "C" fn dume_resize(
+    ctx: *mut DumeCtx,
+    new_width: u32,
+    new_height: u32,
+    new_scale_factor: f64,
+) {
     let ctx = unpointer(ctx);
 
     ctx.swap_chain_desc.width = new_width;
@@ -97,6 +108,7 @@ pub unsafe extern "C" fn dume_resize(ctx: *mut DumeCtx, new_width: u32, new_heig
         .device
         .create_swap_chain(&ctx.surface, &ctx.swap_chain_desc);
     ctx.sample_texture = create_sample_texture(&ctx.device, &ctx.swap_chain_desc);
+    ctx.logical_size = PhysicalSize::new(new_width, new_height).to_logical(new_scale_factor);
 }
 
 #[no_mangle]
@@ -177,12 +189,12 @@ pub unsafe extern "C" fn dume_get_sprite_size(ctx: *mut DumeCtx, sprite: u64) ->
 
 #[no_mangle]
 pub unsafe extern "C" fn dume_get_width(ctx: *mut DumeCtx) -> u32 {
-    unpointer(ctx).swap_chain_desc.width
+    unpointer(ctx).logical_size.width
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn dume_get_height(ctx: *mut DumeCtx) -> u32 {
-    unpointer(ctx).swap_chain_desc.height
+    unpointer(ctx).logical_size.height
 }
 
 #[repr(C)]
@@ -420,8 +432,7 @@ pub unsafe extern "C" fn dume_render(ctx: *mut DumeCtx) {
         &frame.output.view,
         &mut encoder,
         glam::vec2(
-            ctx.swap_chain_desc.width as f32,
-            ctx.swap_chain_desc.height as f32,
+            ctx.logical_size.width as f32, ctx.logical_size.height as f32,
         ),
     );
 
