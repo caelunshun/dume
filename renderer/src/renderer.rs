@@ -169,10 +169,12 @@ impl Renderer {
         pos: Vec2,
         color: Srgba<u8>,
         fonts: &Database,
+        scale_factor: f64,
     ) {
         // Apply the current scale factor so glyphs
         // are rasterized at the precise correct scale.
-        key.size = ((key.size as f32 / 1000.0 * self.scale) * 1000.0) as u64;
+        let scale = self.scale * scale_factor as f32;
+        key.size = ((key.size as f32 / 1000.0 * scale) * 1000.0) as u64;
 
         if let Some(allocation) = self.glyphs.glyph_allocation(key, fonts) {
             let texcoords = self.glyphs.atlas().texture_coordinates(allocation);
@@ -182,7 +184,7 @@ impl Renderer {
             let size = vec2(
                 allocation.rectangle.size().width as f32 - 2.0,
                 allocation.rectangle.size().height as f32 - 2.0,
-            ) / self.scale;
+            ) / scale;
 
             self.push_quad(pos, size, texcoords, paint);
         }

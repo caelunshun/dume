@@ -52,6 +52,8 @@ pub struct Canvas {
     current_path: Path,
     stroke_width: f32,
     paint: Paint,
+
+    scale_factor: f64,
 }
 
 impl Canvas {
@@ -66,7 +68,13 @@ impl Canvas {
             current_path: Path::default(),
             stroke_width: 1.0,
             paint: Paint::Solid(Srgba::new(u8::MAX, u8::MAX, u8::MAX, u8::MAX)),
+
+            scale_factor: 1.0,
         }
+    }
+
+    pub fn set_scale_factor(&mut self, new_scale_factor: f64) {
+        self.scale_factor = new_scale_factor;
     }
 
     pub fn load_font(&mut self, font_data: Vec<u8>) {
@@ -136,7 +144,7 @@ impl Canvas {
                         size: (glyph.size * 1000.) as u64,
                     };
                     self.renderer
-                        .record_glyph(key, glyph.pos + pos, glyph.color, &self.fonts);
+                        .record_glyph(key, glyph.pos + pos, glyph.color, &self.fonts, self.scale_factor);
                 }
                 GlyphCharacter::Icon(sprite) => {
                     self.draw_sprite(

@@ -78,7 +78,8 @@ pub unsafe extern "C" fn dume_init(window: *const Window) -> *mut DumeCtx {
     let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
     let sample_texture = create_sample_texture(&device, &swap_chain_desc);
 
-    let canvas = Canvas::new(Arc::clone(&device), Arc::clone(&queue));
+    let mut canvas = Canvas::new(Arc::clone(&device), Arc::clone(&queue));
+    canvas.set_scale_factor((*window).scale_factor());
 
     let ctx = DumeCtx {
         canvas,
@@ -109,6 +110,8 @@ pub unsafe extern "C" fn dume_resize(
         .create_swap_chain(&ctx.surface, &ctx.swap_chain_desc);
     ctx.sample_texture = create_sample_texture(&ctx.device, &ctx.swap_chain_desc);
     ctx.logical_size = PhysicalSize::new(new_width, new_height).to_logical(new_scale_factor);
+
+    ctx.canvas.set_scale_factor(new_scale_factor);
 }
 
 #[no_mangle]
