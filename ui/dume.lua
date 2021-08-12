@@ -329,7 +329,8 @@ function UI:new(cv, style)
     return o
 end
 
-function UI:createWindow(name, pos, size, rootWidget, flexibleSize, flexiblePos)
+function UI:createWindow(name, pos, size, rootWidget, zDepth, flexibleSize, flexiblePos)
+    zDepth = zDepth or 0
     self:inflate(rootWidget)
 
     if flexibleSize == nil then flexibleSize = false end
@@ -342,6 +343,7 @@ function UI:createWindow(name, pos, size, rootWidget, flexibleSize, flexiblePos)
         rootWidget = rootWidget,
         flexibleSize = flexibleSize,
         flexiblePos = flexiblePos,
+        zDepth = zDepth,
     }
 
     self:computeWidgetLayouts()
@@ -396,7 +398,13 @@ function UI:computeWidgetLayouts()
 end
 
 function UI:paintWidgets()
-    for _, window in pairs(self.windows) do
+    -- Sort windows by Z depth.
+    local windows = {}
+    for _, window in pairs(self.windows) do windows[#windows + 1] = window end
+    table.sort(windows, function(a, b)
+        return a.zDepth < b.zDepth
+    end)
+    for _, window in ipairs(windows) do
         self.cv:translate(window.pos)
         window.rootWidget:paint(self.cv)
         self.cv:translate(-window.pos)
