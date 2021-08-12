@@ -1,7 +1,7 @@
 use std::{iter, mem, sync::Arc};
 
 use fontdb::Database;
-use glam::{vec2, Affine2, Mat4, Vec2};
+use glam::{vec2, Affine2, Mat4, UVec2, Vec2};
 use palette::Srgba;
 
 use crate::{
@@ -108,6 +108,10 @@ impl Canvas {
             descriptor.name.to_owned(),
         );
         id
+    }
+
+    pub fn sprite_dimensions(&self, id: SpriteId) -> UVec2 {
+        self.renderer.sprites().sprite_info(id).size
     }
 
     pub fn remove_sprite(&mut self, id: SpriteId) {
