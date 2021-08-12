@@ -211,7 +211,10 @@ fn main() {
                     &sample_texture,
                     &frame.output.view,
                     &mut encoder,
-                    Vec2::new(window.inner_size().width as f32, window.inner_size().height as f32),
+                    Vec2::new(
+                        window.inner_size().width as f32,
+                        window.inner_size().height as f32,
+                    ),
                 );
                 queue.submit(iter::once(encoder.finish()));
             }

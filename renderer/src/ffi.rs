@@ -435,7 +435,8 @@ pub unsafe extern "C" fn dume_render(ctx: *mut DumeCtx) {
         &frame.output.view,
         &mut encoder,
         glam::vec2(
-            ctx.logical_size.width as f32, ctx.logical_size.height as f32,
+            ctx.logical_size.width as f32,
+            ctx.logical_size.height as f32,
         ),
     );
 

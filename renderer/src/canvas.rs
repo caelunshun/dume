@@ -143,8 +143,13 @@ impl Canvas {
                         font: glyph.font.unwrap(),
                         size: (glyph.size * 1000.) as u64,
                     };
-                    self.renderer
-                        .record_glyph(key, glyph.pos + pos, glyph.color, &self.fonts, self.scale_factor);
+                    self.renderer.record_glyph(
+                        key,
+                        glyph.pos + pos,
+                        glyph.color,
+                        &self.fonts,
+                        self.scale_factor,
+                    );
                 }
                 GlyphCharacter::Icon(sprite) => {
                     self.draw_sprite(
@@ -199,6 +204,32 @@ impl Canvas {
             .segments
             .push(PathSegment::Arc(center, radius, start_angle, end_angle));
         self
+    }
+
+    pub fn rect(&mut self, pos: Vec2, size: Vec2) -> &mut Self {
+        self.move_to(pos)
+            .line_to(pos + vec2(size.x, 0.0))
+            .line_to(pos + size)
+            .line_to(pos + vec2(0.0, size.y))
+            .line_to(pos)
+    }
+
+    pub fn rounded_rect(&mut self, pos: Vec2, size: Vec2, radius: f32) -> &mut Self {
+        let offset_x = vec2(radius, 0.0);
+        let offset_y = vec2(0.0, radius);
+
+        let size_x = vec2(size.x, 0.0);
+        let size_y = vec2(0.0, size.y);
+
+        self.move_to(pos + offset_x)
+            .line_to(pos + size_x - offset_x)
+            .quad_to(pos + size_x, pos + size_x + offset_y)
+            .line_to(pos + size - offset_y)
+            .quad_to(pos + size, pos + size - offset_x)
+            .line_to(pos + size_y + offset_x)
+            .quad_to(pos + size_y, pos + size_y - offset_y)
+            .line_to(pos + offset_y)
+            .quad_to(pos, pos + offset_x)
     }
 
     pub fn stroke_width(&mut self, width: f32) -> &mut Self {
