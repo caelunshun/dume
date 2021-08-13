@@ -166,6 +166,11 @@ pub unsafe extern "C" fn winit_window_grab_cursor(window: *const Window, grabbed
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn winit_window_hide_cursor(window: *const Window, hidden: bool) {
+    (*window).set_cursor_visible(!hidden);
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn winit_event_loop_run(
     event_loop: *mut EventLoop<()>,
     callback: extern "C" fn(*mut c_void, Event) -> CControlFlow,

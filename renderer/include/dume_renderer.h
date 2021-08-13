@@ -263,6 +263,8 @@ void winit_window_free(Window *window);
 
 void winit_window_grab_cursor(const Window *window, bool grabbed);
 
+void winit_window_hide_cursor(const Window *window, bool hidden);
+
 Window *winit_window_new(const WindowOptions *options, const EventLoop *event_loop);
 
 void winit_window_request_redraw(const Window *window);
