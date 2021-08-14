@@ -329,23 +329,26 @@ function UI:new(cv, style)
     return o
 end
 
-function UI:createWindow(name, pos, size, rootWidget, zDepth, flexibleSize, flexiblePos)
+-- A window positioner that always fills the screen.
+dume.FillScreen = function(screenSize)
+    return {
+        pos = Vector(0, 0),
+        size = screenSize,
+    }
+end
+
+function UI:createWindow(name, positioner, rootWidget, zDepth)
     zDepth = zDepth or 0
     self:inflate(rootWidget)
 
-    if flexibleSize == nil then flexibleSize = false end
-    if flexiblePos == nil then flexiblePos = true end
-
     self.windows[name] = {
         name = name,
-        pos = pos,
-        size = size,
         rootWidget = rootWidget,
-        flexibleSize = flexibleSize,
-        flexiblePos = flexiblePos,
+        positioner = positioner,
         zDepth = zDepth,
     }
 
+    self:updateWindowPositions()
     self:computeWidgetLayouts()
     self:handleEvent({
         type = EventType.CursorMove,
@@ -355,6 +358,14 @@ end
 
 function UI:deleteWindow(name)
     self.windows[name] = nil
+end
+
+function UI:updateWindowPositions()
+    for _, window in pairs(self.windows) do
+        local position = window.positioner(Vector(self.cv:getWidth(), self.cv:getHeight()))
+        window.pos = position.pos
+        window.size = position.size
+    end
 end
 
 function UI:handleEvent(event)
@@ -404,6 +415,7 @@ function UI:paintWidgets()
     table.sort(windows, function(a, b)
         return a.zDepth < b.zDepth
     end)
+
     for _, window in ipairs(windows) do
         self.cv:translate(window.pos)
         window.rootWidget:paint(self.cv)
@@ -541,17 +553,7 @@ function UI:inflate(widget, parent)
 end
 
 function UI:resize(oldCanvasSize, newCanvasSize)
-    for _, window in pairs(self.windows) do
-        if window.flexibleSize then
-            window.size.x = window.size.x * newCanvasSize.x / oldCanvasSize.x
-            window.size.y = window.size.y * newCanvasSize.y / oldCanvasSize.y
-        end
-
-        if window.flexiblePos then
-            window.pos.x = window.pos.x * newCanvasSize.x / oldCanvasSize.x
-            window.pos.y = window.pos.y * newCanvasSize.y / oldCanvasSize.y
-        end
-    end
+    self:updateWindowPositions()
 end
 
 dume.UI = UI
