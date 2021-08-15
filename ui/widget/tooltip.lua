@@ -31,7 +31,7 @@ function Tooltip:layout(maxSize, cv)
     self.size = self.child.size
 
     self.tooltip:layout(Vector(cv:getWidth(), cv:getHeight()), cv)
-    self.tooltip.pos = self.state.cursorPos - self.tooltip.size
+    self.tooltip.pos = Vector(-self.tooltip.size.x - 10, -self.tooltip.size.y / 2 + self.child.size.y / 2)
 end
 
 function Tooltip:paint(cv)
