@@ -9,8 +9,9 @@ local Image = {}
 
 local Vector = require("brinevector")
 
-function Image:new(name, size, child)
-    local o = { params = { name = name, size = size } }
+function Image:new(name, size, child, zoomToFill)
+    if zoomToFill == nil then zoomToFill = false end
+    local o = { params = { name = name, size = size, zoomToFill = zoomToFill } }
     if child ~= nil then
         o.params.child = child
         o.children = { child }
@@ -32,7 +33,13 @@ function Image:layout(maxSize, cv)
     self.size = Vector(0, 0)
 
     local realMaxSize = Vector(maxSize.x, maxSize.y)
-    if maxSize.x * aspect > maxSize.y then realMaxSize.x = maxSize.y / aspect end
+    if maxSize.x * aspect > maxSize.y then
+        realMaxSize.x = maxSize.y / aspect
+    end
+
+    if self.params.zoomToFill and maxSize.x * aspect < maxSize.y then
+        realMaxSize.x = realMaxSize.x + (maxSize.y - maxSize.x * aspect) / aspect
+    end
 
     if self.params.size ~= nil then
         self.size.x = self.params.size
