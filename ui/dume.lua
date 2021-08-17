@@ -374,19 +374,14 @@ function UI:handleEvent(event)
     end
 
     local affected = false
-    if event.pos ~= nil then
-        for _, window in pairs(self.windows) do
-            if dume.rectContains(window.pos, window.size, event.pos) then
-                affected = true -- event may have affected this window
-            end
-        end
-    end
-
     for _, window in pairs(self.windows) do
         if event.pos ~= nil then
             event.pos = event.pos - window.pos
         end
         window.rootWidget:handleEvent(event, self.cv)
+        if event.consumed then
+            affected = true
+        end
         if event.pos ~= nil then
             event.pos = event.pos + window.pos
         end

@@ -34,4 +34,12 @@ function Container:paint(cv)
     self:paintChildren(cv)
 end
 
+function Container:handleEvent(event, cv)
+    self:invokeChildrenEvents(event, cv)
+
+    if event.pos ~= nil and self:contains(event.pos) then
+        event.consumed = true
+    end
+end
+
 return Container
