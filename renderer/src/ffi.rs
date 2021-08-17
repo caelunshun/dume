@@ -32,8 +32,7 @@ pub struct DumeCtx {
     device: Arc<wgpu::Device>,
     queue: Arc<wgpu::Queue>,
     surface: wgpu::Surface,
-    swap_chain: wgpu::SwapChain,
-    swap_chain_desc: wgpu::SwapChainDescriptor,
+    surface_desc: wgpu::SurfaceConfiguration,
     sample_texture: wgpu::TextureView,
     logical_size: LogicalSize<u32>,
 }
@@ -46,7 +45,7 @@ pub unsafe extern "C" fn dume_init(window: *const Window) -> *mut DumeCtx {
         .unwrap();
     let PhysicalSize { width, height } = (*window).inner_size();
     let logical_size = (*window).inner_size().to_logical((*window).scale_factor());
-    let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
+    let instance = wgpu::Instance::new(wgpu::Backends::all());
 
     let surface = unsafe { instance.create_surface(&*window) };
 
@@ -55,6 +54,8 @@ pub unsafe extern "C" fn dume_init(window: *const Window) -> *mut DumeCtx {
         compatible_surface: Some(&surface),
     }))
     .expect("failed to find a suitable adapter");
+
+    println!("Selected adapter: {:?}", adapter.get_info());
 
     let (device, queue) = block_on(adapter.request_device(
         &wgpu::DeviceDescriptor {
@@ -68,15 +69,15 @@ pub unsafe extern "C" fn dume_init(window: *const Window) -> *mut DumeCtx {
     let device = Arc::new(device);
     let queue = Arc::new(queue);
 
-    let swap_chain_desc = wgpu::SwapChainDescriptor {
-        usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
+    let surface_desc = wgpu::SurfaceConfiguration {
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         format: TARGET_FORMAT,
         width,
         height,
         present_mode: wgpu::PresentMode::Immediate,
     };
-    let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
-    let sample_texture = create_sample_texture(&device, &swap_chain_desc);
+    surface.configure(&device, &surface_desc);
+    let sample_texture = create_sample_texture(&device, &surface_desc);
 
     let mut canvas = Canvas::new(Arc::clone(&device), Arc::clone(&queue));
     canvas.set_scale_factor((*window).scale_factor());
@@ -86,8 +87,7 @@ pub unsafe extern "C" fn dume_init(window: *const Window) -> *mut DumeCtx {
         device,
         queue,
         surface,
-        swap_chain,
-        swap_chain_desc,
+        surface_desc,
         sample_texture,
         logical_size,
     };
@@ -103,12 +103,10 @@ pub unsafe extern "C" fn dume_resize(
 ) {
     let ctx = unpointer(ctx);
 
-    ctx.swap_chain_desc.width = new_width;
-    ctx.swap_chain_desc.height = new_height;
-    ctx.swap_chain = ctx
-        .device
-        .create_swap_chain(&ctx.surface, &ctx.swap_chain_desc);
-    ctx.sample_texture = create_sample_texture(&ctx.device, &ctx.swap_chain_desc);
+    ctx.surface_desc.width = new_width;
+    ctx.surface_desc.height = new_height;
+    ctx.surface.configure(&ctx.device, &ctx.surface_desc);
+    ctx.sample_texture = create_sample_texture(&ctx.device, &ctx.surface_desc);
     ctx.logical_size = PhysicalSize::new(new_width, new_height).to_logical(new_scale_factor);
 
     ctx.canvas.set_scale_factor(new_scale_factor);
@@ -422,7 +420,7 @@ pub unsafe extern "C" fn dume_render(ctx: *mut DumeCtx) {
     let ctx = unpointer(ctx);
 
     let frame = ctx
-        .swap_chain
+        .surface
         .get_current_frame()
         .expect("failed to get swap chain frame");
 
@@ -432,7 +430,7 @@ pub unsafe extern "C" fn dume_render(ctx: *mut DumeCtx) {
 
     ctx.canvas.render(
         &ctx.sample_texture,
-        &frame.output.view,
+        &frame.output.texture.create_view(&Default::default()),
         &mut encoder,
         glam::vec2(
             ctx.logical_size.width as f32,
@@ -450,7 +448,7 @@ pub unsafe extern "C" fn dume_free(ctx: *mut DumeCtx) {
 
 fn create_sample_texture(
     device: &wgpu::Device,
-    sc_desc: &wgpu::SwapChainDescriptor,
+    sc_desc: &wgpu::SurfaceConfiguration,
 ) -> wgpu::TextureView {
     device
         .create_texture(&wgpu::TextureDescriptor {
@@ -464,7 +462,7 @@ fn create_sample_texture(
             sample_count: SAMPLE_COUNT,
             dimension: wgpu::TextureDimension::D2,
             format: TARGET_FORMAT,
-            usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         })
         .create_view(&Default::default())
 }

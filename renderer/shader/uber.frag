@@ -25,26 +25,18 @@ layout (set = 0, binding = 5) buffer Colors {
 layout (location = 0) out vec4 o_Color;
 
 void main() {
-    if (f_ScissorRect.x == 1) {
-        vec4 encodedRect = colors[f_ScissorRect.y];
-        vec2 rectPos = encodedRect.xy;
-        vec2 rectSize = encodedRect.zw;
-
-        if (f_WorldPos.x < rectPos.x || f_WorldPos.y < rectPos.y
-            || f_WorldPos.x > rectPos.x + rectSize.x || f_WorldPos.y > rectPos.y + rectSize.y) {
-                discard;
-        }
-    }
+    vec4 spriteAtlasColor = texture(sampler2D(u_SpriteAtlas, u_Sampler), f_TexCoord);
+    vec4 fontAtlasColor = texture(sampler2D(u_FontAtlas, u_NearestSampler), f_TexCoord);
 
     int paintType = f_Paint.x;
     int colorIndex = f_Paint.y;
     if (paintType == PAINT_SOLID) {
         o_Color = colors[colorIndex];
     } else if (paintType == PAINT_SPRITE) {
-        o_Color = texture(sampler2D(u_SpriteAtlas, u_Sampler), f_TexCoord);
+        o_Color = spriteAtlasColor;
     } else if (paintType == PAINT_ALPHA_TEXTURE) {
         vec4 color = colors[colorIndex];
-        o_Color = vec4(color.rgb, texture(sampler2D(u_FontAtlas, u_NearestSampler), f_TexCoord).x);
+        o_Color = vec4(color.rgb, fontAtlasColor.x);
         o_Color.a *= color.a;
     } else if (paintType == PAINT_LINEAR_GRADIENT) {
         vec4 colorA = colors[colorIndex];
@@ -64,5 +56,16 @@ void main() {
         t = clamp(t, 0.0, 1.0);
 
         o_Color = colorA * (1 - t) + colorB * t;
+    }
+
+    if (f_ScissorRect.x == 1) {
+        vec4 encodedRect = colors[f_ScissorRect.y];
+        vec2 rectPos = encodedRect.xy;
+        vec2 rectSize = encodedRect.zw;
+
+        if (f_WorldPos.x < rectPos.x || f_WorldPos.y < rectPos.y
+            || f_WorldPos.x > rectPos.x + rectSize.x || f_WorldPos.y > rectPos.y + rectSize.y) {
+                o_Color.a = 0;
+        }
     }
 }

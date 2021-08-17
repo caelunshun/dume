@@ -37,9 +37,9 @@ impl TextureAtlas {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format,
-            usage: wgpu::TextureUsage::COPY_DST
-                | wgpu::TextureUsage::SAMPLED
-                | wgpu::TextureUsage::COPY_SRC,
+            usage: wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_SRC,
         };
         let texture = device.create_texture(&descriptor);
 
@@ -117,6 +117,7 @@ impl TextureAtlas {
                     y: allocation.rectangle.min.y as u32 + 1,
                     z: 0,
                 },
+                aspect: wgpu::TextureAspect::All,
             },
             texture,
             wgpu::ImageDataLayout {
@@ -161,11 +162,13 @@ impl TextureAtlas {
                 texture: &self.texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
             },
             wgpu::ImageCopyTexture {
                 texture: &new_texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
             },
             wgpu::Extent3d {
                 width: old_width,

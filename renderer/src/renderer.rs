@@ -302,22 +302,34 @@ impl Renderer {
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: None,
                 contents: bytemuck::bytes_of(&uniforms),
-                usage: wgpu::BufferUsage::UNIFORM,
+                usage: wgpu::BufferUsages::UNIFORM,
             });
+
+        if self.vertices.is_empty() {
+            self.vertices.push(Vertex {
+                pos: Vec2::ZERO,
+                texcoord: Vec2::ZERO,
+                paint: IVec2::ZERO,
+                scissor: IVec2::ZERO,
+            });
+        }
+        if self.indices.is_empty() {
+            self.indices.push(0);
+        }
 
         let vertex_buffer = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("vertices"),
                 contents: bytemuck::cast_slice(&self.vertices),
-                usage: wgpu::BufferUsage::VERTEX,
+                usage: wgpu::BufferUsages::VERTEX,
             });
         let index_buffer = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("indices"),
                 contents: bytemuck::cast_slice(&self.indices),
-                usage: wgpu::BufferUsage::INDEX,
+                usage: wgpu::BufferUsages::INDEX,
             });
 
         if self.colors.is_empty() {
@@ -329,7 +341,7 @@ impl Renderer {
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("colors"),
                 contents: bytemuck::cast_slice(&self.colors),
-                usage: wgpu::BufferUsage::STORAGE,
+                usage: wgpu::BufferUsages::STORAGE,
             });
 
         let num_indices = self.indices.len() as u32;
@@ -411,14 +423,13 @@ impl Renderer {
 }
 
 fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGroupLayout) {
-    // Validation needs to be disabled for non-uniformity in the fragment shader (?)
     let vert_mod = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-        flags: wgpu::ShaderFlags::default(),
-        ..wgpu::include_spirv!("../shader/uber.vert.spv")
+        label: Some("vert"),
+        source: wgpu::ShaderSource::Wgsl(include_str!("../shader/uber_vert.wgsl").into()),
     });
     let frag_mod = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-        flags: wgpu::ShaderFlags::default(),
-        ..wgpu::include_spirv!("../shader/uber.frag.spv")
+        label: Some("frag"),
+        source: wgpu::ShaderSource::Wgsl(include_str!("../shader/uber_frag.wgsl").into()),
     });
 
     let bg_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -426,7 +437,7 @@ fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGr
         entries: &[
             wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStage::VERTEX,
+                visibility: wgpu::ShaderStages::VERTEX,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
@@ -436,7 +447,7 @@ fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGr
             },
             wgpu::BindGroupLayoutEntry {
                 binding: 1,
-                visibility: wgpu::ShaderStage::FRAGMENT,
+                visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Sampler {
                     filtering: true,
                     comparison: false,
@@ -445,7 +456,7 @@ fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGr
             },
             wgpu::BindGroupLayoutEntry {
                 binding: 2,
-                visibility: wgpu::ShaderStage::FRAGMENT,
+                visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Sampler {
                     filtering: false,
                     comparison: false,
@@ -454,7 +465,7 @@ fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGr
             },
             wgpu::BindGroupLayoutEntry {
                 binding: 3,
-                visibility: wgpu::ShaderStage::FRAGMENT,
+                visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Texture {
                     sample_type: wgpu::TextureSampleType::Float { filterable: true },
                     view_dimension: wgpu::TextureViewDimension::D2,
@@ -464,7 +475,7 @@ fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGr
             },
             wgpu::BindGroupLayoutEntry {
                 binding: 4,
-                visibility: wgpu::ShaderStage::FRAGMENT,
+                visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Texture {
                     sample_type: wgpu::TextureSampleType::Float { filterable: true },
                     view_dimension: wgpu::TextureViewDimension::D2,
@@ -474,9 +485,9 @@ fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGr
             },
             wgpu::BindGroupLayoutEntry {
                 binding: 5,
-                visibility: wgpu::ShaderStage::FRAGMENT,
+                visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    ty: wgpu::BufferBindingType::Storage { read_only: false },
                     has_dynamic_offset: false,
                     min_binding_size: None,
                 },
@@ -499,7 +510,7 @@ fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGr
             entry_point: "main",
             buffers: &[wgpu::VertexBufferLayout {
                 array_stride: size_of::<Vertex>() as _,
-                step_mode: wgpu::InputStepMode::Vertex,
+                step_mode: wgpu::VertexStepMode::Vertex,
                 attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Sint32x2, 3 => Sint32x2],
             }],
         },
@@ -535,7 +546,7 @@ fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGr
                         operation: wgpu::BlendOperation::Add,
                     }
                 }),
-                write_mask: wgpu::ColorWrite::ALL,
+                write_mask: wgpu::ColorWrites::ALL,
             }],
         }),
     });
