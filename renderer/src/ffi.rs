@@ -74,7 +74,7 @@ pub unsafe extern "C" fn dume_init(window: *const Window) -> *mut DumeCtx {
         format: TARGET_FORMAT,
         width,
         height,
-        present_mode: wgpu::PresentMode::Immediate,
+        present_mode: wgpu::PresentMode::Fifo,
     };
     surface.configure(&device, &surface_desc);
     let sample_texture = create_sample_texture(&device, &surface_desc);

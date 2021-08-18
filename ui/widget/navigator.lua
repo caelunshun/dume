@@ -15,7 +15,9 @@ function Navigator:new(pages, defaultPage)
 end
 
 function Navigator:layout(maxSize, cv)
-    self.currentPage:layout(maxSize, cv)
+    for _, page in pairs(self.params.pages) do
+        page:layout(maxSize, cv)
+    end
     self.size = self.currentPage.size
     self.currentPage.pos = Vector(0, 0)
 end

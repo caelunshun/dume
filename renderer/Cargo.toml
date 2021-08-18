@@ -31,7 +31,7 @@ rustybuzz = "0.4"
 thiserror = "1"
 ttf-parser = "0.12"
 unicode-bidi = "0.3"
-wgpu = { git = "https://github.com/gfx-rs/wgpu", rev = "6ba30cbc0bbce498d24d959315d3b4310efdcc06" }
+wgpu = "0.10"
 winit = { version = "0.25", default-features = false, features = [ "x11" ] }
 
 [dev-dependencies]
