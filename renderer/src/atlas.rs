@@ -104,10 +104,6 @@ impl TextureAtlas {
     }
 
     fn write_texture(&mut self, texture: &[u8], width: u32, height: u32, allocation: Allocation) {
-        println!(
-            "Writing texture - {}x{} at ({}, {})",
-            width, height, allocation.rectangle.min.x, allocation.rectangle.min.y
-        );
         self.queue.write_texture(
             wgpu::ImageCopyTexture {
                 texture: &self.texture,
