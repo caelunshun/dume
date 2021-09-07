@@ -136,7 +136,7 @@ impl TextureAtlas {
         let new_width = min_width.next_power_of_two();
         let new_height = min_height.next_power_of_two();
 
-        println!("Atlas growing to {}x{}", new_width, new_height);
+        log::info!("Atlas growing to {}x{}", new_width, new_height);
 
         self.allocator
             .grow(Size::new(new_width as i32, new_height as i32));

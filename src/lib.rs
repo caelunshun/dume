@@ -1,10 +1,11 @@
-//! 2D rendering library on top of wgpu and lyon.
+//! A 2D renderer for `wgpu`. Supports
+//! drawing sprites, paths with solid colors
+//! or gradients, and text.
 
 #![allow(unused)]
 
 mod atlas;
 mod canvas;
-pub mod ffi;
 pub mod font;
 mod glyph;
 mod path;

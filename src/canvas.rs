@@ -1,4 +1,4 @@
-use std::{iter, mem, sync::Arc};
+use std::{iter, mem, sync::Arc, f32::consts::TAU};
 
 use fontdb::Database;
 use glam::{vec2, Affine2, Mat4, UVec2, Vec2};
@@ -234,6 +234,10 @@ impl Canvas {
             .quad_to(pos + size_y, pos + size_y - offset_y)
             .line_to(pos + offset_y)
             .quad_to(pos, pos + offset_x)
+    }
+
+    pub fn circle(&mut self, center: Vec2, radius: f32) -> &mut Self {
+        self.arc(center, radius, 0., TAU)
     }
 
     pub fn stroke_width(&mut self, width: f32) -> &mut Self {
