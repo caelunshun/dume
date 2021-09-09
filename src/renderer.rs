@@ -21,6 +21,7 @@ const PAINT_SOLID_COLOR: i32 = 0;
 const PAINT_SPRITE: i32 = 1;
 const PAINT_ALPHA_TEXTURE: i32 = 2;
 const PAINT_LINEAR_GRADIENT: i32 = 3;
+const PAINT_RADIAL_GRADIENT: i32 = 4;
 
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 #[repr(C)]
@@ -206,6 +207,14 @@ impl Renderer {
 
                 glam::ivec2(PAINT_LINEAR_GRADIENT, id)
             }
+            Paint::RadialGradient { color_a, color_b, center, radius } => {
+                let id = self.push_color(color_a);
+                self.push_color(color_b);
+                self.colors.push(Vec4::new(center.x, center.y, radius, 0.));
+
+                glam::ivec2(PAINT_RADIAL_GRADIENT, id)
+            }
+            
         };
 
         let scissor = self.scissor_vec();

@@ -1,4 +1,4 @@
-use std::{iter, mem, sync::Arc, f32::consts::TAU};
+use std::{f32::consts::TAU, iter, mem, sync::Arc};
 
 use fontdb::Database;
 use glam::{vec2, Affine2, Mat4, UVec2, Vec2};
@@ -21,6 +21,12 @@ pub enum Paint {
         color_b: Srgba<u8>,
         point_a: Vec2,
         point_b: Vec2,
+    },
+    RadialGradient {
+        color_a: Srgba<u8>,
+        color_b: Srgba<u8>,
+        center: Vec2,
+        radius: f32,
     },
 }
 
@@ -264,6 +270,24 @@ impl Canvas {
             color_b,
             point_a,
             point_b,
+        };
+        self
+    }
+
+    pub fn radial_gradient(
+        &mut self,
+        mut center: Vec2,
+        mut radius: f32,
+        color_a: Srgba<u8>,
+        color_b: Srgba<u8>,
+    ) -> &mut Self {
+        center = self.renderer.transform.transform_point2(center);
+        radius *= self.renderer.scale;
+        self.paint = Paint::RadialGradient {
+            center,
+            radius,
+            color_a,
+            color_b,
         };
         self
     }
