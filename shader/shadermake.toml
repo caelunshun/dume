@@ -1,9 +1,0 @@
-target-dir = "."
-
-[shaders.uber-vert]
-path = "uber.vert.glsl"
-kind = "vertex"
-
-[shaders.uber-frag]
-path = "uber.frag.glsl"
-kind = "fragment"

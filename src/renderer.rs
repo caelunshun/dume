@@ -423,14 +423,9 @@ impl Renderer {
 }
 
 fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGroupLayout) {
-    let vert_mod = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-        label: Some("vert"),
-        source: wgpu::ShaderSource::Wgsl(include_str!("../shader/uber_vert.wgsl").into()),
-    });
-    let frag_mod = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-        label: Some("frag"),
-        source: wgpu::ShaderSource::Wgsl(include_str!("../shader/uber_frag.wgsl").into()),
-    });
+    let module = wgpu::include_wgsl!("../shader/uber.wgsl");
+    let vert_mod = device.create_shader_module(&module);
+    let frag_mod = device.create_shader_module(&module);
 
     let bg_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
@@ -487,7 +482,7 @@ fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGr
                 binding: 5,
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
                     has_dynamic_offset: false,
                     min_binding_size: None,
                 },
@@ -507,7 +502,7 @@ fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGr
         layout: Some(&pipeline_layout),
         vertex: wgpu::VertexState {
             module: &vert_mod,
-            entry_point: "main",
+            entry_point: "vs_main",
             buffers: &[wgpu::VertexBufferLayout {
                 array_stride: size_of::<Vertex>() as _,
                 step_mode: wgpu::VertexStepMode::Vertex,
@@ -531,7 +526,7 @@ fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGr
         },
         fragment: Some(wgpu::FragmentState {
             module: &frag_mod,
-            entry_point: "main",
+            entry_point: "fs_main",
             targets: &[wgpu::ColorTargetState {
                 format: TARGET_FORMAT,
                 blend: Some(wgpu::BlendState {
