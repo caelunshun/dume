@@ -9,7 +9,7 @@ use crate::{atlas::TextureAtlas, text::FontId};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GlyphKey {
-    pub c: char,
+    pub index: u32,
     pub font: FontId,
     pub size: u64, // fixed point in 1/1000s of a pixel
 }
@@ -52,7 +52,7 @@ impl GlyphCache {
                         let font = fontdue::Font::from_bytes(
                             font_data,
                             fontdue::FontSettings {
-                                enable_offset_bounding_box: false,
+                                // enable_offset_bounding_box: false,
                                 ..Default::default()
                             },
                         )
@@ -61,7 +61,8 @@ impl GlyphCache {
                     }
                 };
 
-                let (metrics, alpha_map) = font.rasterize(key.c, key.size as f32 / 1000.);
+                let (metrics, alpha_map) =
+                    font.rasterize_indexed(key.index as usize, key.size as f32 / 1000.);
 
                 if metrics.width == 0 || metrics.height == 0 {
                     return None;

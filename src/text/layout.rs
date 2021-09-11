@@ -4,6 +4,7 @@ use fontdb::Database;
 use glam::{vec2, Vec2};
 use palette::Srgba;
 use rustybuzz::{Direction, UnicodeBuffer};
+use ttf_parser::GlyphId;
 use unicode_bidi::{BidiInfo, Level};
 
 use crate::{
@@ -86,6 +87,15 @@ pub struct ShapedGlyph {
     pub font: Option<FontId>,
 }
 
+impl ShapedGlyph {
+    pub fn char(&self) -> Option<char> {
+        match self.c {
+            GlyphCharacter::CharIndex(_, c) => Some(c),
+            GlyphCharacter::Icon(_) => None,
+        }
+    }
+}
+
 /// Metrics for a line within a paragraph.
 #[derive(Debug, Clone, Default)]
 #[non_exhaustive]
@@ -100,7 +110,7 @@ pub struct LineMetrics {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum GlyphCharacter {
-    Char(char),
+    CharIndex(u32, char),
     Icon(SpriteId),
 }
 
@@ -259,26 +269,22 @@ fn shape_word(
 
     let scale = style.size / font.ttf.units_per_em().expect("no units per EM") as f32;
 
-    for (position, (_info, c)) in positions.iter().zip(infos.iter().zip(word.chars())) {
+    for (position, info) in positions.iter().zip(infos.iter()) {
         let bbox = font
             .ttf
-            .glyph_index(c)
-            .map(|id| {
-                let bbox = font.ttf.glyph_bounding_box(id).unwrap_or(ttf_parser::Rect {
-                    x_min: 0,
-                    x_max: 0,
-                    y_min: 0,
-                    y_max: 0,
-                });
-                Rect {
-                    pos: vec2(bbox.x_min as f32, bbox.y_min as f32) * Vec2::splat(scale),
-                    size: vec2(bbox.width() as f32, bbox.height() as f32) * Vec2::splat(scale),
-                }
-            })
-            .unwrap_or(Rect {
-                pos: Vec2::ZERO,
-                size: Vec2::ZERO,
+            .glyph_bounding_box(GlyphId(info.glyph_id as u16))
+            .unwrap_or(ttf_parser::Rect {
+                x_min: 0,
+                x_max: 0,
+                y_min: 0,
+                y_max: 0,
             });
+        let bbox = Rect {
+            pos: vec2(bbox.x_min as f32, bbox.y_min as f32) * Vec2::splat(scale),
+            size: vec2(bbox.width() as f32, bbox.height() as f32) * Vec2::splat(scale),
+        };
+
+        let c = word.chars().skip(info.cluster as usize).next().unwrap_or_default();
 
         let glyph = ShapedGlyph {
             pos: Vec2::ZERO,
@@ -288,7 +294,7 @@ fn shape_word(
             bbox,
             bearing: vec2(bbox.pos.x, bbox.size.y + bbox.pos.y),
             visible: false,
-            c: GlyphCharacter::Char(c),
+            c: GlyphCharacter::CharIndex(info.glyph_id, c),
             color: style.color,
             size: style.size,
             font: Some(font_id),
@@ -316,7 +322,7 @@ fn lay_out(glyphs: &mut [ShapedGlyph], layout: &TextLayout, fonts: &Database) ->
 
     let mut max_y = 0.0f32;
     while i < glyphs.len() {
-        let was_line_break = i > 0 && glyphs[i - 1].c == GlyphCharacter::Char('\n');
+        let was_line_break = i > 0 && glyphs[i - 1].char() == Some('\n');
         let glyph = &mut glyphs[i];
 
         let (source, face_index) = fonts
@@ -374,16 +380,13 @@ fn lay_out(glyphs: &mut [ShapedGlyph], layout: &TextLayout, fonts: &Database) ->
             }
         }
 
-        if matches!(
-            glyph.c,
-            GlyphCharacter::Char(' ') | GlyphCharacter::Char('\n')
-        ) {
+        if matches!(glyph.char(), Some(' ') | Some('\n')) {
             previous_word_boundary = Some(i + 1);
         }
 
         glyph.pos = cursor + glyph_offset;
 
-        if glyph.c != GlyphCharacter::Char('\n') {
+        if glyph.char() != Some('\n') {
             glyph.visible = true;
         }
         cursor += glyph.advance;

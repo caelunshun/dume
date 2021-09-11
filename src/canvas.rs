@@ -147,9 +147,9 @@ impl Canvas {
                 continue;
             }
             match glyph.c {
-                GlyphCharacter::Char(c) => {
+                GlyphCharacter::CharIndex(index, _) => {
                     let key = GlyphKey {
-                        c,
+                        index,
                         font: glyph.font.unwrap(),
                         size: (glyph.size * 1000.) as u64,
                     };
