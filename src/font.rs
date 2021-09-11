@@ -1,5 +1,5 @@
 /// A font weight, indicating how dark it appears.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
 #[repr(C)]
 pub enum Weight {
     Thin,

@@ -21,6 +21,7 @@ lyon = "0.17"
 once_cell = "1"
 palette = "0.5"
 pollster = "0.2"
+serde = { version = "1", features = [ "derive" ] }
 slotmap = "1"
 rustybuzz = "0.4"
 thiserror = "1"
