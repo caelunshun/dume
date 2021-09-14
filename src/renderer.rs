@@ -432,7 +432,7 @@ impl Renderer {
 }
 
 fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGroupLayout) {
-    let module = wgpu::include_wgsl!("../shader/uber.wgsl");
+    let module = todo!();
     let vert_mod = device.create_shader_module(&module);
     let frag_mod = device.create_shader_module(&module);
 
