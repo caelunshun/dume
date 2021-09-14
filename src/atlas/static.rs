@@ -155,7 +155,11 @@ impl StaticTextureAtlasBuilder {
                 wgpu::ImageCopyTexture {
                     texture: &texture,
                     mip_level: 1,
-                    origin: wgpu::Origin3d::ZERO,
+                    origin: wgpu::Origin3d {
+                        x: placement.x(),
+                        y: placement.y(),
+                        z: 0,
+                    },
                     aspect: wgpu::TextureAspect::All,
                 },
                 &buffer.data,

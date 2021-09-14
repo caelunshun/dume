@@ -25,7 +25,7 @@ pub struct AtlasEntry {
 pub struct TextureKey(usize);
 
 impl TextureKey {
-    pub(crate) fn new() -> Self {
+    fn new() -> Self {
         static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
         Self(NEXT_ID.fetch_add(1, Ordering::Relaxed))

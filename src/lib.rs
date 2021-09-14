@@ -14,6 +14,8 @@ mod sprite;
 mod text;*/
 mod rect;
 mod atlas;
+mod texture;
+mod context;
 
 pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 pub const SAMPLE_COUNT: u32 = 4;
