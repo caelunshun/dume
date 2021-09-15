@@ -6,27 +6,25 @@
 
 /*
 mod canvas;
-pub mod font;
 mod glyph;
 mod path;
 mod renderer;
-mod sprite;
-mod text;*/
-mod rect;
+mod sprite;*/
 mod atlas;
-mod texture;
 mod context;
+pub mod font;
+mod rect;
+mod text;
+mod texture;
+mod thread_pool;
 
 pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 pub const SAMPLE_COUNT: u32 = 4;
 
+pub use context::Context;
+pub use font::FontId;
 pub use rect::Rect;
+pub use text::{Text, TextSection, TextStyle};
+pub use texture::{MissingTexture, TextureId, TextureSet, TextureSetBuilder};
+pub use thread_pool::{BasicThreadPool, ThreadPool};
 
-/*
-pub use canvas::{Canvas, SpriteData, SpriteDescriptor};
-pub use sprite::SpriteId;
-pub use text::{
-    layout::{Align, Baseline, Paragraph, TextLayout},
-    markup, Text, TextSection, TextStyle,
-};
-*/

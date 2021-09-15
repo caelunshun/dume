@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use parking_lot::{RwLock, RwLockReadGuard};
 
-use crate::texture::{MissingTexture, TextureId, TextureSet, TextureSetBuilder, Textures};
+use crate::{
+    font::{Font, Fonts, MalformedFont, MissingFont},
+    texture::{MissingTexture, TextureId, TextureSet, TextureSetBuilder, Textures},
+};
 
 /// The thread-safe Dume context. Stores all images,
 /// fonts, and GPU state needed for rendering.
@@ -19,6 +22,7 @@ struct Inner {
     queue: Arc<wgpu::Queue>,
 
     textures: RwLock<Textures>,
+    fonts: RwLock<Fonts>,
 }
 
 impl Context {
@@ -31,11 +35,24 @@ impl Context {
     }
 
     pub fn texture_for_name(&self, name: &str) -> Result<TextureId, MissingTexture> {
-        self.0.textures.read().texture_for_name(name)
+        self.textures().texture_for_name(name)
+    }
+
+    pub fn add_font(&self, font_data: Vec<u8>) -> Result<(), MalformedFont> {
+        self.0.fonts.write().add(Font::from_data(font_data)?);
+        Ok(())
+    }
+
+    pub fn set_default_font_family(&self, family: impl Into<String>) {
+        self.0.fonts.write().set_default_family(family.into());
     }
 
     pub(crate) fn textures(&self) -> RwLockReadGuard<Textures> {
         self.0.textures.read()
+    }
+
+    pub(crate) fn fonts(&self) -> RwLockReadGuard<Fonts> {
+        self.0.fonts.read()
     }
 
     pub(crate) fn device(&self) -> &Arc<wgpu::Device> {

@@ -9,34 +9,28 @@ resolver = "2"
 ahash = "0.7"
 anyhow = "1"
 bytemuck = { version = "1", features = [ "derive" ] }
-fontdb = "0.6"
-fontdue = "0.5"
+flume = "0.10"
 glam = { version = "0.17", features = [ "bytemuck" ] }
 guillotiere = "0.6"
-image = { version = "0.23", default-features = false }
 log = "0.4"
-logos = "0.12"
 lru = "0.6"
 lyon = "0.17"
 once_cell = "1"
-palette = "0.5"
-pollster = "0.2"
+palette = "0.6"
+parking_lot = "0.11"
+rectangle-pack = "0.4"
 serde = { version = "1", features = [ "derive" ] }
 slotmap = "1"
-rustybuzz = "0.4"
+smallvec = "1"
+smartstring = { version = "0.2", features = [ "serde" ] }
+swash = "0.1"
 thiserror = "1"
-ttf-parser = "0.12"
 unicode-bidi = "0.3"
 wgpu = "0.10"
 
 [dev-dependencies]
 fastrand = "1"
 winit = { version = "0.25", default-features = false, features = [ "x11" ] }
-
-[features]
-default = ["png", "jpeg"]
-png = ["image/png"]
-jpeg = ["image/jpeg"]
 
 [profile.dev]
 opt-level = 3

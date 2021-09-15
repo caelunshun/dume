@@ -2,26 +2,25 @@
 
 #![allow(clippy::clippy::derive_hash_xor_eq)]
 
-pub mod layout;
-pub mod markup;
-
 use std::hash::Hash;
 
 use palette::Srgba;
+use smallvec::SmallVec;
+use smartstring::{LazyCompact, SmartString};
 
-use crate::font::{Query, Style, Weight};
-
-pub type FontId = fontdb::ID;
+use crate::font::{FontId, Query, Style, Weight};
 
 /// Some rich text. Implemented as a list of [`TextSection`]s.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Text {
-    sections: Vec<TextSection>,
+    sections: SmallVec<[TextSection; 1]>,
 }
 
 impl Text {
-    pub fn from_sections(sections: Vec<TextSection>) -> Self {
-        Self { sections }
+    pub fn from_sections(sections: impl IntoIterator<Item = TextSection>) -> Self {
+        Self {
+            sections: sections.into_iter().collect(),
+        }
     }
 
     pub fn sections(&self) -> &[TextSection] {
@@ -33,14 +32,17 @@ impl Text {
 #[derive(Debug, Clone, PartialEq)]
 pub enum TextSection {
     /// Render a string of glyphs.
-    Text { text: String, style: TextStyle },
+    Text {
+        text: SmartString<LazyCompact>,
+        style: TextStyle,
+    },
     /// Embed an icon inside text.
     Icon {
-        /// Name of the sprite registered in the sprite registry.
+        /// Name of the texture registered in the context textures.
         ///
-        /// Dume will search both for the sprite called `{name}` and the sprite
+        /// Dume will search both for the texture called `{name}` and the texture
         /// called "icon/{name}".
-        name: String,
+        name: SmartString<LazyCompact>,
         /// Height of the icon. Matches the size of a glyph with the same size.
         size: f32,
     },
@@ -82,7 +84,7 @@ impl Default for TextStyle {
             color: Srgba::new(u8::MAX, u8::MAX, u8::MAX, u8::MAX),
             size: 12.0,
             font: Query {
-                family: "Merriweather".to_owned(),
+                family: None,
                 style: Style::Normal,
                 weight: Weight::Normal,
             },
