@@ -1,22 +1,22 @@
+//! Text layout implementation.
+//!
+//! For an overview of the text layout hierarchy,
+//! see https://raphlinus.github.io/text/2020/10/26/text-layout.html.
+
 use std::ops::Range;
 
-use fontdb::Database;
-use glam::{vec2, Vec2};
-use palette::Srgba;
-use rustybuzz::{Direction, UnicodeBuffer};
-use ttf_parser::GlyphId;
-use unicode_bidi::{BidiInfo, Level};
-
-use crate::{
-    font::Font,
-    rect::Rect,
-    sprite::{SpriteId, Sprites},
-    Text, TextSection, TextStyle,
+use glam::Vec2;
+use serde::{Deserialize, Serialize};
+use smartstring::{LazyCompact, SmartString};
+use swash::{
+    text::{cluster::Boundary, Properties, Script},
+    GlyphId,
 };
+use unicode_bidi::{BidiInfo, Level, ParagraphInfo};
 
-use super::FontId;
+use crate::{Context, Text, TextSection, TextStyle, TextureId};
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(C)]
 pub enum Align {
     /// Top or left
@@ -25,6 +25,12 @@ pub enum Align {
     Center,
     /// Bottom or right
     End,
+}
+
+impl Default for Align {
+    fn default() -> Self {
+        Align::Start
+    }
 }
 
 /// Defines the baseline of a line of text.
@@ -37,21 +43,24 @@ pub enum Baseline {
     Bottom,
 }
 
+impl Default for Baseline {
+    fn default() -> Self {
+        Baseline::Alphabetic
+    }
+}
+
 /// Settings for laying out text.
 ///
 /// TODO: should some parameters be moved to the rich text
-/// representation, so that alignments can be mixed within a paragraph?
+/// representation, so that alignments can be mixed within a blob?
 #[derive(Debug, Clone)]
-#[repr(C)]
-pub struct TextLayout {
-    /// The maximum dimensions of the formatted text.
-    ///
-    /// Excess text is hidden.
-    pub max_dimensions: Vec2,
+pub struct TextOptions {
     /// Whether to overflow onto a new line when the maximum width is reached.
     ///
     /// If false, then excess characters are omitted.
-    pub line_breaks: bool,
+    ///
+    /// Line breaks from special characters ('\n') are still respected if this is `false`.
+    pub wrap_lines: bool,
     /// The baseline to use.
     pub baseline: Baseline,
     /// Horizontal alignment to apply to the text.
@@ -60,373 +69,238 @@ pub struct TextLayout {
     pub align_v: Align,
 }
 
-/// A glyph that has been shaped and formatted inside a [`Paragraph`].
-#[derive(Copy, Clone, Debug)]
-#[non_exhaustive]
-pub struct ShapedGlyph {
-    /// Position of the glyph relative to the position of the paragraph.
-    pub pos: Vec2,
-    /// How far to advance the cursor when drawing this glyph.
-    pub advance: Vec2,
-    /// Offset from the cursor position to draw the glyph at.
-    pub offset: Vec2,
-    /// The glyph bounding box.
-    pub bbox: Rect,
-    /// Offset of the glyph bounding box from the glyph position.
-    pub bearing: Vec2,
-    /// Whether the glyph is visible and should be drawn.
-    pub visible: bool,
-
-    /// Character or icon to draw.
-    pub c: GlyphCharacter,
-    /// Color of the glyph.
-    pub color: Srgba<u8>,
-    /// Font size for the glyph.
-    pub size: f32,
-    /// Font to use for the glyph.
-    pub font: Option<FontId>,
+struct CharInfo {
+    properties: Properties,
+    boundary: Boundary,
 }
 
-impl ShapedGlyph {
-    pub fn char(&self) -> Option<char> {
-        match self.c {
-            GlyphCharacter::CharIndex(_, c) => Some(c),
-            GlyphCharacter::Icon(_) => None,
-        }
-    }
-}
+/// A blob of text that has been laid out and shaped into glyphs.
+///
+/// Created with [`Context::create_text_blob`](crate::Context::create_text_blob).
+///
+/// You need to call [`Context::resize_text_blob`] to set the maximum text dimensions
+/// and compute glyph layout.
+/// If you don't call this method at least once, the text will render as empty.
+pub struct TextBlob {
+    options: TextOptions,
 
-/// Metrics for a line within a paragraph.
-#[derive(Debug, Clone, Default)]
-#[non_exhaustive]
-pub struct LineMetrics {
-    /// The position of the start of the line. (top-left)
-    pub start: Vec2,
-    /// The position of the end of the line. (top-right)
-    pub end: Vec2,
-    /// The range of glyph indices on this line.
-    pub range: Range<usize>,
-}
+    pub runs: Vec<BlobRun>,
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum GlyphCharacter {
-    CharIndex(u32, char),
-    Icon(SpriteId),
-}
+    /// BiDi info, indexed by byte index
+    bidi_levels: Vec<Level>,
+    paragraphs: Vec<ParagraphInfo>,
 
-/// A paragraph of rich text that has been layed
-/// out and is ready for rendering.
-#[derive(Debug, Clone)]
-pub struct Paragraph {
-    text: Text,
-    layout: TextLayout,
+    // Unicode info, indexed by byte index
+    char_info: Vec<CharInfo>,
+
+    max_size: Vec2,
     glyphs: Vec<ShapedGlyph>,
-    lines: Vec<LineMetrics>,
 }
 
-impl Paragraph {
-    pub(crate) fn new(text: Text, layout: TextLayout, fonts: &Database, sprites: &Sprites) -> Self {
-        let mut glyphs = shape(&text, fonts, sprites);
-        let lines = lay_out(&mut glyphs, &layout, fonts);
+impl TextBlob {
+    pub fn new(cx: &Context, text: Text, options: TextOptions) -> Self {
+        let unstyled_text = text.to_unstyled_string();
+        let BidiInfo {
+            levels, paragraphs, ..
+        } = BidiInfo::new(&unstyled_text, None);
 
-        Self {
-            text,
-            layout,
-            glyphs,
-            lines,
+        let mut char_info = Vec::with_capacity(unstyled_text.len());
+        for ((properties, boundary), c) in
+            swash::text::analyze(unstyled_text.chars()).zip(unstyled_text.chars())
+        {
+            for _ in 0..c.len_utf8() {
+                char_info.push(CharInfo {
+                    properties,
+                    boundary,
+                });
+            }
+        }
+
+        let mut blob = Self {
+            options,
+
+            runs: Vec::new(),
+            bidi_levels: levels,
+            paragraphs,
+            char_info,
+
+            max_size: Vec2::ZERO,
+            glyphs: Vec::new(),
+        };
+        blob.compute_runs(cx, text, &unstyled_text);
+        blob
+    }
+
+    fn compute_runs(&mut self, cx: &Context, text: Text, unstyled_text: &str) {
+        // Merge BiDi, style, and script runs.
+        let mut byte_index = 0;
+        for section in text.sections {
+            match section {
+                TextSection::Text { text, style } => {
+                    self.build_runs(&text, &style, byte_index);
+                    byte_index += text.len();
+                }
+                TextSection::Icon { name, size } => {
+                    let texture = cx
+                        .texture_for_name(&name)
+                        .expect("missing texture for embedded icon in text");
+                    self.runs.push(BlobRun::Icon { texture, size });
+                }
+            }
         }
     }
 
-    /// Updates the paragraph's maximum width and height, re-calculating
-    /// layout (but not shaping) if needed.
-    pub(crate) fn update_max_dimensions(&mut self, fonts: &Database, new_max_dimensions: Vec2) {
-        if new_max_dimensions == self.layout.max_dimensions {
+    fn build_runs(&mut self, text: &str, style: &TextStyle, byte_index: usize) {
+        if text.is_empty() {
             return;
         }
 
-        self.layout.max_dimensions = new_max_dimensions;
-        self.lines = lay_out(&mut self.glyphs, &self.layout, fonts);
-    }
+        let level_runs = level_runs(&self.bidi_levels[byte_index..(byte_index + text.len())]);
+        for level_run in level_runs {
+            let start = level_run.start + byte_index;
+            let end = level_run.end + byte_index;
+            let script_runs = script_runs(&self.char_info[start..end]);
 
-    /// Gets the glyphs in the paragraph.
-    pub fn glyphs(&self) -> &[ShapedGlyph] {
-        &self.glyphs
-    }
-
-    /// Gets the lines in the paragraph.
-    pub fn lines(&self) -> &[LineMetrics] {
-        &self.lines
-    }
-
-    /// Gets the width of the paragraph.
-    pub fn width(&self) -> f32 {
-        self.glyphs
-            .iter()
-            .map(|glyph| (glyph.pos.x + glyph.advance.x) as u32)
-            .max()
-            .unwrap_or_default() as f32
-            - self
-                .glyphs
-                .iter()
-                .map(|glyph| glyph.pos.x as u32)
-                .min()
-                .unwrap_or_default() as f32
-    }
-
-    /// Gets the height of the paragraph.
-    pub fn height(&self) -> f32 {
-        self.glyphs
-            .iter()
-            .map(|glyph| (glyph.pos.y + glyph.bbox.size.y) as u32)
-            .max()
-            .unwrap_or_default() as f32
-    }
-}
-
-/// Shapes a text without calculating line breaks.
-///
-//// The `pos` fields of the returned glyphs are set to 0.
-fn shape(text: &Text, fonts: &Database, sprites: &Sprites) -> Vec<ShapedGlyph> {
-    let mut glyphs = Vec::with_capacity(128);
-    for section in text.sections() {
-        match section {
-            TextSection::Text { text, style } => {
-                // Shape the text.
-                let bidi_info = BidiInfo::new(text, Some(Level::ltr()));
-
-                let font_id = style
-                    .font
-                    .with_fontdb_family(|query| fonts.query(query))
-                    .unwrap_or_else(|| panic!("no fonts matched the query {:#?}", style.font));
-                let (source, face_index) = fonts.face_source(font_id).unwrap();
-
-                let font_data = match &*source {
-                    fontdb::Source::Binary(b) => b.as_slice(),
-                    fontdb::Source::File(p) => todo!(),
-                };
-                let font = Font::new(font_data).expect("malformed font");
-
-                for paragraph in &bidi_info.paragraphs {
-                    let (levels, runs) = bidi_info.visual_runs(paragraph, paragraph.range.clone());
-
-                    for run in runs {
-                        let level = levels[run.start];
-                        let subtext = &text[run.clone()];
-
-                        glyphs.extend(shape_word(subtext, style, level, &font, font_id));
-                    }
-                }
-            }
-            TextSection::Icon { name, size } => {
-                let sprite = sprites
-                    .sprite_by_name(name)
-                    .or_else(|| sprites.sprite_by_name(&format!("icon/{}", name)))
-                    .unwrap_or_else(|| panic!("no sprite with name '{}' or 'icon/{}'", name, name));
-                let info = sprites.sprite_info(sprite);
-                let width = size * info.size.x as f32 / info.size.y as f32;
-
-                glyphs.push(ShapedGlyph {
-                    pos: Vec2::ZERO,
-                    advance: vec2(width, 0.0),
-                    offset: Vec2::ZERO,
-                    bbox: Rect {
-                        pos: Vec2::ZERO,
-                        size: vec2(width, *size),
-                    },
-                    bearing: Vec2::ZERO,
-                    visible: false,
-                    c: GlyphCharacter::Icon(sprite),
-                    color: Default::default(), // ignored for sprites
-                    size: *size,
-                    font: None,
+            for (script, script_run) in script_runs {
+                let script_start = start + script_run.start;
+                let script_end = start + script_run.end;
+                self.runs.push(BlobRun::Text {
+                    text: (&text[(script_start - byte_index)..(script_end - byte_index)]).into(),
+                    style: style.clone(),
+                    script,
+                    bidi_level: self.bidi_levels[start],
                 });
             }
         }
     }
 
-    glyphs
+    /// Lays out the text, performing text shaping, line wrapping,
+    ///
+    pub fn resize(&mut self, cx: &Context, max_size: Vec2) {
+        // No need to recompute if the max size hasn't changed by much.
+        if !self.should_resize_for(max_size) {
+            return;
+        }
+
+        self.glyphs.clear();
+    }
+
+    fn should_resize_for(&self, max_size: Vec2) -> bool {
+        (max_size.x - self.max_size.x).abs() > 0.1 || (max_size.y - self.max_size.y).abs() > 0.1
+    }
 }
 
-fn shape_word(
-    word: &str,
-    style: &TextStyle,
-    level: Level,
-    font: &Font,
-    font_id: FontId,
-) -> Vec<ShapedGlyph> {
-    let mut buffer = UnicodeBuffer::new();
-    buffer.push_str(word);
-    buffer.set_direction(if level.is_rtl() {
-        Direction::RightToLeft
-    } else {
-        Direction::LeftToRight
-    });
-    let glyph_buffer = rustybuzz::shape(&font.hb, &[], buffer);
-    let positions = glyph_buffer.glyph_positions();
-    let infos = glyph_buffer.glyph_infos();
-
-    let mut glyphs = Vec::with_capacity(positions.len());
-
-    let scale = style.size / font.ttf.units_per_em().expect("no units per EM") as f32;
-
-    for (position, info) in positions.iter().zip(infos.iter()) {
-        let bbox = font
-            .ttf
-            .glyph_bounding_box(GlyphId(info.glyph_id as u16))
-            .unwrap_or(ttf_parser::Rect {
-                x_min: 0,
-                x_max: 0,
-                y_min: 0,
-                y_max: 0,
-            });
-        let bbox = Rect {
-            pos: vec2(bbox.x_min as f32, bbox.y_min as f32) * Vec2::splat(scale),
-            size: vec2(bbox.width() as f32, bbox.height() as f32) * Vec2::splat(scale),
-        };
-
-        let c = word.chars().skip(info.cluster as usize).next().unwrap_or_default();
-
-        let glyph = ShapedGlyph {
-            pos: Vec2::ZERO,
-            advance: vec2(position.x_advance as f32, position.y_advance as f32)
-                * Vec2::splat(scale),
-            offset: vec2(position.x_offset as f32, position.y_offset as f32) * Vec2::splat(scale),
-            bbox,
-            bearing: vec2(bbox.pos.x, bbox.size.y + bbox.pos.y),
-            visible: false,
-            c: GlyphCharacter::CharIndex(info.glyph_id, c),
-            color: style.color,
-            size: style.size,
-            font: Some(font_id),
-        };
-        glyphs.push(glyph);
+fn level_runs(levels: &[Level]) -> Vec<Range<usize>> {
+    let mut result = Vec::new();
+    let mut prev_level = levels[0];
+    let mut prev_level_start = 0;
+    for (i, &level) in levels.iter().enumerate() {
+        if level != prev_level {
+            result.push(prev_level_start..i);
+            prev_level = level;
+            prev_level_start = i;
+        }
+        if i == levels.len() - 1 {
+            result.push(prev_level_start..(i + 1));
+        }
     }
-
-    glyphs
+    result
 }
 
-/// Lays out some already-shaped text, applying position data
-/// and line breaks.
-fn lay_out(glyphs: &mut [ShapedGlyph], layout: &TextLayout, fonts: &Database) -> Vec<LineMetrics> {
-    let mut cursor = Vec2::ZERO; // origin relative to paragraph
+fn script_runs(infos: &[CharInfo]) -> Vec<(Script, Range<usize>)> {
+    let mut result = Vec::new();
+    let mut prev_script = infos[0].properties.script();
+    let mut prev_script_start = 0;
+    let mut prev_non_common_script = infos[0].properties.script();
+    for (i, info) in infos.iter().enumerate() {
+        let script = info.properties.script();
 
-    // Reset positions in case we don't update them all.
-    glyphs.iter_mut().for_each(|g| {
-        g.pos = Vec2::ZERO;
-        g.visible = false;
-    });
-
-    let mut i = 0;
-    let mut previous_word_boundary = None;
-    let mut lines = vec![LineMetrics::default()];
-
-    let mut max_y = 0.0f32;
-    while i < glyphs.len() {
-        let was_line_break = i > 0 && glyphs[i - 1].char() == Some('\n');
-        let glyph = &mut glyphs[i];
-
-        let (source, face_index) = fonts
-            .face_source(glyph.font.unwrap_or_else(|| fonts.faces()[0].id))
-            .unwrap();
-
-        let font_data = match &*source {
-            fontdb::Source::Binary(b) => b.as_slice(),
-            fontdb::Source::File(p) => todo!(),
-        };
-        let font = Font::new(font_data).expect("malformed font");
-
-        let scale = glyph.size / font.ttf.units_per_em().unwrap() as f32;
-        let ascender = font.ttf.ascender() as f32 * scale;
-        let descender = font.ttf.descender() as f32 * scale;
-        let line_gap = font.ttf.line_gap() as f32 * scale;
-        let line_space = ascender - descender + line_gap;
-
-        let mut glyph_offset = glyph.offset + vec2(glyph.bearing.x, -glyph.bearing.y);
-
-        let baseline_offset = match layout.baseline {
-            Baseline::Top => ascender,
-            Baseline::Middle => (ascender + descender) / 2.0,
-            Baseline::Alphabetic => 0.0,
-            Baseline::Bottom => descender,
-        };
-        glyph_offset.y += baseline_offset;
-
-        if (cursor + glyph_offset).y > layout.max_dimensions.y {
-            // Out of vertical space; abort.
-            break;
+        if script != prev_script && script != Script::Common && prev_script != Script::Common {
+            result.push((prev_non_common_script, prev_script_start..i));
+            prev_script = script;
+            prev_script_start = i;
         }
 
-        if (cursor + glyph_offset).x > layout.max_dimensions.x || was_line_break {
-            if layout.line_breaks {
-                // Out of space on this line; proceed to the next one.
-                cursor.y += line_space;
-                cursor.x = 0.0;
-                lines.push(LineMetrics {
-                    start: cursor,
-                    range: i..i + 1,
-                    ..Default::default()
-                });
-                if !was_line_break {
-                    // Go to the previous word and do the line break there.
-                    // (We can't break in the middle of a word.)
-                    i = match previous_word_boundary {
-                        Some(i) => i,
-                        None => break,
-                    };
-                    continue;
-                }
-            } else {
-                break;
-            }
+        if script != Script::Common {
+            prev_non_common_script = script;
         }
 
-        if matches!(glyph.char(), Some(' ') | Some('\n')) {
-            previous_word_boundary = Some(i + 1);
-        }
-
-        glyph.pos = cursor + glyph_offset;
-
-        if glyph.char() != Some('\n') {
-            glyph.visible = true;
-        }
-        cursor += glyph.advance;
-
-        let current_line = lines.last_mut().unwrap();
-        current_line.end = cursor;
-        current_line.range.end = current_line.range.end.max(i + 1);
-
-        max_y = max_y.max(cursor.y + line_space);
-
-        i += 1;
-    }
-
-    // Apply horizontal alignment.
-    for line in &lines {
-        let line_width = line.end.x - line.start.x;
-        let relative_pos = relative_align_pos(layout.align_h, line_width, layout.max_dimensions.x);
-
-        for glyph in &mut glyphs[line.range.clone()] {
-            glyph.pos.x += relative_pos;
+        if i == infos.len() - 1 {
+            let range = prev_script_start..(i + 1);
+            result.push((prev_non_common_script, range));
         }
     }
-
-    // Apply vertical alignment.
-    let height = max_y;
-    let relative_pos = relative_align_pos(layout.align_v, height, layout.max_dimensions.y);
-    for glyph in glyphs {
-        glyph.pos.y += relative_pos;
-    }
-
-    lines
+    result
 }
 
-fn relative_align_pos(align: Align, length: f32, max_length: f32) -> f32 {
-    match align {
-        Align::Start => 0.0,
-        Align::Center => {
-            let center_pos = max_length / 2.0;
-            center_pos - (length / 2.0)
-        }
-        Align::End => max_length - length,
+/// A glyph in a text blob, ready for rendering or layout.
+#[derive(Debug)]
+struct ShapedGlyph {
+    /// Position of the glyph relative to the text blob origin
+    pos: Vec2,
+    /// Offset from the pen position to draw at
+    offset: Vec2,
+    /// X distance to advance the pen after drawing (Y advance unsupported for now)
+    advance: f32,
+
+    /// The character to draw
+    c: GlyphCharacter,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum GlyphCharacter {
+    Glyph(GlyphId),
+    Icon(TextureId),
+}
+
+/// A run within a [`Blob`] that has the same
+/// BiDi level, script, and style.
+#[derive(Debug)]
+pub enum BlobRun {
+    Text {
+        text: SmartString<LazyCompact>,
+        style: TextStyle,
+        bidi_level: Level,
+        script: Script,
+    },
+    Icon {
+        texture: TextureId,
+        size: f32,
+    },
+    LineBreak,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_level_runs() {
+        assert_eq!(
+            level_runs(&[
+                Level::ltr(),
+                Level::ltr(),
+                Level::rtl(),
+                Level::ltr(),
+                Level::ltr(),
+                Level::rtl(),
+            ]),
+            vec![0..2, 2..3, 3..5, 5..6]
+        );
+    }
+
+    #[test]
+    fn test_script_runs() {
+        let info: Vec<_> = swash::text::analyze("dر".chars())
+            .map(|(properties, boundary)| CharInfo {
+                properties,
+                boundary,
+            })
+            .collect();
+
+        assert_eq!(
+            script_runs(&info),
+            vec![(Script::Latin, 0..1), (Script::Arabic, 1..2),]
+        );
     }
 }

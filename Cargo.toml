@@ -30,6 +30,7 @@ wgpu = "0.10"
 
 [dev-dependencies]
 fastrand = "1"
+pollster = "0.2"
 winit = { version = "0.25", default-features = false, features = [ "x11" ] }
 
 [profile.dev]

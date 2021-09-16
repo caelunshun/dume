@@ -26,6 +26,15 @@ struct Inner {
 }
 
 impl Context {
+    pub fn new(device: Arc<wgpu::Device>, queue: Arc<wgpu::Queue>) -> Self {
+        Self(Arc::new(Inner {
+            device,
+            queue,
+            textures: RwLock::new(Textures::default()),
+            fonts: RwLock::new(Fonts::default()),
+        }))
+    }
+
     pub fn create_texture_set_builder(&self) -> TextureSetBuilder {
         TextureSetBuilder::new(self.clone())
     }

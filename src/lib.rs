@@ -24,7 +24,7 @@ pub const SAMPLE_COUNT: u32 = 4;
 pub use context::Context;
 pub use font::FontId;
 pub use rect::Rect;
-pub use text::{Text, TextSection, TextStyle};
+pub use text::{Text, TextSection, layout::{TextBlob, TextOptions}, TextStyle};
 pub use texture::{MissingTexture, TextureId, TextureSet, TextureSetBuilder};
 pub use thread_pool::{BasicThreadPool, ThreadPool};
 

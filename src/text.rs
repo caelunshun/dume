@@ -10,6 +10,8 @@ use smartstring::{LazyCompact, SmartString};
 
 use crate::font::{FontId, Query, Style, Weight};
 
+pub mod layout;
+
 /// Some rich text. Implemented as a list of [`TextSection`]s.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Text {
@@ -25,6 +27,16 @@ impl Text {
 
     pub fn sections(&self) -> &[TextSection] {
         &self.sections
+    }
+
+    pub fn to_unstyled_string(&self) -> SmartString<LazyCompact> {
+        let mut s = SmartString::new();
+        for section in &self.sections {
+            if let TextSection::Text { text, .. } = section {
+                s.push_str(text);
+            }
+        }
+        s
     }
 }
 
