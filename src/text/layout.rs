@@ -3,18 +3,23 @@
 //! For an overview of the text layout hierarchy,
 //! see https://raphlinus.github.io/text/2020/10/26/text-layout.html.
 
-use std::ops::Range;
+use std::{cell::RefCell, ops::Range};
 
-use glam::Vec2;
+use glam::{vec2, Vec2};
 use serde::{Deserialize, Serialize};
 use smartstring::{LazyCompact, SmartString};
 use swash::{
+    shape::{Direction, ShapeContext},
     text::{cluster::Boundary, Properties, Script},
     GlyphId,
 };
 use unicode_bidi::{BidiInfo, Level, ParagraphInfo};
 
 use crate::{Context, Text, TextSection, TextStyle, TextureId};
+
+thread_local! {
+    static SHAPE_CONTEXT: RefCell<ShapeContext> = RefCell::new(ShapeContext::new());
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(C)]
@@ -84,7 +89,7 @@ struct CharInfo {
 pub struct TextBlob {
     options: TextOptions,
 
-    pub runs: Vec<BlobRun>,
+     runs: Vec<BlobRun>,
 
     /// BiDi info, indexed by byte index
     bidi_levels: Vec<Level>,
@@ -94,11 +99,11 @@ pub struct TextBlob {
     char_info: Vec<CharInfo>,
 
     max_size: Vec2,
-    glyphs: Vec<ShapedGlyph>,
+     glyphs: Vec<ShapedGlyph>,
 }
 
 impl TextBlob {
-    pub fn new(cx: &Context, text: Text, options: TextOptions) -> Self {
+    pub(crate) fn new(cx: &Context, text: Text, options: TextOptions) -> Self {
         let unstyled_text = text.to_unstyled_string();
         let BidiInfo {
             levels, paragraphs, ..
@@ -128,6 +133,7 @@ impl TextBlob {
             glyphs: Vec::new(),
         };
         blob.compute_runs(cx, text, &unstyled_text);
+        blob.shape_glyphs(cx);
         blob
     }
 
@@ -174,15 +180,64 @@ impl TextBlob {
         }
     }
 
-    /// Lays out the text, performing text shaping, line wrapping,
-    ///
+    fn shape_glyphs(&mut self, cx: &Context) {
+        // Shape each run.
+        let fonts = cx.fonts();
+        SHAPE_CONTEXT.with(move |cell| {
+            let mut shape_ctx = cell.borrow_mut();
+            for run in &self.runs {
+                match run {
+                    BlobRun::Text {
+                        text,
+                        style,
+                        bidi_level,
+                        script,
+                    } => {
+                        let font_id = fonts
+                            .query(&style.font)
+                            .expect("could not resolve font query");
+                        let font = fonts.get(font_id);
+
+                        let dir = if bidi_level.is_ltr() {
+                            Direction::LeftToRight
+                        } else {
+                            Direction::RightToLeft
+                        };
+
+                        let mut shaper = shape_ctx
+                            .builder(font)
+                            .script(*script)
+                            .direction(dir)
+                            .size(style.size)
+                            .build();
+
+                        shaper.add_str(&text);
+
+                        let glyphs = &mut self.glyphs;
+                        shaper.shape_with(move |cluster| {
+                            for glyph in cluster.glyphs {
+                                glyphs.push(ShapedGlyph {
+                                    pos: Vec2::ZERO, // computed later
+                                    offset: vec2(glyph.x, glyph.y),
+                                    advance: glyph.advance,
+                                    c: GlyphCharacter::Glyph(glyph.id),
+                                });
+                            }
+                        });
+                    }
+                    BlobRun::Icon { texture, size } => todo!(),
+                    BlobRun::ExplicitLineBreak => todo!(),
+                }
+            }
+        });
+    }
+
+    /// Lays out the text, performing glyph positioning and line wrapping.
     pub fn resize(&mut self, cx: &Context, max_size: Vec2) {
         // No need to recompute if the max size hasn't changed by much.
         if !self.should_resize_for(max_size) {
             return;
         }
-
-        self.glyphs.clear();
     }
 
     fn should_resize_for(&self, max_size: Vec2) -> bool {
@@ -235,7 +290,7 @@ fn script_runs(infos: &[CharInfo]) -> Vec<(Script, Range<usize>)> {
 
 /// A glyph in a text blob, ready for rendering or layout.
 #[derive(Debug)]
-struct ShapedGlyph {
+pub struct ShapedGlyph {
     /// Position of the glyph relative to the text blob origin
     pos: Vec2,
     /// Offset from the pen position to draw at
@@ -256,7 +311,7 @@ pub(crate) enum GlyphCharacter {
 /// A run within a [`Blob`] that has the same
 /// BiDi level, script, and style.
 #[derive(Debug)]
-pub enum BlobRun {
+pub(crate) enum BlobRun {
     Text {
         text: SmartString<LazyCompact>,
         style: TextStyle,
@@ -267,7 +322,9 @@ pub enum BlobRun {
         texture: TextureId,
         size: f32,
     },
-    LineBreak,
+    /// An explicit line break. (Does not include automatic
+    /// line breaks from text wrapping.)
+    ExplicitLineBreak,
 }
 
 #[cfg(test)]

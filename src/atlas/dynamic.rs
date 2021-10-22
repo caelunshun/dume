@@ -1,15 +1,15 @@
 use std::{iter, num::NonZeroU32, sync::Arc};
 
 use ahash::AHashMap;
-use glam::{uvec2, Vec2};
-use guillotiere::{AllocId, Allocation, AtlasAllocator, Size};
+use glam::uvec2;
+use guillotiere::{Allocation, AtlasAllocator, Size};
 
 use super::{AtlasEntry, TextureKey};
 
 const STARTING_DIM: u32 = 1024;
 
 /// A dynamic texture atlas that supports adding and removing
-/// textures on demand. Space from deallocated can be reused.
+/// textures on demand. Space from deallocated textures can be reused.
 ///
 /// A padding of two pixels is inserted between stiched textures
 /// to avoid bleeding.

@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, num::NonZeroU32};
 
 use ahash::AHashMap;
-use glam::{uvec2, UVec2};
+use glam::{uvec2, vec2, UVec2, Vec2};
 use rectangle_pack::{GroupedRectsToPlace, RectToInsert, TargetBin};
 
 use super::{AtlasEntry, TextureKey};
@@ -36,8 +36,24 @@ impl StaticTextureAtlas {
         self.descriptor.size.height
     }
 
+    pub fn size(&self) -> UVec2 {
+        uvec2(self.width(), self.height())
+    }
+
     pub fn get(&self, key: TextureKey) -> &AtlasEntry {
         &self.entries[&key]
+    }
+
+    pub fn texcoords(&self, key: TextureKey) -> [Vec2; 4] {
+        let placement = self.get(key);
+        let start = placement.pos.as_f32() / self.size().as_f32();
+        let size = placement.size.as_f32() / self.size().as_f32();
+        [
+            start,
+            start + vec2(size.x, 0.),
+            start + size,
+            start + vec2(0., size.y),
+        ]
     }
 
     pub fn texture(&self) -> &wgpu::Texture {
@@ -84,7 +100,7 @@ impl StaticTextureAtlasBuilder {
     ///
     /// Returns an error if the given size constraints are insufficient to fit all textures.
     pub fn build(
-        mut self,
+        self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         min_size: u32,
@@ -92,7 +108,7 @@ impl StaticTextureAtlasBuilder {
     ) -> Result<StaticTextureAtlas, NotEnoughSpace> {
         assert!(min_size.is_power_of_two());
         assert!(max_size.is_power_of_two());
-        assert!(min_size >= max_size);
+        assert!(min_size <= max_size);
 
         let mut placements = None;
 
@@ -154,7 +170,7 @@ impl StaticTextureAtlasBuilder {
             queue.write_texture(
                 wgpu::ImageCopyTexture {
                     texture: &texture,
-                    mip_level: 1,
+                    mip_level: 0,
                     origin: wgpu::Origin3d {
                         x: placement.x(),
                         y: placement.y(),
@@ -166,7 +182,8 @@ impl StaticTextureAtlasBuilder {
                 wgpu::ImageDataLayout {
                     offset: 0,
                     bytes_per_row: Some(
-                        NonZeroU32::new(buffer.size.x).expect("texture width cannot be zero"),
+                        NonZeroU32::new(self.format.describe().block_size as u32 * buffer.size.x)
+                            .expect("texture width cannot be zero"),
                     ),
                     rows_per_image: Some(
                         NonZeroU32::new(buffer.size.y).expect("texture height cannot be zero"),

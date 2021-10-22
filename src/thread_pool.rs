@@ -1,7 +1,7 @@
 use std::thread;
 
 /// Abstraction over a threadpool that can spawn tasks.
-use flume::{Receiver, Sender};
+use flume::Sender;
 
 pub trait ThreadPool: Send + Sync + 'static {
     fn spawn(&self, task: impl FnOnce() + Send + 'static);
@@ -37,7 +37,8 @@ impl BasicThreadPool {
                     for task in receiver {
                         task.call();
                     }
-                });
+                })
+                .expect("failed to spawn thread");
         }
 
         Self { tasks: sender }

@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
+use glam::Vec2;
 use parking_lot::{RwLock, RwLockReadGuard};
 
 use crate::{
-    font::{Font, Fonts, MalformedFont, MissingFont},
+    font::{Font, Fonts, MalformedFont},
     texture::{MissingTexture, TextureId, TextureSet, TextureSetBuilder, Textures},
+    Canvas,
 };
 
 /// The thread-safe Dume context. Stores all images,
@@ -54,6 +56,10 @@ impl Context {
 
     pub fn set_default_font_family(&self, family: impl Into<String>) {
         self.0.fonts.write().set_default_family(family.into());
+    }
+
+    pub fn create_canvas(&self, target_size: Vec2) -> Canvas {
+        Canvas::new(self.clone(), target_size)
     }
 
     pub(crate) fn textures(&self) -> RwLockReadGuard<Textures> {

@@ -2,8 +2,6 @@
 //!
 //! Font parsing, shaping, and rendering is handled by the `swash` crate.
 
-use std::borrow::Cow;
-
 use serde::{Deserialize, Serialize};
 use smartstring::{LazyCompact, SmartString};
 use swash::{CacheKey, FontRef, StringId};

@@ -8,7 +8,7 @@ use palette::Srgba;
 use smallvec::SmallVec;
 use smartstring::{LazyCompact, SmartString};
 
-use crate::font::{FontId, Query, Style, Weight};
+use crate::font::{Query, Style, Weight};
 
 pub mod layout;
 

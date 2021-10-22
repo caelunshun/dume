@@ -1,366 +1,67 @@
-use std::{f32::consts::TAU, iter, mem, sync::Arc};
+use glam::{Mat4, Vec2};
 
-use fontdb::Database;
-use glam::{vec2, Affine2, Mat4, UVec2, Vec2};
-use palette::Srgba;
+use crate::{renderer::Renderer, Context, TextureId};
 
-use crate::{
-    glyph::GlyphKey,
-    path::{Path, PathSegment, TesselateKind},
-    rect::Rect,
-    renderer::Renderer,
-    text::layout::GlyphCharacter,
-    Paragraph, SpriteId, Text, TextLayout,
-};
-
-#[derive(Debug, Copy, Clone)]
-pub enum Paint {
-    Solid(Srgba<u8>),
-    LinearGradient {
-        color_a: Srgba<u8>,
-        color_b: Srgba<u8>,
-        point_a: Vec2,
-        point_b: Vec2,
-    },
-    RadialGradient {
-        color_a: Srgba<u8>,
-        color_b: Srgba<u8>,
-        center: Vec2,
-        radius: f32,
-    },
-}
-
-#[derive(Debug)]
-pub struct SpriteDescriptor<'a> {
-    pub name: &'a str,
-    pub data: SpriteData<'a>,
-}
-
-#[derive(Debug)]
-pub enum SpriteData<'a> {
-    Encoded(&'a [u8]),
-    Rgba {
-        width: u32,
-        height: u32,
-        data: &'a mut [u8],
-    },
-}
-
-/// A canvas for 2D rendering.
+/// A 2D canvas using `wgpu`. Modeled after the HTML5 canvas
+/// API.
 pub struct Canvas {
-    device: Arc<wgpu::Device>,
-    queue: Arc<wgpu::Queue>,
-
-    pub(crate) renderer: Renderer,
-
-    fonts: Database,
-
-    current_path: Path,
-    stroke_width: f32,
-    paint: Paint,
-
-    scale_factor: f64,
+    context: Context,
+    renderer: Renderer,
+    target_logical_size: Vec2,
 }
 
 impl Canvas {
-    pub fn new(device: Arc<wgpu::Device>, queue: Arc<wgpu::Queue>) -> Self {
+    pub(crate) fn new(context: Context, target_logical_size: Vec2) -> Self {
         Self {
-            renderer: Renderer::new(Arc::clone(&device), Arc::clone(&queue)),
-            fonts: Database::new(),
-
-            device,
-            queue,
-
-            current_path: Path::default(),
-            stroke_width: 1.0,
-            paint: Paint::Solid(Srgba::new(u8::MAX, u8::MAX, u8::MAX, u8::MAX)),
-
-            scale_factor: 1.0,
+            renderer: Renderer::new(context.device(), target_logical_size),
+            context,
+            target_logical_size,
         }
     }
 
-    pub fn set_scale_factor(&mut self, new_scale_factor: f64) {
-        self.scale_factor = new_scale_factor;
-    }
-
-    pub fn load_font(&mut self, font_data: Vec<u8>) {
-        self.fonts.load_font_data(font_data);
-    }
-
-    pub fn create_sprite(&mut self, descriptor: SpriteDescriptor) -> SpriteId {
-        let mut image;
-        let mut flat_samples;
-        let (rgba_data, width, height) = match descriptor.data {
-            SpriteData::Encoded(data) => {
-                image = image::load_from_memory(data)
-                    .expect("failed to parse image")
-                    .to_rgba8();
-                let width = image.width();
-                let height = image.height();
-                flat_samples = image.as_flat_samples_mut();
-                (flat_samples.as_mut_slice(), width, height)
-            }
-            SpriteData::Rgba {
-                width,
-                height,
-                data,
-            } => (data, width, height),
-        };
-
-        let id = self.renderer.sprites_mut().insert(
-            rgba_data,
-            width,
-            height,
-            descriptor.name.to_owned(),
-        );
-        id
-    }
-
-    pub fn sprite_dimensions(&self, id: SpriteId) -> UVec2 {
-        self.renderer.sprites().sprite_info(id).size
-    }
-
-    pub fn remove_sprite(&mut self, id: SpriteId) {
-        self.renderer.sprites_mut().remove(id);
-    }
-
-    pub fn sprite_by_name(&self, name: &str) -> Option<SpriteId> {
-        self.renderer.sprites().sprite_by_name(name)
-    }
-
-    pub fn draw_sprite(&mut self, sprite: SpriteId, pos: Vec2, width: f32) -> &mut Self {
-        self.renderer.record_sprite(sprite, pos, width);
+    /// Draws a texture / sprite on the canvas.
+    ///
+    /// `texture` is the ID of the texture to draw, which you
+    /// may acquire through `Context::texture_for_name`.
+    ///
+    /// `pos` is the position in logical pixels of the top-left of the sprite.
+    ///
+    /// `width` is the width of the image on the canvas, also in
+    /// logical pixels. The height is automatically computed from the texture's aspect ratio.
+    pub fn draw_sprite(&mut self, texture: TextureId, pos: Vec2, width: f32) -> &mut Self {
+        self.renderer
+            .draw_sprite(&self.context, texture, pos, width);
         self
     }
 
-    pub fn create_paragraph(&self, text: Text, layout: TextLayout) -> Paragraph {
-        Paragraph::new(text, layout, &self.fonts, self.renderer.sprites())
-    }
-
-    pub fn resize_paragraph(&self, paragraph: &mut Paragraph, new_max_dimensions: Vec2) {
-        paragraph.update_max_dimensions(&self.fonts, new_max_dimensions);
-    }
-
-    pub fn draw_paragraph(&mut self, pos: Vec2, paragraph: &Paragraph) -> &mut Self {
-        for glyph in paragraph.glyphs() {
-            if !glyph.visible {
-                continue;
-            }
-            match glyph.c {
-                GlyphCharacter::CharIndex(index, _) => {
-                    let key = GlyphKey {
-                        index,
-                        font: glyph.font.unwrap(),
-                        size: (glyph.size * 1000.) as u64,
-                    };
-                    self.renderer.record_glyph(
-                        key,
-                        glyph.pos + pos,
-                        glyph.color,
-                        &self.fonts,
-                        self.scale_factor,
-                    );
-                }
-                GlyphCharacter::Icon(sprite) => {
-                    self.draw_sprite(
-                        sprite,
-                        glyph.pos + pos - vec2(0., glyph.bbox.size.y),
-                        glyph.bbox.size.x,
-                    );
-                }
-            }
-        }
-
-        self
-    }
-
-    pub fn begin_path(&mut self) -> &mut Self {
-        self.current_path.segments.clear();
-        self
-    }
-
-    pub fn move_to(&mut self, pos: Vec2) -> &mut Self {
-        self.current_path.segments.push(PathSegment::MoveTo(pos));
-        self
-    }
-
-    pub fn line_to(&mut self, pos: Vec2) -> &mut Self {
-        self.current_path.segments.push(PathSegment::LineTo(pos));
-        self
-    }
-
-    pub fn quad_to(&mut self, control: Vec2, pos: Vec2) -> &mut Self {
-        self.current_path
-            .segments
-            .push(PathSegment::QuadTo(control, pos));
-        self
-    }
-
-    pub fn cubic_to(&mut self, control1: Vec2, control2: Vec2, pos: Vec2) -> &mut Self {
-        self.current_path
-            .segments
-            .push(PathSegment::CubicTo(control1, control2, pos));
-        self
-    }
-
-    pub fn arc(
-        &mut self,
-        center: Vec2,
-        radius: f32,
-        start_angle: f32,
-        end_angle: f32,
-    ) -> &mut Self {
-        self.current_path
-            .segments
-            .push(PathSegment::Arc(center, radius, start_angle, end_angle));
-        self
-    }
-
-    pub fn rect(&mut self, pos: Vec2, size: Vec2) -> &mut Self {
-        self.move_to(pos)
-            .line_to(pos + vec2(size.x, 0.0))
-            .line_to(pos + size)
-            .line_to(pos + vec2(0.0, size.y))
-            .line_to(pos)
-    }
-
-    pub fn rounded_rect(&mut self, pos: Vec2, size: Vec2, radius: f32) -> &mut Self {
-        let offset_x = vec2(radius, 0.0);
-        let offset_y = vec2(0.0, radius);
-
-        let size_x = vec2(size.x, 0.0);
-        let size_y = vec2(0.0, size.y);
-
-        self.move_to(pos + offset_x)
-            .line_to(pos + size_x - offset_x)
-            .quad_to(pos + size_x, pos + size_x + offset_y)
-            .line_to(pos + size - offset_y)
-            .quad_to(pos + size, pos + size - offset_x)
-            .line_to(pos + size_y + offset_x)
-            .quad_to(pos + size_y, pos + size_y - offset_y)
-            .line_to(pos + offset_y)
-            .quad_to(pos, pos + offset_x)
-    }
-
-    pub fn circle(&mut self, center: Vec2, radius: f32) -> &mut Self {
-        self.arc(center, radius, 0., TAU)
-    }
-
-    pub fn stroke_width(&mut self, width: f32) -> &mut Self {
-        self.stroke_width = width;
-        self
-    }
-
-    pub fn solid_color(&mut self, color: Srgba<u8>) -> &mut Self {
-        self.paint = Paint::Solid(color);
-        self
-    }
-
-    pub fn linear_gradient(
-        &mut self,
-        mut point_a: Vec2,
-        mut point_b: Vec2,
-        color_a: Srgba<u8>,
-        color_b: Srgba<u8>,
-    ) -> &mut Self {
-        point_a = self.renderer.transform.transform_point2(point_a);
-        point_b = self.renderer.transform.transform_point2(point_b);
-        self.paint = Paint::LinearGradient {
-            color_a,
-            color_b,
-            point_a,
-            point_b,
-        };
-        self
-    }
-
-    pub fn radial_gradient(
-        &mut self,
-        mut center: Vec2,
-        mut radius: f32,
-        color_a: Srgba<u8>,
-        color_b: Srgba<u8>,
-    ) -> &mut Self {
-        center = self.renderer.transform.transform_point2(center);
-        radius *= self.renderer.scale;
-        self.paint = Paint::RadialGradient {
-            center,
-            radius,
-            color_a,
-            color_b,
-        };
-        self
-    }
-
-    pub fn stroke(&mut self) {
-        let path = mem::take(&mut self.current_path);
-        let kind = TesselateKind::Stroke {
-            width: (self.stroke_width * 100.) as u32,
-        };
-        let path = (path, kind);
-        self.renderer.record_path(&path, self.paint);
-        self.current_path = path.0;
-    }
-
-    pub fn fill(&mut self) {
-        let path = mem::take(&mut self.current_path);
-        let kind = TesselateKind::Fill;
-        let path = (path, kind);
-        self.renderer.record_path(&path, self.paint);
-        self.current_path = path.0;
-    }
-
-    pub fn scissor_rect(&mut self, mut rect: Rect) -> &mut Self {
-        rect.pos = self.renderer.transform.transform_point2(rect.pos);
-        rect.size = self.renderer.transform.transform_vector2(rect.size);
-        self.renderer.set_scissor(rect);
-        self
-    }
-
-    pub fn clear_scissor(&mut self) -> &mut Self {
-        self.renderer.clear_scissor();
-        self
-    }
-
-    pub fn translate(&mut self, vector: Vec2) {
-        self.renderer.transform.translation += vector;
-    }
-
-    pub fn scale(&mut self, scale: f32) {
-        self.renderer.transform =
-            self.renderer.transform * Affine2::from_scale(glam::vec2(scale, scale));
-        self.renderer.scale = scale;
-    }
-
-    pub fn reset_transform(&mut self) {
-        self.renderer.transform = Affine2::IDENTITY;
-        self.renderer.scale = 1.0;
-    }
-
+    /// Renders a frame, flushing all current draw commands.
+    ///
+    /// You need to submit the provided `CommandEncoder` to a `Queue`
+    /// for rendering to work.
     pub fn render(
         &mut self,
-        sampled_view: &wgpu::TextureView,
-        target_view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
-        window_size: Vec2,
+        target_texture: &wgpu::TextureView,
+        target_sample_texture: &wgpu::TextureView,
     ) {
-        let ortho = Mat4::orthographic_lh(0.0, window_size.x, window_size.y, 0.0, -1.0, 1.0);
-        let mut prepared_sprites = self.renderer.prepare(ortho);
-        {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("doom"),
-                color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: sampled_view,
-                    resolve_target: Some(target_view),
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: true,
-                    },
-                }],
-                depth_stencil_attachment: None,
-            });
-
-            self.renderer.render(&mut pass, &mut prepared_sprites);
-        }
+        let projection_matrix = Mat4::orthographic_lh(
+            0.,
+            self.target_logical_size.x,
+            self.target_logical_size.y,
+            0.,
+            0.,
+            1.,
+        );
+        let prepared =
+            self.renderer
+                .prepare_render(&self.context, self.context.device(), projection_matrix);
+        self.renderer.render(
+            &self.context,
+            self.context.device(),
+            encoder,
+            &prepared,
+            target_texture,
+            target_sample_texture,
+        );
     }
 }

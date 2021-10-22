@@ -1,5 +1,5 @@
 use ahash::AHashMap;
-use glam::uvec2;
+use glam::{uvec2, UVec2};
 use slotmap::{SecondaryMap, SlotMap};
 
 use crate::{
@@ -42,6 +42,7 @@ impl Textures {
                 log::warn!("Duplicate textures with name '{}'", name);
             }
             set.by_id.insert(id, *key);
+            set.sizes.insert(id, set.atlas.get(*key).size);
         }
 
         texture_set_id
@@ -75,6 +76,7 @@ pub struct TextureSet {
     atlas: StaticTextureAtlas,
     by_name: AHashMap<String, TextureKey>,
     by_id: SecondaryMap<TextureId, TextureKey>,
+    sizes: SecondaryMap<TextureId, UVec2>,
 }
 
 impl TextureSet {
@@ -84,6 +86,10 @@ impl TextureSet {
 
     pub fn key_by_id(&self, id: TextureId) -> TextureKey {
         self.by_id[id]
+    }
+
+    pub fn texture_size(&self, id: TextureId) -> UVec2 {
+        self.sizes[id]
     }
 }
 
@@ -137,6 +143,7 @@ impl TextureSetBuilder {
             atlas,
             by_name: self.by_name,
             by_id: SecondaryMap::new(), // initialized by Textures::add_texture_set
+            sizes: SecondaryMap::new(),
         })
     }
 }

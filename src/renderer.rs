@@ -1,559 +1,228 @@
-use std::{mem::size_of, sync::Arc};
+use crate::{Context, Rect, TextureId, TextureSetId};
 
+use ahash::AHashMap;
 use bytemuck::{Pod, Zeroable};
-use fontdb::Database;
-use glam::{vec2, Affine2, IVec2, Mat4, Vec2, Vec4};
-use guillotiere::Allocation;
-use palette::Srgba;
+use glam::{Mat4, Vec2};
 use wgpu::util::DeviceExt;
 
-use crate::{
-    canvas::Paint,
-    glyph::{GlyphCache, GlyphKey},
-    path::{Path, PathCache, TesselateKind},
-    rect::Rect,
-    sprite::{SpriteId, Sprites},
-    SAMPLE_COUNT, TARGET_FORMAT,
+use self::{
+    layering::LayeringEngine,
+    sprite::{PreparedSpriteBatch, SpriteBatch, SpriteRenderer},
 };
 
-// Must match uber.frag.glsl defines
-const PAINT_SOLID_COLOR: i32 = 0;
-const PAINT_SPRITE: i32 = 1;
-const PAINT_ALPHA_TEXTURE: i32 = 2;
-const PAINT_LINEAR_GRADIENT: i32 = 3;
-const PAINT_RADIAL_GRADIENT: i32 = 4;
+mod layering;
+mod sprite;
 
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
-#[repr(C)]
-struct Vertex {
-    pos: Vec2,
-    texcoord: Vec2,
-    paint: IVec2,
-    scissor: IVec2,
-}
+/// Renderer for a canvas.
+///
+/// # Batched rendering
+/// Rendering is split into _batches_ -
+/// each type of primitive that can be rendered
+/// belongs to a single batch. A batch can be drawn
+/// with a single draw call, using a single shader and vertex buffer.
+///
+/// The renderer uses a tile-based hit detection algorithm to
+/// determine where batches intersect. To ensure proper draw order,
+/// a primitive has to be added to a new batch if the old batch of the
+/// same type was occluded by a primitive in a different, more recent batch.
+///
+/// For example:
+/// 1. render fullscreen image -> batch 1
+/// 2. render another fullscreen image -> batch 1
+/// 3. render some text on top -> batch 2 (because the primitive type is different)
+/// 4. render another fullscreen image -> batch 3 (because if added to batch 1,
+///    the text would be drawn over the image, not under it
+///    as draw order requires)
+/// 5. render another fullsreen image, but from a different texture set -> batch 4
+///    (because the bind groups provided
+///    to the shader are different for different texture sets)
+pub struct Renderer {
+    sprite_renderer: SpriteRenderer,
 
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
-#[repr(C)]
-struct Uniforms {
-    ortho: Mat4,
+    batches: Batches,
+
+    layering: LayeringEngine,
 }
 
 pub struct PreparedRender {
-    bind_group: wgpu::BindGroup,
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
-    color_buffer: wgpu::Buffer,
-
-    num_indices: u32,
+    batches: Vec<PreparedBatch>,
 }
 
-/// Renders sprites, glyphs, and paths using a single draw call.
-///
-/// Calling `record_*` adds another command, which is
-/// buffered in a vertex buffer. Calling `render` causes
-/// the sprites to be rendered.
-pub struct Renderer {
-    sprites: Sprites,
-    glyphs: GlyphCache,
-    paths: PathCache,
-
-    device: Arc<wgpu::Device>,
-    #[allow(unused)]
-    queue: Arc<wgpu::Queue>,
-    sampler: wgpu::Sampler,
-    nearest_sampler: wgpu::Sampler,
-    pipeline: wgpu::RenderPipeline,
-    bg_layout: wgpu::BindGroupLayout,
-
-    /// Buffered for the current layer.
-    vertices: Vec<Vertex>,
-    indices: Vec<u32>,
-    colors: Vec<Vec4>,
-
-    scissor: Option<(Rect, i32)>,
-
-    pub transform: Affine2,
-    pub scale: f32,
+enum PreparedBatch {
+    Sprite(PreparedSpriteBatch),
 }
 
 impl Renderer {
-    pub fn new(device: Arc<wgpu::Device>, queue: Arc<wgpu::Queue>) -> Self {
-        let (pipeline, bg_layout) = create_pipeline(&device);
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("sprite_sampler"),
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Linear,
-            lod_min_clamp: 0.0,
-            lod_max_clamp: 100.0,
-            compare: None,
-            anisotropy_clamp: None,
-            border_color: None,
-        });
-        let nearest_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("font_sampler"),
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            lod_min_clamp: 0.0,
-            lod_max_clamp: 100.0,
-            compare: None,
-            anisotropy_clamp: None,
-            border_color: None,
-        });
+    pub fn new(device: &wgpu::Device, window_size: Vec2) -> Self {
+        let mut layering = LayeringEngine::new();
+        layering.set_window_size(window_size);
         Self {
-            sprites: Sprites::new(Arc::clone(&device), Arc::clone(&queue)),
-            glyphs: GlyphCache::new(Arc::clone(&device), Arc::clone(&queue)),
-            paths: PathCache::new(),
+            sprite_renderer: SpriteRenderer::new(device),
 
-            device,
-            queue,
-            sampler,
-            nearest_sampler,
-            pipeline,
-            bg_layout,
-
-            vertices: Vec::new(),
-            indices: Vec::new(),
-            colors: Vec::new(),
-
-            scissor: None,
-            transform: Affine2::IDENTITY,
-            scale: 1.0,
+            batches: Batches::default(),
+            layering,
         }
     }
 
-    pub fn set_scissor(&mut self, rect: Rect) {
-        let rect_encoded = glam::vec4(rect.pos.x, rect.pos.y, rect.size.x, rect.size.y);
-        self.colors.push(rect_encoded);
-        self.scissor = Some((rect, self.colors.len() as i32 - 1));
+    pub fn draw_sprite(&mut self, cx: &Context, texture: TextureId, pos: Vec2, width: f32) {
+        let texture_set = cx.textures().set_for_texture(texture);
+
+        let batch_id = find_batch_with_layering(
+            &mut self.batches,
+            &mut self.layering,
+            BatchKey::Sprite { texture_set },
+            Batch::Sprite(self.sprite_renderer.create_batch(texture_set)),
+            self.sprite_renderer
+                .affected_region(cx, texture_set, texture, pos, width),
+        );
+
+        self.sprite_renderer.draw_sprite(
+            cx,
+            self.batches.get(batch_id).unwrap_sprite(),
+            texture,
+            pos,
+            width,
+        );
     }
 
-    pub fn clear_scissor(&mut self) {
-        self.scissor = None;
-    }
-
-    pub fn sprites(&self) -> &Sprites {
-        &self.sprites
-    }
-
-    pub fn sprites_mut(&mut self) -> &mut Sprites {
-        &mut self.sprites
-    }
-
-    /// Draws a sprite on the current layer.
-    pub fn record_sprite(&mut self, id: SpriteId, pos: Vec2, width: f32) {
-        let info = self.sprites.sprite_info(id);
-        let mipmap_level = self.sprites.mipmap_level_for_scale(id, width * self.scale);
-        let allocation = info.mipmap_allocations[mipmap_level];
-
-        let height = width * info.mipmap_sizes[mipmap_level].y as f32
-            / info.mipmap_sizes[mipmap_level].x as f32;
-        let size = Vec2::new(width, height);
-
-        let texcoords = self.sprites().atlas().texture_coordinates(allocation);
-
-        let paint = glam::ivec2(PAINT_SPRITE, 0);
-
-        self.push_quad(pos, size, texcoords, paint);
-    }
-
-    pub fn record_glyph(
+    pub fn prepare_render(
         &mut self,
-        mut key: GlyphKey,
-        pos: Vec2,
-        color: Srgba<u8>,
-        fonts: &Database,
-        scale_factor: f64,
-    ) {
-        // Apply the current scale factor so glyphs
-        // are rasterized at the precise correct scale.
-        let scale = self.scale * scale_factor as f32;
-        key.size = ((key.size as f32 / 1000.0 * scale) * 1000.0) as u64;
+        cx: &Context,
+        device: &wgpu::Device,
+        projection_matrix: Mat4,
+    ) -> PreparedRender {
+        self.batches.by_key.clear();
+        self.layering.reset();
 
-        if let Some(allocation) = self.glyphs.glyph_allocation(key, fonts) {
-            let texcoords = self.glyphs.atlas().texture_coordinates(allocation);
-
-            let paint = glam::ivec2(PAINT_ALPHA_TEXTURE, self.push_color(color));
-
-            let size = vec2(
-                allocation.rectangle.size().width as f32 - 2.0,
-                allocation.rectangle.size().height as f32 - 2.0,
-            ) / scale;
-
-            self.push_quad(pos, size, texcoords, paint);
-        }
-    }
-
-    pub fn record_path(&mut self, path: &(Path, TesselateKind), paint: Paint) {
-        let paint = match paint {
-            Paint::Solid(color) => glam::ivec2(PAINT_SOLID_COLOR, self.push_color(color)),
-            Paint::LinearGradient {
-                color_a,
-                color_b,
-                point_a,
-                point_b,
-            } => {
-                let id = self.push_color(color_a);
-                self.push_color(color_b);
-                self.colors
-                    .push(Vec4::new(point_a.x, point_a.y, point_b.x, point_b.y));
-
-                glam::ivec2(PAINT_LINEAR_GRADIENT, id)
-            }
-            Paint::RadialGradient { color_a, color_b, center, radius } => {
-                let id = self.push_color(color_a);
-                self.push_color(color_b);
-                self.colors.push(Vec4::new(center.x, center.y, radius, 0.));
-
-                glam::ivec2(PAINT_RADIAL_GRADIENT, id)
-            }
-            
-        };
-
-        let scissor = self.scissor_vec();
-        let Self {
-            indices,
-            vertices,
-            transform,
-            ..
-        } = self;
-        self.paths.with_tesselated_path(path, |tesselated| {
-            let base_vertex = vertices.len() as u32;
-            for vertex in &tesselated.vertices {
-                vertices.push(Vertex {
-                    pos: transform.transform_point2(*vertex),
-                    texcoord: Vec2::ZERO,
-                    paint,
-                    scissor,
-                });
-            }
-            for index in &tesselated.indices {
-                indices.push(*index + base_vertex);
-            }
-        });
-    }
-
-    fn push_color(&mut self, color: Srgba<u8>) -> i32 {
-        let linear = color.into_format::<f32, f32>().into_linear();
-        self.colors.push(Vec4::new(
-            linear.red,
-            linear.green,
-            linear.blue,
-            linear.alpha,
-        ));
-
-        self.colors.len() as i32 - 1
-    }
-
-    fn push_quad(&mut self, pos: Vec2, size: Vec2, texcoords: [Vec2; 4], paint: IVec2) {
-        let scissor = self.scissor_vec();
-        let vertices = [
-            Vertex {
-                pos: self.transform.transform_point2(pos),
-                texcoord: texcoords[0],
-                paint,
-                scissor,
-            },
-            Vertex {
-                pos: self
-                    .transform
-                    .transform_point2(pos + Vec2::new(size.x, 0.0)),
-                texcoord: texcoords[1],
-                paint,
-                scissor,
-            },
-            Vertex {
-                pos: self.transform.transform_point2(pos + size),
-                texcoord: texcoords[2],
-                paint,
-                scissor,
-            },
-            Vertex {
-                pos: self
-                    .transform
-                    .transform_point2(pos + Vec2::new(0.0, size.y)),
-                texcoord: texcoords[3],
-                paint,
-                scissor,
-            },
-        ];
-        let i = self.vertices.len() as u32;
-        assert!(i.checked_add(4).is_some(), "too many sprites in one layer");
-        let indices = [i, i + 1, i + 2, i + 2, i + 3, i];
-
-        self.vertices.extend_from_slice(&vertices);
-        self.indices.extend_from_slice(&indices);
-    }
-
-    fn scissor_vec(&self) -> IVec2 {
-        match self.scissor {
-            Some((rect, index)) => glam::ivec2(1, index),
-            None => glam::ivec2(0, 0),
-        }
-    }
-
-    /// Prepares to render the current layer, and flushes the command buffer.
-    pub fn prepare(&mut self, ortho: Mat4) -> PreparedRender {
-        self.scissor = None;
-        self.transform = Affine2::IDENTITY;
-        self.scale = 1.0;
-
-        let uniforms = Uniforms { ortho };
-        let uniform_buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::bytes_of(&uniforms),
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
-
-        if self.vertices.is_empty() {
-            self.vertices.push(Vertex {
-                pos: Vec2::ZERO,
-                texcoord: Vec2::ZERO,
-                paint: IVec2::ZERO,
-                scissor: IVec2::ZERO,
-            });
-        }
-        if self.indices.is_empty() {
-            self.indices.push(0);
-        }
-
-        let vertex_buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("vertices"),
-                contents: bytemuck::cast_slice(&self.vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
-        let index_buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("indices"),
-                contents: bytemuck::cast_slice(&self.indices),
-                usage: wgpu::BufferUsages::INDEX,
-            });
-
-        if self.colors.is_empty() {
-            self.colors.push(glam::vec4(1.0, 1.0, 1.0, 1.0));
-        }
-
-        let color_buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("colors"),
-                contents: bytemuck::cast_slice(&self.colors),
-                usage: wgpu::BufferUsages::STORAGE,
-            });
-
-        let num_indices = self.indices.len() as u32;
-        self.vertices.clear();
-        self.indices.clear();
-        self.colors.clear();
-
-        let sprite_tv = self
-            .sprites()
-            .atlas()
-            .texture()
-            .create_view(&Default::default());
-
-        let font_tv = self
-            .glyphs
-            .atlas()
-            .texture()
-            .create_view(&Default::default());
-
-        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let locals = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            layout: &self.bg_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer: &uniform_buffer,
-                        offset: 0,
-                        size: None,
-                    }),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&self.sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&self.nearest_sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: wgpu::BindingResource::TextureView(&sprite_tv),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 4,
-                    resource: wgpu::BindingResource::TextureView(&font_tv),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 5,
-                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer: &color_buffer,
-                        offset: 0,
-                        size: None,
-                    }),
-                },
-            ],
+            contents: bytemuck::bytes_of(&projection_matrix),
+            usage: wgpu::BufferUsages::UNIFORM,
         });
 
-        PreparedRender {
-            bind_group,
-            vertex_buffer,
-            index_buffer,
-            color_buffer,
-            num_indices,
+        let mut prepared = Vec::new();
+        for batch in self.batches.batches.drain(..) {
+            let prep = match batch {
+                Batch::Sprite(s) => PreparedBatch::Sprite(
+                    self.sprite_renderer.prepare_batch(cx, device, s, &locals),
+                ),
+            };
+            prepared.push(prep);
         }
+        self.batches.by_key.clear();
+
+        PreparedRender { batches: prepared }
     }
 
-    pub fn render<'pass>(
-        &'pass mut self,
-        pass: &mut wgpu::RenderPass<'pass>,
-        data: &'pass mut PreparedRender,
+    pub fn render(
+        &mut self,
+        cx: &Context,
+        device: &wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
+        prepared: &PreparedRender,
+
+        target_texture: &wgpu::TextureView,
+        target_sample_texture: &wgpu::TextureView,
     ) {
-        pass.set_pipeline(&self.pipeline);
-        pass.set_vertex_buffer(0, data.vertex_buffer.slice(..));
-        pass.set_index_buffer(data.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-        pass.set_bind_group(0, &data.bind_group, &[]);
-        pass.draw_indexed(0..data.num_indices, 0, 0..1);
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
+            color_attachments: &[wgpu::RenderPassColorAttachment {
+                view: target_sample_texture,
+                resolve_target: Some(target_texture),
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: true,
+                },
+            }],
+            depth_stencil_attachment: None,
+        });
+
+        for prep in &prepared.batches {
+            match prep {
+                PreparedBatch::Sprite(s) => self.sprite_renderer.render_layer(&mut render_pass, s),
+            }
+        }
     }
 }
 
-fn create_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGroupLayout) {
-    let module = todo!();
-    let vert_mod = device.create_shader_module(&module);
-    let frag_mod = device.create_shader_module(&module);
+fn find_batch_with_layering<'a>(
+    batches: &'a mut Batches,
+    layering: &mut LayeringEngine,
+    key: BatchKey,
+    created_batch: Batch,
+    affected_draw_region: Rect,
+) -> BatchId {
+    let mut created_batch = Some(created_batch);
+    let (_, batch_id) = batches.batch_by_key_or_insert(key, || created_batch.take().unwrap());
 
-    let bg_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: None,
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Sampler {
-                    filtering: true,
-                    comparison: false,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 2,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Sampler {
-                    filtering: false,
-                    comparison: false,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 3,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    multisampled: false,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 4,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    multisampled: false,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 5,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-        ],
-    });
+    let layering_result = layering.layer(affected_draw_region, batch_id);
 
-    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: None,
-        bind_group_layouts: &[&bg_layout],
-        push_constant_ranges: &[],
-    });
+    match layering_result {
+        layering::LayeringResult::UseCurrentBatch => batch_id,
+        layering::LayeringResult::CreateNewBatch => {
+            batches.insert_batch(key, created_batch.take().unwrap())
+        }
+    }
+}
 
-    let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("sprite_pipeline"),
-        layout: Some(&pipeline_layout),
-        vertex: wgpu::VertexState {
-            module: &vert_mod,
-            entry_point: "vs_main",
-            buffers: &[wgpu::VertexBufferLayout {
-                array_stride: size_of::<Vertex>() as _,
-                step_mode: wgpu::VertexStepMode::Vertex,
-                attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Sint32x2, 3 => Sint32x2],
-            }],
-        },
-        primitive: wgpu::PrimitiveState {
-            topology: wgpu::PrimitiveTopology::TriangleList,
-            strip_index_format: None,
-            front_face: wgpu::FrontFace::Ccw,
-            cull_mode: None,
-            clamp_depth: false,
-            polygon_mode: wgpu::PolygonMode::Fill,
-            conservative: false,
-        },
-        depth_stencil: None,
-        multisample: wgpu::MultisampleState {
-            count: SAMPLE_COUNT,
-            mask: !0,
-            alpha_to_coverage_enabled: false,
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: &frag_mod,
-            entry_point: "fs_main",
-            targets: &[wgpu::ColorTargetState {
-                format: TARGET_FORMAT,
-                blend: Some(wgpu::BlendState {
-                    color: wgpu::BlendComponent {
-                        src_factor: wgpu::BlendFactor::SrcAlpha,
-                        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                        operation: wgpu::BlendOperation::Add,
-                    },
-                    alpha: wgpu::BlendComponent {
-                        src_factor: wgpu::BlendFactor::One,
-                        dst_factor: wgpu::BlendFactor::One,
-                        operation: wgpu::BlendOperation::Add,
-                    }
-                }),
-                write_mask: wgpu::ColorWrites::ALL,
-            }],
-        }),
-    });
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+struct BatchId(usize);
 
-    (render_pipeline, bg_layout)
+#[derive(Default)]
+struct Batches {
+    batches: Vec<Batch>,
+    by_key: AHashMap<BatchKey, BatchId>,
+}
+
+impl Batches {
+    pub fn get(&mut self, id: BatchId) -> &mut Batch {
+        &mut self.batches[id.0]
+    }
+
+    pub fn batch_by_key_or_insert(
+        &mut self,
+        key: BatchKey,
+        create_batch: impl FnOnce() -> Batch,
+    ) -> (&mut Batch, BatchId) {
+        match self.by_key.get(&key) {
+            Some(&id) => (&mut self.batches[id.0], id),
+            None => {
+                let batch = create_batch();
+                self.batches.push(batch);
+                let id = BatchId(self.batches.len() - 1);
+                self.by_key.insert(key, id);
+                (&mut self.batches[id.0], id)
+            }
+        }
+    }
+
+    pub fn insert_batch(&mut self, key: BatchKey, batch: Batch) -> BatchId {
+        self.batches.push(batch);
+        let id = BatchId(self.batches.len() - 1);
+        self.by_key.insert(key, id);
+        id
+    }
+}
+
+enum Batch {
+    Sprite(SpriteBatch),
+}
+
+impl Batch {
+    pub fn unwrap_sprite(&mut self) -> &mut SpriteBatch {
+        match self {
+            Batch::Sprite(s) => s,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+enum BatchKey {
+    Sprite { texture_set: TextureSetId },
+}
+
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+#[repr(C)]
+struct Locals {
+    projection_matrix: Mat4,
 }

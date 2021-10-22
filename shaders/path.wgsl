@@ -16,7 +16,7 @@ struct Locals {
     projection_matrix: mat4x4<f32>;
 };
 [[group(0), binding(0)]]
-var locals: Locals;
+var<uniform> locals: Locals;
 
 [[stage(vertex)]]
 fn vs_main(
