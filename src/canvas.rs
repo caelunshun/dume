@@ -55,13 +55,16 @@ impl Canvas {
         let prepared =
             self.renderer
                 .prepare_render(&self.context, self.context.device(), projection_matrix);
-        self.renderer.render(
-            &self.context,
-            self.context.device(),
-            encoder,
-            &prepared,
-            target_texture,
-            target_sample_texture,
-        );
+        self.renderer
+            .render(encoder, &prepared, target_texture, target_sample_texture);
+    }
+
+    /// Updates the target size of the canvas in logical pixels.
+    ///
+    /// If the canvas is used to draw to a window, call this whenever
+    /// the window is resized.
+    pub fn resize(&mut self, new_logical_size: Vec2) {
+        self.target_logical_size = new_logical_size;
+        self.renderer.resize(new_logical_size);
     }
 }

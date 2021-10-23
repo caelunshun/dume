@@ -89,7 +89,7 @@ struct CharInfo {
 pub struct TextBlob {
     options: TextOptions,
 
-     runs: Vec<BlobRun>,
+    runs: Vec<BlobRun>,
 
     /// BiDi info, indexed by byte index
     bidi_levels: Vec<Level>,
@@ -99,7 +99,7 @@ pub struct TextBlob {
     char_info: Vec<CharInfo>,
 
     max_size: Vec2,
-     glyphs: Vec<ShapedGlyph>,
+    glyphs: Vec<ShapedGlyph>,
 }
 
 impl TextBlob {
@@ -149,6 +149,7 @@ impl TextBlob {
                 TextSection::Icon { name, size } => {
                     let texture = cx
                         .texture_for_name(&name)
+                        .or_else(|_| cx.texture_for_name(&format!("icon/{}", name)))
                         .expect("missing texture for embedded icon in text");
                     self.runs.push(BlobRun::Icon { texture, size });
                 }
@@ -213,20 +214,29 @@ impl TextBlob {
 
                         shaper.add_str(&text);
 
-                        let glyphs = &mut self.glyphs;
-                        shaper.shape_with(move |cluster| {
+                        shaper.shape_with(|cluster| {
                             for glyph in cluster.glyphs {
-                                glyphs.push(ShapedGlyph {
+                                self.glyphs.push(ShapedGlyph {
                                     pos: Vec2::ZERO, // computed later
                                     offset: vec2(glyph.x, glyph.y),
                                     advance: glyph.advance,
-                                    c: GlyphCharacter::Glyph(glyph.id),
+                                    c: GlyphCharacter::Glyph(glyph.id, style.size),
                                 });
                             }
                         });
                     }
-                    BlobRun::Icon { texture, size } => todo!(),
-                    BlobRun::ExplicitLineBreak => todo!(),
+                    BlobRun::Icon { texture, size } => self.glyphs.push(ShapedGlyph {
+                        pos: Vec2::ZERO,
+                        offset: vec2(0., 0.),
+                        advance: *size,
+                        c: GlyphCharacter::Icon(*texture, *size),
+                    }),
+                    BlobRun::ExplicitLineBreak => self.glyphs.push(ShapedGlyph {
+                        pos: Vec2::ZERO,
+                        offset: vec2(0., 0.),
+                        advance: 0.,
+                        c: GlyphCharacter::LineBreak,
+                    }),
                 }
             }
         });
@@ -238,6 +248,16 @@ impl TextBlob {
         if !self.should_resize_for(max_size) {
             return;
         }
+
+        let mut cursor_x = 0.;
+        for glyph in &mut self.glyphs {
+            glyph.pos.x = cursor_x;
+            cursor_x += glyph.advance;
+        }
+    }
+
+    pub(crate) fn glyphs(&self) -> &[ShapedGlyph] {
+        &self.glyphs
     }
 
     fn should_resize_for(&self, max_size: Vec2) -> bool {
@@ -304,8 +324,9 @@ pub struct ShapedGlyph {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum GlyphCharacter {
-    Glyph(GlyphId),
-    Icon(TextureId),
+    Glyph(GlyphId, f32),
+    Icon(TextureId, f32),
+    LineBreak,
 }
 
 /// A run within a [`Blob`] that has the same

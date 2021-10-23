@@ -116,8 +116,6 @@ impl Renderer {
 
     pub fn render(
         &mut self,
-        cx: &Context,
-        device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
         prepared: &PreparedRender,
 
@@ -142,6 +140,10 @@ impl Renderer {
                 PreparedBatch::Sprite(s) => self.sprite_renderer.render_layer(&mut render_pass, s),
             }
         }
+    }
+
+    pub fn resize(&mut self, new_target_size: Vec2) {
+        self.layering.set_window_size(new_target_size);
     }
 }
 

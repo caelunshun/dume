@@ -6,6 +6,7 @@ mod atlas;
 mod canvas;
 mod context;
 pub mod font;
+mod path;
 mod rect;
 mod renderer;
 mod text;

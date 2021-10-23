@@ -69,6 +69,10 @@ fn main() {
                     surface_config.height = new_size.height;
                     surface.configure(&device, &surface_config);
                     sample_texture = create_sample_texture(&device, &surface_config);
+                    canvas.resize(vec2(
+                        window.inner_size().to_logical(window.scale_factor()).width,
+                        window.inner_size().to_logical(window.scale_factor()).height,
+                    ));
                 }
 
                 _ => {}
