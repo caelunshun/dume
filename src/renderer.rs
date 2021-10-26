@@ -1,17 +1,20 @@
-use crate::{Context, Rect, TextureId, TextureSetId};
+use crate::{Context, FontId, Rect, TextureId, TextureSetId};
 
 use ahash::AHashMap;
 use bytemuck::{Pod, Zeroable};
-use glam::{Mat4, Vec2};
+use glam::{Mat4, Vec2, Vec4};
+use swash::GlyphId;
 use wgpu::util::DeviceExt;
 
 use self::{
     layering::LayeringEngine,
     sprite::{PreparedSpriteBatch, SpriteBatch, SpriteRenderer},
+    text::{PreparedTextBatch, TextBatch, TextRenderer},
 };
 
 mod layering;
 mod sprite;
+mod text;
 
 /// Renderer for a canvas.
 ///
@@ -38,6 +41,7 @@ mod sprite;
 ///    to the shader are different for different texture sets)
 pub struct Renderer {
     sprite_renderer: SpriteRenderer,
+    text_renderer: TextRenderer,
 
     batches: Batches,
 
@@ -50,6 +54,7 @@ pub struct PreparedRender {
 
 enum PreparedBatch {
     Sprite(PreparedSpriteBatch),
+    Text(PreparedTextBatch),
 }
 
 impl Renderer {
@@ -58,6 +63,7 @@ impl Renderer {
         layering.set_window_size(window_size);
         Self {
             sprite_renderer: SpriteRenderer::new(device),
+            text_renderer: TextRenderer::new(device),
 
             batches: Batches::default(),
             layering,
@@ -85,6 +91,36 @@ impl Renderer {
         );
     }
 
+    pub fn draw_glyph(
+        &mut self,
+        cx: &Context,
+        hidpi_factor: f32,
+        glyph: GlyphId,
+        pos: Vec2,
+        size: f32,
+        font: FontId,
+        color: Vec4,
+    ) {
+        let batch_id = find_batch_with_layering(
+            &mut self.batches,
+            &mut self.layering,
+            BatchKey::Text,
+            Batch::Text(self.text_renderer.create_batch()),
+            Rect::new(Vec2::ZERO, Vec2::ZERO),
+        );
+
+        self.text_renderer.draw_glyph(
+            cx,
+            hidpi_factor,
+            self.batches.get(batch_id).unwrap_text(),
+            glyph,
+            size,
+            color,
+            pos,
+            font,
+        );
+    }
+
     pub fn prepare_render(
         &mut self,
         cx: &Context,
@@ -106,6 +142,9 @@ impl Renderer {
                 Batch::Sprite(s) => PreparedBatch::Sprite(
                     self.sprite_renderer.prepare_batch(cx, device, s, &locals),
                 ),
+                Batch::Text(s) => {
+                    PreparedBatch::Text(self.text_renderer.prepare_batch(cx, device, s, &locals))
+                }
             };
             prepared.push(prep);
         }
@@ -138,6 +177,7 @@ impl Renderer {
         for prep in &prepared.batches {
             match prep {
                 PreparedBatch::Sprite(s) => self.sprite_renderer.render_layer(&mut render_pass, s),
+                PreparedBatch::Text(s) => self.text_renderer.render_layer(&mut render_pass, s),
             }
         }
     }
@@ -208,12 +248,21 @@ impl Batches {
 
 enum Batch {
     Sprite(SpriteBatch),
+    Text(TextBatch),
 }
 
 impl Batch {
     pub fn unwrap_sprite(&mut self) -> &mut SpriteBatch {
         match self {
             Batch::Sprite(s) => s,
+            _ => panic!("expected sprite batch"),
+        }
+    }
+
+    pub fn unwrap_text(&mut self) -> &mut TextBatch {
+        match self {
+            Batch::Text(s) => s,
+            _ => panic!("expected text batch"),
         }
     }
 }
@@ -221,6 +270,7 @@ impl Batch {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 enum BatchKey {
     Sprite { texture_set: TextureSetId },
+    Text,
 }
 
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]

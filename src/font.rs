@@ -153,7 +153,7 @@ impl Font {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub struct FontId(usize);
 
 /// The fonts available to a `Context`.
@@ -167,6 +167,12 @@ impl Fonts {
     pub fn add(&mut self, font: Font) -> FontId {
         let id = FontId(self.fonts.len());
         self.fonts.push(font);
+        let name = self
+            .get(id)
+            .localized_strings()
+            .find_by_id(StringId::Family, None)
+            .expect("missing font family string");
+        log::info!("Loaded font '{}'", name);
         id
     }
 

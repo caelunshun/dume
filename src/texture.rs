@@ -129,7 +129,7 @@ impl TextureSetBuilder {
     /// Panics if `min_atlas_size > max_atlas_size` or if either atlas
     /// size bound is not a power of two.
     pub fn build(
-        mut self,
+        self,
         min_atlas_size: u32,
         max_atlas_size: u32,
     ) -> Result<TextureSet, NotEnoughSpace> {

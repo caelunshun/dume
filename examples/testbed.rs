@@ -1,10 +1,14 @@
 use std::{
-    iter::{self},
+    fs,
+    iter::{self, once},
     sync::Arc,
 };
 
-use dume::{TextureSetBuilder, SAMPLE_COUNT, TARGET_FORMAT};
+use dume::{
+    Text, TextOptions, TextSection, TextStyle, TextureSetBuilder, SAMPLE_COUNT, TARGET_FORMAT,
+};
 use glam::vec2;
+use palette::Srgba;
 use pollster::block_on;
 use winit::{
     event::{Event, WindowEvent},
@@ -48,6 +52,21 @@ fn main() {
     let image2 = context.texture_for_name("image2").unwrap();
     let image3 = context.texture_for_name("image3").unwrap();
 
+    context
+        .add_font(fs::read("assets/ZenAntiqueSoft-Regular.ttf").unwrap())
+        .unwrap();
+    context.set_default_font_family("Zen Antique Soft");
+
+    let text = Text::from_sections(once(TextSection::Text {
+        text: "Neither borrower nor lender be.".into(),
+        style: TextStyle {
+            color: Srgba::new(u8::MAX - 200, u8::MAX, u8::MAX, u8::MAX),
+            size: 30.,
+            font: Default::default(),
+        },
+    }));
+    let text = context.create_text_blob(text, TextOptions::default());
+
     let mut surface_config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         format: TARGET_FORMAT,
@@ -58,10 +77,13 @@ fn main() {
     surface.configure(&device, &surface_config);
     let mut sample_texture = create_sample_texture(&device, &surface_config);
 
-    let mut canvas = context.create_canvas(vec2(
-        window.inner_size().to_logical(window.scale_factor()).width,
-        window.inner_size().to_logical(window.scale_factor()).height,
-    ));
+    let mut canvas = context.create_canvas(
+        vec2(
+            window.inner_size().to_logical(window.scale_factor()).width,
+            window.inner_size().to_logical(window.scale_factor()).height,
+        ),
+        window.scale_factor() as f32,
+    );
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -74,10 +96,13 @@ fn main() {
                     surface_config.height = new_size.height;
                     surface.configure(&device, &surface_config);
                     sample_texture = create_sample_texture(&device, &surface_config);
-                    canvas.resize(vec2(
-                        window.inner_size().to_logical(window.scale_factor()).width,
-                        window.inner_size().to_logical(window.scale_factor()).height,
-                    ));
+                    canvas.resize(
+                        vec2(
+                            window.inner_size().to_logical(window.scale_factor()).width,
+                            window.inner_size().to_logical(window.scale_factor()).height,
+                        ),
+                        window.scale_factor() as f32,
+                    );
                 }
 
                 _ => {}
@@ -87,6 +112,8 @@ fn main() {
                 canvas.draw_sprite(image1, vec2(0., 0.), 500.);
                 canvas.draw_sprite(image3, vec2(100., 100.), 400.);
                 canvas.draw_sprite(image2, vec2(0., 0.), 500.);
+
+                canvas.draw_text(&text, vec2(100., 100.), 1.);
 
                 let mut encoder = device.create_command_encoder(&Default::default());
                 let frame = surface.get_current_texture().unwrap();

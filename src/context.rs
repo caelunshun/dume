@@ -1,12 +1,13 @@
 use std::{sync::Arc, time::Duration};
 
 use glam::{uvec2, UVec2, Vec2};
-use parking_lot::{RwLock, RwLockReadGuard};
+use parking_lot::{Mutex, MutexGuard, RwLock, RwLockReadGuard};
 
 use crate::{
     font::{Font, Fonts, MalformedFont},
+    glyph::GlyphCache,
     texture::{MissingTexture, TextureId, TextureSet, TextureSetBuilder, Textures},
-    Canvas,
+    Canvas, Text, TextBlob, TextOptions,
 };
 
 /// Builder for a [`Context`].
@@ -41,13 +42,14 @@ impl ContextBuilder {
     /// Builds the context.
     pub fn build(self) -> Context {
         Context(Arc::new(Inner {
+            textures: RwLock::new(Textures::default()),
+            fonts: RwLock::new(Fonts::default()),
+            glyph_cache: Mutex::new(GlyphCache::new(&self.device, &self.queue, &self.settings)),
+
             settings: self.settings,
 
             device: self.device,
             queue: self.queue,
-
-            textures: RwLock::new(Textures::default()),
-            fonts: RwLock::new(Fonts::default()),
         }))
     }
 }
@@ -85,6 +87,7 @@ struct Inner {
 
     textures: RwLock<Textures>,
     fonts: RwLock<Fonts>,
+    glyph_cache: Mutex<GlyphCache>,
 }
 
 impl Context {
@@ -117,8 +120,16 @@ impl Context {
         self.0.fonts.write().set_default_family(family.into());
     }
 
-    pub fn create_canvas(&self, target_size: Vec2) -> Canvas {
-        Canvas::new(self.clone(), target_size)
+    pub fn create_canvas(&self, target_size: Vec2, hidpi_factor: f32) -> Canvas {
+        Canvas::new(self.clone(), target_size, hidpi_factor)
+    }
+
+    pub fn create_text_blob(&self, text: Text, options: TextOptions) -> TextBlob {
+        TextBlob::new(self, text, options)
+    }
+
+    pub fn resize_text_blob(&self, blob: &mut TextBlob, new_size: Vec2) {
+        blob.resize(self, new_size);
     }
 
     pub(crate) fn textures(&self) -> RwLockReadGuard<Textures> {
@@ -127,6 +138,10 @@ impl Context {
 
     pub(crate) fn fonts(&self) -> RwLockReadGuard<Fonts> {
         self.0.fonts.read()
+    }
+
+    pub(crate) fn glyph_cache(&self) -> MutexGuard<GlyphCache> {
+        self.0.glyph_cache.lock()
     }
 
     pub(crate) fn device(&self) -> &Arc<wgpu::Device> {

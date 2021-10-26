@@ -1,7 +1,7 @@
 use std::{iter, num::NonZeroU32, sync::Arc};
 
 use ahash::AHashMap;
-use glam::uvec2;
+use glam::{uvec2, vec2, Vec2};
 use guillotiere::{Allocation, AtlasAllocator, Size};
 
 use super::{AtlasEntry, TextureKey};
@@ -16,6 +16,7 @@ const STARTING_DIM: u32 = 1024;
 pub struct DynamicTextureAtlas {
     descriptor: wgpu::TextureDescriptor<'static>,
     texture: wgpu::Texture,
+    texture_view: wgpu::TextureView,
 
     allocator: AtlasAllocator,
     entries: AHashMap<TextureKey, Allocation>,
@@ -50,6 +51,7 @@ impl DynamicTextureAtlas {
 
         Self {
             descriptor,
+            texture_view: texture.create_view(&Default::default()),
             texture,
 
             allocator: AtlasAllocator::new(Size::new(STARTING_DIM as i32, STARTING_DIM as i32)),
@@ -109,6 +111,26 @@ impl DynamicTextureAtlas {
     /// Gets the atlas texture.
     pub fn texture(&self) -> &wgpu::Texture {
         &self.texture
+    }
+
+    pub fn texture_view(&self) -> &wgpu::TextureView {
+        &self.texture_view
+    }
+
+    pub fn texcoords(&self, key: TextureKey) -> [Vec2; 4] {
+        let placement = self.get(key);
+        let size = vec2(
+            self.descriptor.size.width as f32,
+            self.descriptor.size.height as f32,
+        );
+        let start = placement.pos.as_f32() / size;
+        let size = placement.size.as_f32() / size;
+        [
+            start,
+            start + vec2(size.x, 0.),
+            start + size,
+            start + vec2(0., size.y),
+        ]
     }
 
     fn write_texture(&mut self, texture: &[u8], width: u32, height: u32, allocation: Allocation) {

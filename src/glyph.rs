@@ -31,7 +31,7 @@ pub enum Glyph {
 ///
 /// Each glyph is uniquely identified by a [`GlyphKey`], which includes
 /// the font, size, and subpixel offset of the glyph.
-pub struct GlyphCache {
+pub(crate) struct GlyphCache {
     atlas: DynamicTextureAtlas,
     cache: LruCache<GlyphKey, Glyph>,
 
@@ -42,11 +42,15 @@ pub struct GlyphCache {
 }
 
 impl GlyphCache {
-    pub fn new(cx: &Context) -> Self {
+    pub fn new(
+        device: &Arc<wgpu::Device>,
+        queue: &Arc<wgpu::Queue>,
+        settings: &crate::context::Settings,
+    ) -> Self {
         Self {
             atlas: DynamicTextureAtlas::new(
-                Arc::clone(cx.device()),
-                Arc::clone(cx.queue()),
+                Arc::clone(device),
+                Arc::clone(queue),
                 wgpu::TextureFormat::R8Unorm,
                 "glyph_atlas",
             ),
@@ -54,8 +58,8 @@ impl GlyphCache {
 
             scale_context: ScaleContext::new(),
 
-            glyph_subpixel_steps: cx.settings().glyph_subpixel_steps,
-            glyph_expire_duration: cx.settings().glyph_expire_duration,
+            glyph_subpixel_steps: settings.glyph_subpixel_steps,
+            glyph_expire_duration: settings.glyph_expire_duration,
         }
     }
 

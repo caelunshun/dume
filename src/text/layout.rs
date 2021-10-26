@@ -6,6 +6,7 @@
 use std::{cell::RefCell, ops::Range};
 
 use glam::{vec2, Vec2};
+use palette::Srgba;
 use serde::{Deserialize, Serialize};
 use smartstring::{LazyCompact, SmartString};
 use swash::{
@@ -15,7 +16,7 @@ use swash::{
 };
 use unicode_bidi::{BidiInfo, Level, ParagraphInfo};
 
-use crate::{Context, Text, TextSection, TextStyle, TextureId};
+use crate::{Context, FontId, Text, TextSection, TextStyle, TextureId};
 
 thread_local! {
     static SHAPE_CONTEXT: RefCell<ShapeContext> = RefCell::new(ShapeContext::new());
@@ -72,6 +73,17 @@ pub struct TextOptions {
     pub align_h: Align,
     /// Vertical alignment to apply to the text.
     pub align_v: Align,
+}
+
+impl Default for TextOptions {
+    fn default() -> Self {
+        Self {
+            wrap_lines: true,
+            baseline: Default::default(),
+            align_h: Default::default(),
+            align_v: Default::default(),
+        }
+    }
 }
 
 struct CharInfo {
@@ -134,6 +146,7 @@ impl TextBlob {
         };
         blob.compute_runs(cx, text, &unstyled_text);
         blob.shape_glyphs(cx);
+        blob.resize(cx, Vec2::splat(f32::INFINITY));
         blob
     }
 
@@ -221,6 +234,9 @@ impl TextBlob {
                                     offset: vec2(glyph.x, glyph.y),
                                     advance: glyph.advance,
                                     c: GlyphCharacter::Glyph(glyph.id, style.size),
+                                    font: font_id,
+                                    color: style.color,
+                                    size: style.size,
                                 });
                             }
                         });
@@ -230,12 +246,18 @@ impl TextBlob {
                         offset: vec2(0., 0.),
                         advance: *size,
                         c: GlyphCharacter::Icon(*texture, *size),
+                        font: Default::default(),
+                        size: *size,
+                        color: Default::default(),
                     }),
                     BlobRun::ExplicitLineBreak => self.glyphs.push(ShapedGlyph {
                         pos: Vec2::ZERO,
                         offset: vec2(0., 0.),
                         advance: 0.,
                         c: GlyphCharacter::LineBreak,
+                        font: Default::default(),
+                        size: 0.,
+                        color: Default::default(),
                     }),
                 }
             }
@@ -312,18 +334,22 @@ fn script_runs(infos: &[CharInfo]) -> Vec<(Script, Range<usize>)> {
 #[derive(Debug)]
 pub struct ShapedGlyph {
     /// Position of the glyph relative to the text blob origin
-    pos: Vec2,
+    pub pos: Vec2,
     /// Offset from the pen position to draw at
-    offset: Vec2,
+    pub offset: Vec2,
     /// X distance to advance the pen after drawing (Y advance unsupported for now)
-    advance: f32,
+    pub advance: f32,
 
     /// The character to draw
-    c: GlyphCharacter,
+    pub c: GlyphCharacter,
+
+    pub font: FontId,
+    pub size: f32,
+    pub color: Srgba<u8>,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) enum GlyphCharacter {
+pub enum GlyphCharacter {
     Glyph(GlyphId, f32),
     Icon(TextureId, f32),
     LineBreak,
