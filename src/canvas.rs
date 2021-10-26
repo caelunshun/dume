@@ -1,6 +1,9 @@
 use glam::{Mat4, Vec2};
 
-use crate::{renderer::Renderer, Context, TextureId};
+use crate::{
+    renderer::{PreparedRender, Renderer},
+    Context, TextureId,
+};
 
 /// A 2D canvas using `wgpu`. Modeled after the HTML5 canvas
 /// API.

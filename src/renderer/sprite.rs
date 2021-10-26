@@ -210,12 +210,11 @@ impl SpriteRenderer {
         layer: SpriteBatch,
         locals: &wgpu::Buffer,
     ) -> PreparedSpriteBatch {
-        let texture = cx
-            .textures()
+        let textures = cx.textures();
+        let texture = textures
             .texture_set(layer.texture_set)
             .atlas()
-            .texture()
-            .create_view(&Default::default());
+            .texture_view();
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &self.bg_layout,
@@ -230,7 +229,7 @@ impl SpriteRenderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&texture),
+                    resource: wgpu::BindingResource::TextureView(texture),
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,

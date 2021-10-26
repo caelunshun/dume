@@ -19,6 +19,7 @@ pub struct NotEnoughSpace;
 /// efficiently than the dynamic variant, since it knows all texture sizes upfront.
 pub struct StaticTextureAtlas {
     texture: wgpu::Texture,
+    texture_view: wgpu::TextureView,
     descriptor: wgpu::TextureDescriptor<'static>,
     entries: AHashMap<TextureKey, AtlasEntry>,
 }
@@ -58,6 +59,10 @@ impl StaticTextureAtlas {
 
     pub fn texture(&self) -> &wgpu::Texture {
         &self.texture
+    }
+
+    pub fn texture_view(&self) -> &wgpu::TextureView {
+        &self.texture_view
     }
 }
 
@@ -198,6 +203,7 @@ impl StaticTextureAtlasBuilder {
         }
 
         Ok(StaticTextureAtlas {
+            texture_view: texture.create_view(&Default::default()),
             texture,
             descriptor,
             entries,

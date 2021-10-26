@@ -2,6 +2,8 @@
 //! drawing sprites, paths with solid colors
 //! or gradients, and text.
 
+#![allow(clippy::derive_hash_xor_eq)]
+
 mod atlas;
 mod canvas;
 mod context;
@@ -12,6 +14,7 @@ mod renderer;
 mod text;
 mod texture;
 mod thread_pool;
+mod glyph;
 
 pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 pub const SAMPLE_COUNT: u32 = 4;

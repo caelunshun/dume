@@ -18,13 +18,22 @@ fn main() {
         .init()
         .unwrap();
 
+    let event_loop = EventLoop::new();
+    let window = Window::new(&event_loop).unwrap();
+
     let instance = wgpu::Instance::new(wgpu::Backends::all());
-    let adapter = block_on(instance.request_adapter(&Default::default())).unwrap();
+    let surface = unsafe { instance.create_surface(&window) };
+    let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+        power_preference: wgpu::PowerPreference::HighPerformance,
+        force_fallback_adapter: false,
+        compatible_surface: Some(&surface),
+    }))
+    .unwrap();
     let (device, queue) = block_on(adapter.request_device(&Default::default(), None)).unwrap();
 
     let device = Arc::new(device);
     let queue = Arc::new(queue);
-    let context = dume::Context::new(Arc::clone(&device), Arc::clone(&queue));
+    let context = dume::Context::builder(Arc::clone(&device), Arc::clone(&queue)).build();
 
     let mut texture_set_a = context.create_texture_set_builder();
     load_texture(&mut texture_set_a, "assets/image1.jpg", "image1");
@@ -39,10 +48,6 @@ fn main() {
     let image2 = context.texture_for_name("image2").unwrap();
     let image3 = context.texture_for_name("image3").unwrap();
 
-    let event_loop = EventLoop::new();
-    let window = Window::new(&event_loop).unwrap();
-
-    let surface = unsafe { instance.create_surface(&window) };
     let mut surface_config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         format: TARGET_FORMAT,

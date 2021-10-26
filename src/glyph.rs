@@ -1,78 +1,123 @@
-use std::{collections::hash_map::Entry, sync::Arc};
+use std::{sync::Arc, time::Duration};
 
-use ahash::AHashMap;
-use fontdb::Database;
-use fontdue::layout::GlyphRasterConfig;
-use guillotiere::{AllocId, Allocation};
+use glam::{UVec2, Vec2};
+use lru::LruCache;
+use swash::{
+    scale::{Render, ScaleContext, Source},
+    zeno::{Format, Placement, Vector},
+    GlyphId,
+};
 
-use crate::{atlas::TextureAtlas, text::FontId};
+use crate::{
+    atlas::{DynamicTextureAtlas, TextureKey},
+    Context, FontId,
+};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct GlyphKey {
-    pub index: u32,
-    pub font: FontId,
-    pub size: u64, // fixed point in 1/1000s of a pixel
+struct GlyphKey {
+    font: FontId,
+    size: u32,              // 1/10s of a pixel
+    subpixel_offset: UVec2, // in terms of glyph_subpixel_steps
+    glyph_id: GlyphId,
 }
 
-/// A cache of rendered glyphs stored on a GPU texture atlas.
+#[derive(Debug, Copy, Clone)]
+pub enum Glyph {
+    Empty, // for unknown glyphs or glyphs with size 0
+    InAtlas(TextureKey, Placement),
+}
+
+/// A cache of rasterized glyphs stored in a texture atlas.
+///
+/// Each glyph is uniquely identified by a [`GlyphKey`], which includes
+/// the font, size, and subpixel offset of the glyph.
 pub struct GlyphCache {
-    atlas: TextureAtlas,
-    fonts: AHashMap<FontId, fontdue::Font>,
-    glyphs: AHashMap<GlyphKey, Allocation>,
+    atlas: DynamicTextureAtlas,
+    cache: LruCache<GlyphKey, Glyph>,
+
+    scale_context: ScaleContext,
+
+    glyph_subpixel_steps: UVec2,
+    glyph_expire_duration: Duration,
 }
 
 impl GlyphCache {
-    pub fn new(device: Arc<wgpu::Device>, queue: Arc<wgpu::Queue>) -> Self {
-        let atlas = TextureAtlas::new(device, queue, wgpu::TextureFormat::R8Unorm, "font_atlas");
+    pub fn new(cx: &Context) -> Self {
         Self {
-            atlas,
-            fonts: AHashMap::new(),
-            glyphs: AHashMap::new(),
+            atlas: DynamicTextureAtlas::new(
+                Arc::clone(cx.device()),
+                Arc::clone(cx.queue()),
+                wgpu::TextureFormat::R8Unorm,
+                "glyph_atlas",
+            ),
+            cache: LruCache::unbounded(), // glyphs are expired manually
+
+            scale_context: ScaleContext::new(),
+
+            glyph_subpixel_steps: cx.settings().glyph_subpixel_steps,
+            glyph_expire_duration: cx.settings().glyph_expire_duration,
         }
     }
 
-    pub fn atlas(&self) -> &TextureAtlas {
+    pub fn atlas(&self) -> &DynamicTextureAtlas {
         &self.atlas
     }
 
-    /// Gets the atlas allocation for the given glyph. Returns `None` if the glyph
-    /// is empty and should not be rendered.
-    pub fn glyph_allocation(&mut self, key: GlyphKey, fonts: &Database) -> Option<Allocation> {
-        match self.glyphs.entry(key) {
-            Entry::Occupied(entry) => Some(*entry.get()),
-            Entry::Vacant(entry) => {
-                let font = match self.fonts.entry(key.font) {
-                    Entry::Occupied(entry) => entry.into_mut(),
-                    Entry::Vacant(entry) => {
-                        let (font, _index) = fonts.face_source(key.font).unwrap();
-                        let font_data = match &*font {
-                            fontdb::Source::Binary(b) => b.as_slice(),
-                            fontdb::Source::File(_) => todo!(),
-                        };
-                        let font = fontdue::Font::from_bytes(
-                            font_data,
-                            fontdue::FontSettings {
-                                // enable_offset_bounding_box: false,
-                                ..Default::default()
-                            },
-                        )
-                        .expect("malformed font");
-                        entry.insert(font)
+    pub fn glyph_or_rasterize(
+        &mut self,
+        cx: &Context,
+        font: FontId,
+        glyph_id: GlyphId,
+        size: f32,
+        position: Vec2,
+    ) -> Glyph {
+        let subpixel_offset = (position.fract() * self.glyph_subpixel_steps.as_f32()).as_u32();
+        let key = GlyphKey {
+            font,
+            size: (size * 10.) as u32,
+            subpixel_offset,
+            glyph_id,
+        };
+
+        match self.cache.get(&key) {
+            Some(g) => *g,
+            None => {
+                // Rasterize the glyph and write it to the atlas.
+                // NB: color bitmaps can't be supported yet because the atlas is alpha-only.
+                let mut render = Render::new(&[Source::Outline]);
+                render
+                    .offset(Vector::new(position.x.fract(), position.y.fract()))
+                    .format(Format::Alpha);
+
+                let fonts = cx.fonts();
+                let font = fonts.get(font);
+                let mut scaler = self
+                    .scale_context
+                    .builder(font)
+                    .hint(true)
+                    .size(size)
+                    .build();
+
+                let image = render.render(&mut scaler, glyph_id);
+
+                let glyph = match image {
+                    Some(image) => {
+                        if image.placement.width == 0 || image.placement.height == 0 {
+                            Glyph::Empty
+                        } else {
+                            let key = self.atlas.insert(
+                                &image.data,
+                                image.placement.width,
+                                image.placement.height,
+                            );
+                            Glyph::InAtlas(key, image.placement)
+                        }
                     }
+                    None => Glyph::Empty,
                 };
 
-                let (metrics, alpha_map) =
-                    font.rasterize_indexed(key.index as usize, key.size as f32 / 1000.);
-
-                if metrics.width == 0 || metrics.height == 0 {
-                    return None;
-                }
-
-                Some(*entry.insert(self.atlas.insert(
-                    &alpha_map,
-                    metrics.width as u32,
-                    metrics.height as u32,
-                )))
+                self.cache.put(key, glyph);
+                self.cache.get(&key).copied().unwrap()
             }
         }
     }
