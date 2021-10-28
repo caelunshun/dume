@@ -4,7 +4,7 @@ use std::iter;
 
 use dume::{Canvas, Context, Text, TextBlob, TextSection, TextStyle};
 use dume_winit::{block_on, Application, DumeWinit};
-use glam::vec2;
+use glam::{vec2, Vec2};
 use winit::{event_loop::EventLoop, window::WindowBuilder};
 
 static TEXT: &str = r#"
@@ -58,12 +58,20 @@ impl App {
 
 impl Application for App {
     fn draw(&mut self, canvas: &mut Canvas) {
+        canvas
+            .begin_path()
+            .rect(Vec2::ZERO, vec2(100., 100.))
+            .solid_color((200, 10, 150, 255))
+            .fill();
         canvas.draw_text(&self.text, vec2(10., 50.), 1.);
     }
 }
 
 fn main() {
-    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    #[cfg(target_arch = "wasm32")]
+    {
+        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    }
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .with_title("Dume Text Example")
