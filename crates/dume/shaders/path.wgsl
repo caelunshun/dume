@@ -3,11 +3,14 @@
 // The `paint` vertex attribute determines how to shade the path.
 // The first component indicates whether to use a solid color, a
 // a linear gradient, or a radial gradient; the second component is an
-// index into the Colors storage buffer.
+// index into the Colors texture.
+//
+// The Colors texture emulates a storage buffer, since storage buffers are unsupported
+// on WebGL.
 
 struct VertexOutput {
     [[location(0)]] world_pos: vec2<f32>;
-    [[location(1)]] paint: vec2<u32>;
+    [[location(1)]] paint: vec2<i32>;
     [[builtin(position)]] position: vec4<f32>;
 };
 
@@ -21,7 +24,7 @@ var<uniform> locals: Locals;
 [[stage(vertex)]]
 fn vs_main(
     [[location(0)]] world_pos: vec2<f32>,
-    [[location(1)]] paint: vec2<u32>,
+    [[location(1)]] paint: vec2<i32>,
 ) -> VertexOutput {
     var out: VertexOutput;
 
@@ -37,12 +40,12 @@ let PAINT_TYPE_SOLID: i32 = 0;
 let PAINT_TYPE_LINEAR_GRADIENT: i32 = 1;
 let PAINT_TYPE_RADIAL_GRADIENT: i32 = 2;
 
-[[block]]
-struct Colors {
-    buffer: [[stride(16)]] array<vec4<f32>>;
-};
 [[group(0), binding(1)]]
-var<storage, read> colors: Colors;
+var colors: texture_2d<f32>;
+
+fn get_color(index: i32) -> vec4<f32> {
+    return textureLoad(colors, vec2<i32>(index, 0), 0);
+}
 
 fn linear_gradient(pos: vec2<f32>, point_a: vec2<f32>, point_b: vec2<f32>, color_a: vec4<f32>, color_b: vec4<f32>) -> vec4<f32> {
     // https://stackoverflow.com/questions/1459368/snap-point-to-a-line
@@ -64,22 +67,22 @@ fn radial_gradient(pos: vec2<f32>, center: vec2<f32>, radius: f32, color_a: vec4
 
 [[stage(fragment)]]
 fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
-    let paint_type = i32(in.paint.x);
-    let color_index = i32(in.paint.y);
+    let paint_type = in.paint.x;
+    let color_index = in.paint.y;
 
     if (paint_type == PAINT_TYPE_SOLID) {
-        return colors.buffer[color_index];
+        return get_color(color_index);
     } else {
         if (paint_type == PAINT_TYPE_LINEAR_GRADIENT) {
-            let point = colors.buffer[color_index + 2];
+            let point = get_color(color_index + 2);
             let point_a = point.xy;
             let point_b = point.zw;
-            return linear_gradient(in.world_pos, point_a, point_b, colors.buffer[color_index], colors.buffer[color_index + 1]);
+            return linear_gradient(in.world_pos, point_a, point_b, get_color(color_index), get_color(color_index + 1));
         } else {
-            let point = colors.buffer[color_index + 2];
+            let point = get_color(color_index + 2);
             let center = point.xy;
             let radius = point.z;
-            return radial_gradient(in.world_pos, center, radius, colors.buffer[color_index], colors.buffer[color_index + 1]);
+            return radial_gradient(in.world_pos, center, radius, get_color(color_index), get_color(color_index + 1));
         }
     }
 }

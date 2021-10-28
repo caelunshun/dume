@@ -16,6 +16,9 @@ mod texture;
 mod thread_pool;
 mod glyph;
 
+#[cfg(target_arch = "wasm32")]
+pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+#[cfg(not(target_arch = "wasm32"))]
 pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 pub const SAMPLE_COUNT: u32 = 4;
 

@@ -111,14 +111,32 @@ impl TextureSetBuilder {
         }
     }
 
-    /// Adds a texture to the texture set.
+    /// Adds a texture to the texture set from raw RGBA data.
     ///
     /// `data` should be _BGRA_-encoded 8-bit texture data.
     /// Note that most texture data you work with will be RGBA;
     /// you will need to swap the byte order when passing data to this function.
-    pub fn add_texture(&mut self, width: u32, height: u32, data: Vec<u8>, name: impl Into<String>) {
+    pub fn add_raw_texture(
+        &mut self,
+        width: u32,
+        height: u32,
+        data: Vec<u8>,
+        name: impl Into<String>,
+    ) {
         let key = self.atlas_builder.add_texture(data, uvec2(width, height));
         self.by_name.insert(name.into(), key);
+    }
+
+    /// Adds a texture to the texture set from an encoded image.
+    #[cfg(feature = "image_")]
+    pub fn add_texture(
+        &mut self,
+        data: &[u8],
+        name: impl Into<String>,
+    ) -> Result<(), image::ImageError> {
+        let image = image::load_from_memory(data)?.to_bgra8();
+        self.add_raw_texture(image.width(), image.height(), image.into_raw(), name);
+        Ok(())
     }
 
     /// Builds the texture set into a texture atlas, copying

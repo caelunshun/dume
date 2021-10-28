@@ -1,7 +1,5 @@
 //! Rich text implementation.
 
-#![allow(clippy::clippy::derive_hash_xor_eq)]
-
 use std::hash::Hash;
 
 use palette::Srgba;

@@ -185,12 +185,10 @@ impl Fonts {
     }
 
     pub fn query(&self, query: &Query) -> Result<FontId, MissingFont> {
-        let i = self.fonts.iter().position(|font| {
-            query.matches(
-                &font.as_ref(),
-                self.default_family.as_ref().map(|s| s.as_str()),
-            )
-        });
+        let i = self
+            .fonts
+            .iter()
+            .position(|font| query.matches(&font.as_ref(), self.default_family.as_deref()));
 
         i.map(FontId).ok_or_else(|| MissingFont(query.clone()))
     }

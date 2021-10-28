@@ -1,5 +1,3 @@
-#![allow(clippy::clippy::derive_hash_xor_eq)]
-
 use std::hash::{Hash, Hasher};
 
 use glam::Vec2;
@@ -151,7 +149,7 @@ pub enum TesselateKind {
 }
 
 /// A cache of tesselated paths.
-#[allow(clippy::clippy::new_without_default)]
+#[allow(clippy::new_without_default)]
 pub struct PathCache {
     paths: LruCache<(Path, TesselateKind), TesselatedPath, ahash::RandomState>,
     fill_tesselator: FillTessellator,

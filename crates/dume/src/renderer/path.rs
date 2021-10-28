@@ -80,10 +80,10 @@ impl PathRenderer {
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
                     },
                     count: None,
                 },
@@ -107,7 +107,7 @@ impl PathRenderer {
                 buffers: &[wgpu::VertexBufferLayout {
                     array_stride: size_of::<Vertex>() as u64,
                     step_mode: wgpu::VertexStepMode::Vertex,
-                    attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Uint32x2],
+                    attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Sint32x2],
                 }],
             },
             primitive: wgpu::PrimitiveState {
@@ -203,14 +203,27 @@ impl PathRenderer {
         &self,
         _cx: &Context,
         device: &wgpu::Device,
+        queue: &wgpu::Queue,
         layer: PathBatch,
         locals: &wgpu::Buffer,
     ) -> PreparedPathBatch {
-        let colors = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
-            contents: bytemuck::cast_slice(&layer.colors),
-            usage: wgpu::BufferUsages::STORAGE,
-        });
+        let colors = device.create_texture_with_data(
+            queue,
+            &wgpu::TextureDescriptor {
+                label: Some("colors"),
+                size: wgpu::Extent3d {
+                    width: layer.colors.len() as u32,
+                    height: 1,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba32Float,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING,
+            },
+            bytemuck::cast_slice(&layer.colors),
+        );
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &self.bg_layout,
@@ -225,11 +238,9 @@ impl PathRenderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer: &colors,
-                        offset: 0,
-                        size: None,
-                    }),
+                    resource: wgpu::BindingResource::TextureView(
+                        &colors.create_view(&Default::default()),
+                    ),
                 },
             ],
         });

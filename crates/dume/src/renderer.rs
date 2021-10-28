@@ -174,9 +174,13 @@ impl Renderer {
                 Batch::Text(s) => {
                     PreparedBatch::Text(self.text_renderer.prepare_batch(cx, device, s, &locals))
                 }
-                Batch::Path(s) => {
-                    PreparedBatch::Path(self.path_renderer.prepare_batch(cx, device, s, &locals))
-                }
+                Batch::Path(s) => PreparedBatch::Path(self.path_renderer.prepare_batch(
+                    cx,
+                    device,
+                    cx.queue(),
+                    s,
+                    &locals,
+                )),
             };
             prepared.push(prep);
         }
@@ -220,8 +224,8 @@ impl Renderer {
     }
 }
 
-fn find_batch_with_layering<'a>(
-    batches: &'a mut Batches,
+fn find_batch_with_layering(
+    batches: &mut Batches,
     layering: &mut LayeringEngine,
     key: BatchKey,
     created_batch: Batch,

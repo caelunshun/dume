@@ -151,11 +151,11 @@ impl Context {
         self.0.path_cache.lock()
     }
 
-    pub(crate) fn device(&self) -> &Arc<wgpu::Device> {
+    pub fn device(&self) -> &Arc<wgpu::Device> {
         &self.0.device
     }
 
-    pub(crate) fn queue(&self) -> &Arc<wgpu::Queue> {
+    pub fn queue(&self) -> &Arc<wgpu::Queue> {
         &self.0.queue
     }
 

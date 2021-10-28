@@ -235,7 +235,7 @@ impl TextBlob {
                             .size(style.size)
                             .build();
 
-                        shaper.add_str(&text);
+                        shaper.add_str(text);
 
                         shaper.shape_with(|cluster| {
                             for glyph in cluster.glyphs {
