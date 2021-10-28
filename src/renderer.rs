@@ -1,4 +1,7 @@
-use crate::{Context, FontId, Rect, TextureId, TextureSetId};
+use crate::{
+    path::{Path, TesselateKind},
+    Context, FontId, Rect, TextureId, TextureSetId,
+};
 
 use ahash::AHashMap;
 use bytemuck::{Pod, Zeroable};
@@ -8,13 +11,17 @@ use wgpu::util::DeviceExt;
 
 use self::{
     layering::LayeringEngine,
+    path::{PathBatch, PathRenderer, PreparedPathBatch},
     sprite::{PreparedSpriteBatch, SpriteBatch, SpriteRenderer},
     text::{PreparedTextBatch, TextBatch, TextRenderer},
 };
 
 mod layering;
+mod path;
 mod sprite;
 mod text;
+
+pub use path::Paint;
 
 /// Renderer for a canvas.
 ///
@@ -42,6 +49,7 @@ mod text;
 pub struct Renderer {
     sprite_renderer: SpriteRenderer,
     text_renderer: TextRenderer,
+    path_renderer: PathRenderer,
 
     batches: Batches,
 
@@ -55,6 +63,7 @@ pub struct PreparedRender {
 enum PreparedBatch {
     Sprite(PreparedSpriteBatch),
     Text(PreparedTextBatch),
+    Path(PreparedPathBatch),
 }
 
 impl Renderer {
@@ -64,7 +73,7 @@ impl Renderer {
         Self {
             sprite_renderer: SpriteRenderer::new(device),
             text_renderer: TextRenderer::new(device),
-
+            path_renderer: PathRenderer::new(device),
             batches: Batches::default(),
             layering,
         }
@@ -106,7 +115,8 @@ impl Renderer {
             &mut self.layering,
             BatchKey::Text,
             Batch::Text(self.text_renderer.create_batch()),
-            Rect::new(Vec2::ZERO, Vec2::ZERO),
+            self.text_renderer
+                .affected_region(cx, hidpi_factor, glyph, size, pos, font),
         );
 
         self.text_renderer.draw_glyph(
@@ -119,6 +129,25 @@ impl Renderer {
             pos,
             font,
         );
+    }
+
+    pub fn draw_path(&mut self, cx: &Context, path: &(Path, TesselateKind), paint: Paint) {
+        let mut path_cache = cx.path_cache();
+        path_cache.with_tesselated_path(path, |tesselated| {
+            let batch_id = find_batch_with_layering(
+                &mut self.batches,
+                &mut self.layering,
+                BatchKey::Path,
+                Batch::Path(self.path_renderer.create_batch()),
+                self.path_renderer.affected_region(tesselated),
+            );
+
+            self.path_renderer.draw_path(
+                tesselated,
+                self.batches.get(batch_id).unwrap_path(),
+                paint,
+            );
+        });
     }
 
     pub fn prepare_render(
@@ -144,6 +173,9 @@ impl Renderer {
                 ),
                 Batch::Text(s) => {
                     PreparedBatch::Text(self.text_renderer.prepare_batch(cx, device, s, &locals))
+                }
+                Batch::Path(s) => {
+                    PreparedBatch::Path(self.path_renderer.prepare_batch(cx, device, s, &locals))
                 }
             };
             prepared.push(prep);
@@ -178,6 +210,7 @@ impl Renderer {
             match prep {
                 PreparedBatch::Sprite(s) => self.sprite_renderer.render_layer(&mut render_pass, s),
                 PreparedBatch::Text(s) => self.text_renderer.render_layer(&mut render_pass, s),
+                PreparedBatch::Path(s) => self.path_renderer.render_layer(&mut render_pass, s),
             }
         }
     }
@@ -249,6 +282,7 @@ impl Batches {
 enum Batch {
     Sprite(SpriteBatch),
     Text(TextBatch),
+    Path(PathBatch),
 }
 
 impl Batch {
@@ -265,12 +299,20 @@ impl Batch {
             _ => panic!("expected text batch"),
         }
     }
+
+    pub fn unwrap_path(&mut self) -> &mut PathBatch {
+        match self {
+            Batch::Path(s) => s,
+            _ => panic!("expected path batch"),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 enum BatchKey {
     Sprite { texture_set: TextureSetId },
     Text,
+    Path,
 }
 
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]

@@ -1,40 +1,69 @@
 use std::{convert::TryInto, mem::size_of};
 
 use bytemuck::{Pod, Zeroable};
-use glam::{vec2, Vec2, Vec4};
-use swash::GlyphId;
+use glam::{uvec2, vec4, UVec2, Vec2, Vec4};
 use wgpu::util::DeviceExt;
 
-use crate::{glyph::Glyph, Context, FontId, Rect, SAMPLE_COUNT, TARGET_FORMAT};
+use crate::{path::TesselatedPath, Context, Rect, SAMPLE_COUNT, TARGET_FORMAT};
 
 use super::Locals;
 
-/// Renderer for text glyphs.
-///
-/// All glyphs are stored in the same texture atlas in the `GlyphCache`.
-pub struct TextRenderer {
-    sampler: wgpu::Sampler,
+#[derive(Copy, Clone, Debug)]
+pub enum Paint {
+    SolidColor(Vec4),
+    LinearGradient {
+        p_a: Vec2,
+        p_b: Vec2,
+        c_a: Vec4,
+        c_b: Vec4,
+    },
+    RadialGradient {
+        center: Vec2,
+        radius: f32,
+        c_center: Vec4,
+        c_outer: Vec4,
+    },
+}
+
+impl Paint {
+    pub fn encode(&self, color_buffer: &mut Vec<Vec4>) -> UVec2 {
+        let index = color_buffer.len() as u32;
+        // Type constants must match those defined in path.wgsl
+        let typ = match self {
+            Paint::SolidColor(color) => {
+                color_buffer.push(*color);
+                0
+            }
+            Paint::LinearGradient { p_a, p_b, c_a, c_b } => {
+                color_buffer.push(*c_a);
+                color_buffer.push(*c_b);
+                color_buffer.push(vec4(p_a.x, p_a.y, p_b.x, p_b.y));
+                1
+            }
+            Paint::RadialGradient {
+                center,
+                radius,
+                c_center,
+                c_outer,
+            } => {
+                color_buffer.push(*c_center);
+                color_buffer.push(*c_outer);
+                color_buffer.push(vec4(center.x, center.y, *radius, 0.));
+                2
+            }
+        };
+        uvec2(typ, index)
+    }
+}
+
+/// Renderer for vector paths - both stroking and filling.
+pub struct PathRenderer {
     bg_layout: wgpu::BindGroupLayout,
     pipeline: wgpu::RenderPipeline,
 }
 
-impl TextRenderer {
+impl PathRenderer {
     pub fn new(device: &wgpu::Device) -> Self {
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("text_sampler"),
-            address_mode_u: wgpu::AddressMode::Repeat,
-            address_mode_v: wgpu::AddressMode::Repeat,
-            address_mode_w: wgpu::AddressMode::Repeat,
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            lod_min_clamp: 0.,
-            lod_max_clamp: 100.,
-            compare: None,
-            anisotropy_clamp: None,
-            border_color: None,
-        });
-
         let bg_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
             entries: &[
@@ -51,19 +80,10 @@ impl TextRenderer {
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler {
-                        filtering: false,
-                        comparison: false,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
                     },
                     count: None,
                 },
@@ -76,10 +96,10 @@ impl TextRenderer {
             push_constant_ranges: &[],
         });
 
-        let module = device.create_shader_module(&wgpu::include_wgsl!("../../shaders/text.wgsl"));
+        let module = device.create_shader_module(&wgpu::include_wgsl!("../../shaders/path.wgsl"));
 
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("text_pipeline"),
+            label: Some("path_pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &module,
@@ -87,13 +107,13 @@ impl TextRenderer {
                 buffers: &[wgpu::VertexBufferLayout {
                     array_stride: size_of::<Vertex>() as u64,
                     step_mode: wgpu::VertexStepMode::Vertex,
-                    attributes: &wgpu::vertex_attr_array![0 => Float32x4, 1 => Float32x2, 2 => Float32x2],
+                    attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Uint32x2],
                 }],
             },
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
-                front_face: wgpu::FrontFace::Cw,
+                front_face: wgpu::FrontFace::Ccw,
                 cull_mode: Some(wgpu::Face::Back),
                 clamp_depth: false,
                 polygon_mode: wgpu::PolygonMode::Fill,
@@ -128,107 +148,69 @@ impl TextRenderer {
         });
 
         Self {
-            sampler,
             bg_layout,
             pipeline,
         }
     }
 
-    pub fn create_batch(&self) -> TextBatch {
-        TextBatch {
+    pub fn create_batch(&self) -> PathBatch {
+        PathBatch {
             vertices: Vec::new(),
             indices: Vec::new(),
+            colors: Vec::new(),
         }
     }
 
-    pub fn affected_region(
-        &self,
-        cx: &Context,
-        hidpi_factor: f32,
-        glyph: GlyphId,
-        size: f32,
-        pos: Vec2,
-        font: FontId,
-    ) -> Rect {
-        let mut glyphs = cx.glyph_cache();
+    pub fn affected_region(&self, path: &TesselatedPath) -> Rect {
+        // Compute path boundary box
+        let mut min = Vec2::splat(f32::INFINITY);
+        let mut max = Vec2::splat(f32::NEG_INFINITY);
 
-        let glyph = glyphs.glyph_or_rasterize(cx, font, glyph, size * hidpi_factor, pos);
-        let (_key, placement) = match glyph {
-            Glyph::Empty => return Rect::default(),
-            Glyph::InAtlas(k, p) => (k, p),
-        };
+        for vertex in &path.vertices {
+            if vertex.x < min.x {
+                min.x = vertex.x;
+            }
+            if vertex.y < min.y {
+                min.y = vertex.y;
+            }
+            if vertex.x > max.x {
+                max.x = vertex.x;
+            }
+            if vertex.y > max.y {
+                max.y = vertex.y;
+            }
+        }
 
-        let pos = pos.floor() + vec2(placement.left as f32, -placement.top as f32) / hidpi_factor;
-
-        let width = placement.width as f32 / hidpi_factor;
-        let height = placement.height as f32 / hidpi_factor;
-
-        Rect::new(pos, vec2(width, height))
+        Rect::new(min, max - min)
     }
 
-    pub fn draw_glyph(
-        &self,
-        cx: &Context,
-        hidpi_factor: f32,
-        batch: &mut TextBatch,
-        glyph: GlyphId,
-        size: f32,
-        color: Vec4,
-        pos: Vec2,
-        font: FontId,
-    ) {
-        let mut glyphs = cx.glyph_cache();
+    pub fn draw_path(&self, path: &TesselatedPath, batch: &mut PathBatch, paint: Paint) {
+        let paint = paint.encode(&mut batch.colors);
 
-        let glyph = glyphs.glyph_or_rasterize(cx, font, glyph, size * hidpi_factor, pos);
-        let (key, placement) = match glyph {
-            Glyph::Empty => return, // nothing to render
-            Glyph::InAtlas(k, p) => (k, p),
-        };
-
-        let texcoords = glyphs.atlas().texcoords(key);
-
-        let pos = pos.floor() + vec2(placement.left as f32, -placement.top as f32) / hidpi_factor;
-
-        let width = placement.width as f32 / hidpi_factor;
-        let height = placement.height as f32 / hidpi_factor;
-
-        let i = batch.vertices.len() as u32;
-        batch.vertices.extend_from_slice(&[
-            Vertex {
-                color,
-                pos,
-                tex_coords: texcoords[0],
-            },
-            Vertex {
-                color,
-                pos: pos + vec2(width, 0.),
-                tex_coords: texcoords[1],
-            },
-            Vertex {
-                color,
-                pos: pos + vec2(width, height),
-                tex_coords: texcoords[2],
-            },
-            Vertex {
-                color,
-                pos: pos + vec2(0., height),
-                tex_coords: texcoords[3],
-            },
-        ]);
+        let base_vertex = batch.vertices.len() as u32;
+        for vertex in &path.vertices {
+            batch.vertices.push(Vertex {
+                position: *vertex,
+                paint,
+            });
+        }
         batch
             .indices
-            .extend_from_slice(&[i, i + 1, i + 2, i + 2, i + 3, i]);
+            .extend(path.indices.iter().map(|&i| i + base_vertex));
     }
 
     pub fn prepare_batch(
         &self,
-        cx: &Context,
+        _cx: &Context,
         device: &wgpu::Device,
-        layer: TextBatch,
+        layer: PathBatch,
         locals: &wgpu::Buffer,
-    ) -> PreparedTextBatch {
-        let glyphs = cx.glyph_cache();
-
+    ) -> PreparedPathBatch {
+        let colors = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(&layer.colors),
+            usage: wgpu::BufferUsages::STORAGE,
+        });
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &self.bg_layout,
@@ -243,11 +225,11 @@ impl TextRenderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::TextureView(glyphs.atlas().texture_view()),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &colors,
+                        offset: 0,
+                        size: None,
+                    }),
                 },
             ],
         });
@@ -264,7 +246,7 @@ impl TextRenderer {
             usage: wgpu::BufferUsages::INDEX,
         });
 
-        PreparedTextBatch {
+        PreparedPathBatch {
             bind_group,
             vertices,
             indices,
@@ -275,7 +257,7 @@ impl TextRenderer {
     pub fn render_layer<'a>(
         &'a self,
         pass: &mut wgpu::RenderPass<'a>,
-        layer: &'a PreparedTextBatch,
+        layer: &'a PreparedPathBatch,
     ) {
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &layer.bind_group, &[]);
@@ -285,20 +267,20 @@ impl TextRenderer {
     }
 }
 
-#[derive(Copy, Clone, Pod, Zeroable)]
+#[derive(Debug, Copy, Clone, Pod, Zeroable)]
 #[repr(C)]
 struct Vertex {
-    color: Vec4,
-    tex_coords: Vec2,
-    pos: Vec2,
+    position: Vec2,
+    paint: UVec2,
 }
 
-pub struct TextBatch {
+pub struct PathBatch {
     vertices: Vec<Vertex>,
     indices: Vec<u32>,
+    colors: Vec<Vec4>,
 }
 
-pub struct PreparedTextBatch {
+pub struct PreparedPathBatch {
     bind_group: wgpu::BindGroup,
     vertices: wgpu::Buffer,
     indices: wgpu::Buffer,

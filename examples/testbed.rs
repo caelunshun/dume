@@ -58,10 +58,10 @@ fn main() {
     context.set_default_font_family("Zen Antique Soft");
 
     let text = Text::from_sections(once(TextSection::Text {
-        text: "Neither borrower nor lender be.".into(),
+        text: "And on the pedestal these words appear:\nMy name is Ozymandias, King of Kings; look on my works, ye Mighty, and despair!\nNothing beside remains.".into(),
         style: TextStyle {
-            color: Srgba::new(u8::MAX - 200, u8::MAX, u8::MAX, u8::MAX),
-            size: 30.,
+            color: Srgba::new(u8::MAX, u8::MAX, u8::MAX, u8::MAX),
+            size: 15.,
             font: Default::default(),
         },
     }));
@@ -109,11 +109,32 @@ fn main() {
             },
             Event::MainEventsCleared => window.request_redraw(),
             Event::RedrawRequested(_) => {
+                canvas
+                    .begin_path()
+                    .rect(vec2(10., 10.), vec2(500., 500.))
+                    .stroke_width(5.)
+                    .solid_color((0, 255, 0, 255))
+                    .stroke();
+
                 canvas.draw_sprite(image1, vec2(0., 0.), 500.);
                 canvas.draw_sprite(image3, vec2(100., 100.), 400.);
                 canvas.draw_sprite(image2, vec2(0., 0.), 500.);
 
                 canvas.draw_text(&text, vec2(100., 100.), 1.);
+
+                canvas
+                    .begin_path()
+                    .move_to(vec2(400., 400.))
+                    .line_to(vec2(500., 500.))
+                    .line_to(vec2(600., 400.))
+                    .line_to(vec2(400., 400.))
+                    .linear_gradient(
+                        vec2(400., 400.),
+                        vec2(600., 600.),
+                        (27, 200, 86, 255),
+                        (200, 27, 68, 255),
+                    )
+                    .fill();
 
                 let mut encoder = device.create_command_encoder(&Default::default());
                 let frame = surface.get_current_texture().unwrap();

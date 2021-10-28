@@ -144,13 +144,13 @@ impl TextBlob {
             max_size: Vec2::ZERO,
             glyphs: Vec::new(),
         };
-        blob.compute_runs(cx, text, &unstyled_text);
+        blob.compute_runs(cx, text);
         blob.shape_glyphs(cx);
         blob.resize(cx, Vec2::splat(f32::INFINITY));
         blob
     }
 
-    fn compute_runs(&mut self, cx: &Context, text: Text, unstyled_text: &str) {
+    fn compute_runs(&mut self, cx: &Context, text: Text) {
         // Merge BiDi, style, and script runs.
         let mut byte_index = 0;
         for section in text.sections {
@@ -171,6 +171,16 @@ impl TextBlob {
     }
 
     fn build_runs(&mut self, text: &str, style: &TextStyle, byte_index: usize) {
+        // Check for explicit line breaks.
+        for (i, c) in text.char_indices() {
+            if c == '\n' {
+                self.build_runs(&text[..i], style, byte_index);
+                self.runs.push(BlobRun::ExplicitLineBreak);
+                self.build_runs(&text[i + 1..], style, byte_index + i + 1);
+                return;
+            }
+        }
+
         if text.is_empty() {
             return;
         }
@@ -271,10 +281,24 @@ impl TextBlob {
             return;
         }
 
-        let mut cursor_x = 0.;
+        let fonts = cx.fonts();
+
+        let mut cursor = Vec2::ZERO;
+        let mut glyph_size = 0.0f32;
         for glyph in &mut self.glyphs {
-            glyph.pos.x = cursor_x;
-            cursor_x += glyph.advance;
+            glyph.pos = cursor;
+            cursor.x += glyph.advance;
+            glyph_size = glyph_size.max(glyph.size);
+
+            if matches!(glyph.c, GlyphCharacter::LineBreak) {
+                let font = fonts.get(glyph.font);
+                let metrics = font.metrics(&[]);
+                let spacing = metrics.ascent + metrics.descent + metrics.leading;
+                let spacing = spacing * (glyph_size / metrics.units_per_em as f32);
+                cursor.y += spacing;
+                cursor.x = 0.;
+                glyph_size = 0.;
+            }
         }
     }
 

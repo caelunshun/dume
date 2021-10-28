@@ -1,4 +1,4 @@
-// Shader for rendering arbitrary paths, tesselated to vertices.
+// Shader for rendering arbitrary paths that have been tesselated to vertices.
 //
 // The `paint` vertex attribute determines how to shade the path.
 // The first component indicates whether to use a solid color, a
@@ -33,9 +33,9 @@ fn vs_main(
     return out;
 }
 
-var PAINT_TYPE_SOLID: u32 = 0;
-var PAINT_TYPE_LINEAR_GRADIENT: u32 = 1;
-var PAINT_TYPE_RADIAL_GRADIENT: u32 = 2;
+let PAINT_TYPE_SOLID: i32 = 0;
+let PAINT_TYPE_LINEAR_GRADIENT: i32 = 1;
+let PAINT_TYPE_RADIAL_GRADIENT: i32 = 2;
 
 [[block]]
 struct Colors {
@@ -64,7 +64,7 @@ fn radial_gradient(pos: vec2<f32>, center: vec2<f32>, radius: f32, color_a: vec4
 
 [[stage(fragment)]]
 fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
-    let paint_type = in.paint.x;
+    let paint_type = i32(in.paint.x);
     let color_index = i32(in.paint.y);
 
     if (paint_type == PAINT_TYPE_SOLID) {

@@ -22,7 +22,7 @@ pub struct Path {
 impl Path {
     pub fn to_lyon(&self, close: bool) -> lyon::path::Path {
         let mut builder = lyon::path::Path::builder().with_svg();
-        for (i, segment) in self.segments.iter().enumerate() {
+        for segment in &self.segments {
             match segment {
                 PathSegment::MoveTo(p) => {
                     builder.move_to(point(*p));
@@ -179,19 +179,19 @@ impl PathCache {
             let mut tesselated = TesselatedPath::default();
             match path.1 {
                 TesselateKind::Fill => {
-                    self.fill_tesselator.tessellate_path(
-                        &lyon_path,
-                        &FillOptions::default(),
-                        &mut tesselated,
-                    );
+                    self.fill_tesselator
+                        .tessellate_path(&lyon_path, &FillOptions::default(), &mut tesselated)
+                        .expect("failed to fill path");
                 }
                 TesselateKind::Stroke { width } => {
                     let width = width as f32 / 100.0;
-                    self.stroke_tesselator.tessellate_path(
-                        &lyon_path,
-                        &StrokeOptions::default().with_line_width(width),
-                        &mut tesselated,
-                    );
+                    self.stroke_tesselator
+                        .tessellate_path(
+                            &lyon_path,
+                            &StrokeOptions::default().with_line_width(width),
+                            &mut tesselated,
+                        )
+                        .expect("failed to stroke path");
                 }
             }
 
