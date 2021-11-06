@@ -1,6 +1,5 @@
 use std::{sync::Arc, time::Duration};
 
-use ahash::AHashMap;
 use glam::{UVec2, Vec2};
 use lru::LruCache;
 use swash::{

@@ -38,6 +38,11 @@ impl Canvas {
         }
     }
 
+    /// Gets the size of the drawing region.
+    pub fn size(&self) -> Vec2 {
+        self.target_logical_size
+    }
+
     /// Draws a texture / sprite on the canvas.
     ///
     /// `texture` is the ID of the texture to draw, which you
@@ -62,7 +67,7 @@ impl Canvas {
         for glyph in text.glyphs() {
             let color = glyph.color.into_format::<f32, f32>().into_linear();
             match &glyph.c {
-                GlyphCharacter::Glyph(glyph_id, size) => self.renderer.draw_glyph(
+                GlyphCharacter::Glyph(glyph_id, size, _) => self.renderer.draw_glyph(
                     &self.context,
                     self.scale_factor,
                     *glyph_id,

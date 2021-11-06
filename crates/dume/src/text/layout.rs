@@ -14,13 +14,15 @@ use swash::{
     text::{cluster::Boundary, Properties, Script},
     GlyphId,
 };
-use unicode_bidi::{BidiInfo, Level, ParagraphInfo};
+use unicode_bidi::{BidiInfo, Level};
 
 use crate::{Context, FontId, Text, TextSection, TextStyle, TextureId};
 
 thread_local! {
     static SHAPE_CONTEXT: RefCell<ShapeContext> = RefCell::new(ShapeContext::new());
 }
+
+mod resize;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(C)]
@@ -88,7 +90,6 @@ impl Default for TextOptions {
 
 struct CharInfo {
     properties: Properties,
-    boundary: Boundary,
 }
 
 /// A blob of text that has been laid out and shaped into glyphs.
@@ -105,31 +106,27 @@ pub struct TextBlob {
 
     /// BiDi info, indexed by byte index
     bidi_levels: Vec<Level>,
-    paragraphs: Vec<ParagraphInfo>,
 
-    // Unicode info, indexed by byte index
+    /// Character properties, indexed by byte index
     char_info: Vec<CharInfo>,
 
     max_size: Vec2,
     glyphs: Vec<ShapedGlyph>,
+
+    size: Vec2,
 }
 
 impl TextBlob {
     pub(crate) fn new(cx: &Context, text: Text, options: TextOptions) -> Self {
         let unstyled_text = text.to_unstyled_string();
-        let BidiInfo {
-            levels, paragraphs, ..
-        } = BidiInfo::new(&unstyled_text, None);
+        let BidiInfo { levels, .. } = BidiInfo::new(&unstyled_text, None);
 
         let mut char_info = Vec::with_capacity(unstyled_text.len());
-        for ((properties, boundary), c) in
+        for ((properties, _boundary), c) in
             swash::text::analyze(unstyled_text.chars()).zip(unstyled_text.chars())
         {
             for _ in 0..c.len_utf8() {
-                char_info.push(CharInfo {
-                    properties,
-                    boundary,
-                });
+                char_info.push(CharInfo { properties });
             }
         }
 
@@ -138,11 +135,12 @@ impl TextBlob {
 
             runs: Vec::new(),
             bidi_levels: levels,
-            paragraphs,
             char_info,
 
             max_size: Vec2::ZERO,
             glyphs: Vec::new(),
+
+            size: Vec2::ZERO,
         };
         blob.compute_runs(cx, text);
         blob.shape_glyphs(cx);
@@ -207,6 +205,7 @@ impl TextBlob {
     fn shape_glyphs(&mut self, cx: &Context) {
         // Shape each run.
         let fonts = cx.fonts();
+        let mut index = 0;
         SHAPE_CONTEXT.with(move |cell| {
             let mut shape_ctx = cell.borrow_mut();
             for run in &self.runs {
@@ -238,18 +237,29 @@ impl TextBlob {
                         shaper.add_str(text);
 
                         shaper.shape_with(|cluster| {
-                            for glyph in cluster.glyphs {
+                            for (i, glyph) in cluster.glyphs.iter().enumerate() {
                                 self.glyphs.push(ShapedGlyph {
                                     pos: Vec2::ZERO, // computed later
                                     offset: vec2(glyph.x, glyph.y),
                                     advance: glyph.advance,
-                                    c: GlyphCharacter::Glyph(glyph.id, style.size),
+                                    c: GlyphCharacter::Glyph(
+                                        glyph.id,
+                                        style.size,
+                                        (&text[cluster.source.start as usize..])
+                                            .chars()
+                                            .next()
+                                            .unwrap(),
+                                    ),
                                     font: font_id,
                                     color: style.color,
                                     size: style.size,
+                                    index: cluster.source.start + index + i as u32,
+                                    boundary: cluster.info.boundary(),
                                 });
                             }
                         });
+
+                        index += text.len() as u32;
                     }
                     BlobRun::Icon { texture, size } => self.glyphs.push(ShapedGlyph {
                         pos: Vec2::ZERO,
@@ -259,6 +269,8 @@ impl TextBlob {
                         font: Default::default(),
                         size: *size,
                         color: Default::default(),
+                        index: 0,
+                        boundary: Boundary::None,
                     }),
                     BlobRun::ExplicitLineBreak => self.glyphs.push(ShapedGlyph {
                         pos: Vec2::ZERO,
@@ -268,6 +280,8 @@ impl TextBlob {
                         font: Default::default(),
                         size: 0.,
                         color: Default::default(),
+                        index: 0,
+                        boundary: Boundary::None,
                     }),
                 }
             }
@@ -281,29 +295,18 @@ impl TextBlob {
             return;
         }
 
-        let fonts = cx.fonts();
+        self.max_size = max_size;
 
-        let mut cursor = Vec2::ZERO;
-        let mut glyph_size = 0.0f32;
-        for glyph in &mut self.glyphs {
-            glyph.pos = cursor;
-            cursor.x += glyph.advance;
-            glyph_size = glyph_size.max(glyph.size);
-
-            if matches!(glyph.c, GlyphCharacter::LineBreak) {
-                let font = fonts.get(glyph.font);
-                let metrics = font.metrics(&[]);
-                let spacing = metrics.ascent + metrics.descent + metrics.leading;
-                let spacing = spacing * (glyph_size / metrics.units_per_em as f32);
-                cursor.y += spacing;
-                cursor.x = 0.;
-                glyph_size = 0.;
-            }
-        }
+        let engine = resize::Layouter::new(self, cx);
+        engine.run_layout();
     }
 
     pub(crate) fn glyphs(&self) -> &[ShapedGlyph] {
         &self.glyphs
+    }
+
+    pub fn size(&self) -> Vec2 {
+        self.size
     }
 
     fn should_resize_for(&self, max_size: Vec2) -> bool {
@@ -370,11 +373,15 @@ pub struct ShapedGlyph {
     pub font: FontId,
     pub size: f32,
     pub color: Srgba<u8>,
+
+    pub boundary: Boundary,
+
+    pub index: u32,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub enum GlyphCharacter {
-    Glyph(GlyphId, f32),
+    Glyph(GlyphId, f32, char),
     Icon(TextureId, f32),
     LineBreak,
 }
@@ -420,10 +427,7 @@ mod tests {
     #[test]
     fn test_script_runs() {
         let info: Vec<_> = swash::text::analyze("dر".chars())
-            .map(|(properties, boundary)| CharInfo {
-                properties,
-                boundary,
-            })
+            .map(|(properties, _)| CharInfo { properties })
             .collect();
 
         assert_eq!(
