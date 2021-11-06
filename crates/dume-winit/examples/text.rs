@@ -36,7 +36,7 @@ impl App {
             .unwrap();
         cx.set_default_font_family("Zen Antique Soft");
 
-        let  text = cx.create_text_blob(
+        let text = cx.create_text_blob(
             Text::from_sections(iter::once(TextSection::Text {
                 text: TEXT.into(),
                 style: TextStyle {

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use smartstring::{LazyCompact, SmartString};
 use swash::{
     shape::{Direction, ShapeContext},
-    text::{cluster::Boundary, Properties, Script},
+    text::{Properties, Script},
     GlyphId,
 };
 use unicode_bidi::{BidiInfo, Level};
@@ -205,7 +205,6 @@ impl TextBlob {
     fn shape_glyphs(&mut self, cx: &Context) {
         // Shape each run.
         let fonts = cx.fonts();
-        let mut index = 0;
         SHAPE_CONTEXT.with(move |cell| {
             let mut shape_ctx = cell.borrow_mut();
             for run in &self.runs {
@@ -237,7 +236,7 @@ impl TextBlob {
                         shaper.add_str(text);
 
                         shaper.shape_with(|cluster| {
-                            for (i, glyph) in cluster.glyphs.iter().enumerate() {
+                            for glyph in cluster.glyphs {
                                 self.glyphs.push(ShapedGlyph {
                                     pos: Vec2::ZERO, // computed later
                                     offset: vec2(glyph.x, glyph.y),
@@ -253,13 +252,9 @@ impl TextBlob {
                                     font: font_id,
                                     color: style.color,
                                     size: style.size,
-                                    index: cluster.source.start + index + i as u32,
-                                    boundary: cluster.info.boundary(),
                                 });
                             }
                         });
-
-                        index += text.len() as u32;
                     }
                     BlobRun::Icon { texture, size } => self.glyphs.push(ShapedGlyph {
                         pos: Vec2::ZERO,
@@ -269,8 +264,6 @@ impl TextBlob {
                         font: Default::default(),
                         size: *size,
                         color: Default::default(),
-                        index: 0,
-                        boundary: Boundary::None,
                     }),
                     BlobRun::ExplicitLineBreak => self.glyphs.push(ShapedGlyph {
                         pos: Vec2::ZERO,
@@ -280,8 +273,6 @@ impl TextBlob {
                         font: Default::default(),
                         size: 0.,
                         color: Default::default(),
-                        index: 0,
-                        boundary: Boundary::None,
                     }),
                 }
             }
@@ -373,10 +364,6 @@ pub struct ShapedGlyph {
     pub font: FontId,
     pub size: f32,
     pub color: Srgba<u8>,
-
-    pub boundary: Boundary,
-
-    pub index: u32,
 }
 
 #[derive(Copy, Clone, Debug)]

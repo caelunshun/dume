@@ -8,13 +8,13 @@ mod atlas;
 mod canvas;
 mod context;
 pub mod font;
+mod glyph;
 mod path;
 mod rect;
 mod renderer;
 mod text;
 mod texture;
 mod thread_pool;
-mod glyph;
 
 #[cfg(target_arch = "wasm32")]
 pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
@@ -26,12 +26,15 @@ pub use canvas::Canvas;
 pub use context::Context;
 pub use font::FontId;
 pub use rect::Rect;
+use smartstring::LazyCompact;
 pub use text::{
-    layout::{TextBlob, TextOptions},
+    layout::{Align, Baseline, TextBlob, TextOptions},
     Text, TextSection, TextStyle,
 };
 pub use texture::{MissingTexture, TextureId, TextureSet, TextureSetBuilder, TextureSetId};
 pub use thread_pool::{BasicThreadPool, ThreadPool};
+
+pub type SmartString = smartstring::SmartString<LazyCompact>;
 
 /// Utility function to convert RGBA to BGRA data in place.
 pub fn convert_rgba_to_bgra(data: &mut [u8]) {

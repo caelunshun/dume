@@ -5,7 +5,7 @@ use crate::{
 
 use ahash::AHashMap;
 use bytemuck::{Pod, Zeroable};
-use glam::{Mat4, Vec2, Vec4};
+use glam::{Affine2, Mat4, Vec2, Vec4};
 use swash::GlyphId;
 use wgpu::util::DeviceExt;
 
@@ -79,7 +79,14 @@ impl Renderer {
         }
     }
 
-    pub fn draw_sprite(&mut self, cx: &Context, texture: TextureId, pos: Vec2, width: f32) {
+    pub fn draw_sprite(
+        &mut self,
+        cx: &Context,
+        transform: Affine2,
+        texture: TextureId,
+        pos: Vec2,
+        width: f32,
+    ) {
         let texture_set = cx.textures().set_for_texture(texture);
 
         let batch_id = find_batch_with_layering(
@@ -88,11 +95,13 @@ impl Renderer {
             BatchKey::Sprite { texture_set },
             Batch::Sprite(self.sprite_renderer.create_batch(texture_set)),
             self.sprite_renderer
-                .affected_region(cx, texture_set, texture, pos, width),
+                .affected_region(cx, texture_set, texture, pos, width)
+                .transformed(transform),
         );
 
         self.sprite_renderer.draw_sprite(
             cx,
+            transform,
             self.batches.get(batch_id).unwrap_sprite(),
             texture,
             pos,
@@ -103,6 +112,7 @@ impl Renderer {
     pub fn draw_glyph(
         &mut self,
         cx: &Context,
+        transform: Affine2,
         hidpi_factor: f32,
         glyph: GlyphId,
         pos: Vec2,
@@ -116,11 +126,13 @@ impl Renderer {
             BatchKey::Text,
             Batch::Text(self.text_renderer.create_batch()),
             self.text_renderer
-                .affected_region(cx, hidpi_factor, glyph, size, pos, font),
+                .affected_region(cx, hidpi_factor, glyph, size, pos, font)
+                .transformed(transform),
         );
 
         self.text_renderer.draw_glyph(
             cx,
+            transform,
             hidpi_factor,
             self.batches.get(batch_id).unwrap_text(),
             glyph,
@@ -131,7 +143,13 @@ impl Renderer {
         );
     }
 
-    pub fn draw_path(&mut self, cx: &Context, path: &(Path, TesselateKind), paint: Paint) {
+    pub fn draw_path(
+        &mut self,
+        cx: &Context,
+        transform: Affine2,
+        path: &(Path, TesselateKind),
+        paint: Paint,
+    ) {
         let mut path_cache = cx.path_cache();
         path_cache.with_tesselated_path(path, |tesselated| {
             let batch_id = find_batch_with_layering(
@@ -139,11 +157,14 @@ impl Renderer {
                 &mut self.layering,
                 BatchKey::Path,
                 Batch::Path(self.path_renderer.create_batch()),
-                self.path_renderer.affected_region(tesselated),
+                self.path_renderer
+                    .affected_region(tesselated)
+                    .transformed(transform),
             );
 
             self.path_renderer.draw_path(
                 tesselated,
+                transform,
                 self.batches.get(batch_id).unwrap_path(),
                 paint,
             );

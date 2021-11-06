@@ -1,7 +1,7 @@
 use std::{convert::TryInto, mem::size_of};
 
 use bytemuck::{Pod, Zeroable};
-use glam::{uvec2, vec4, UVec2, Vec2, Vec4};
+use glam::{uvec2, vec4, Affine2, UVec2, Vec2, Vec4};
 use wgpu::util::DeviceExt;
 
 use crate::{path::TesselatedPath, Context, Rect, SAMPLE_COUNT, TARGET_FORMAT};
@@ -184,13 +184,19 @@ impl PathRenderer {
         Rect::new(min, max - min)
     }
 
-    pub fn draw_path(&self, path: &TesselatedPath, batch: &mut PathBatch, paint: Paint) {
+    pub fn draw_path(
+        &self,
+        path: &TesselatedPath,
+        transform: Affine2,
+        batch: &mut PathBatch,
+        paint: Paint,
+    ) {
         let paint = paint.encode(&mut batch.colors);
 
         let base_vertex = batch.vertices.len() as u32;
         for vertex in &path.vertices {
             batch.vertices.push(Vertex {
-                position: *vertex,
+                position: transform.transform_point2(*vertex),
                 paint,
             });
         }

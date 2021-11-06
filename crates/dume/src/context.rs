@@ -114,6 +114,12 @@ impl Context {
         self.textures().texture_for_name(name)
     }
 
+    pub fn texture_dimensions(&self, texture: TextureId) -> UVec2 {
+        self.textures()
+            .texture_set(self.textures().set_for_texture(texture))
+            .texture_size(texture)
+    }
+
     pub fn add_font(&self, font_data: Vec<u8>) -> Result<(), MalformedFont> {
         self.0.fonts.write().add(Font::from_data(font_data)?);
         Ok(())

@@ -1,7 +1,7 @@
 use std::{convert::TryInto, mem::size_of};
 
 use bytemuck::{Pod, Zeroable};
-use glam::{vec2, Vec2};
+use glam::{vec2, Affine2, Vec2};
 use wgpu::util::DeviceExt;
 
 use crate::{Context, Rect, TextureId, TextureSetId, SAMPLE_COUNT, TARGET_FORMAT};
@@ -171,6 +171,7 @@ impl SpriteRenderer {
     pub fn draw_sprite(
         &self,
         cx: &Context,
+        transform: Affine2,
         layer: &mut SpriteBatch,
         texture: TextureId,
         position: Vec2,
@@ -180,7 +181,7 @@ impl SpriteRenderer {
             self.texture_height_and_coords(cx, layer.texture_set, texture, width);
 
         let i = layer.vertices.len() as u32;
-        layer.vertices.extend_from_slice(&[
+        let mut vertices = [
             Vertex {
                 position,
                 tex_coords: texcoords[0],
@@ -197,7 +198,12 @@ impl SpriteRenderer {
                 position: position + vec2(0., height),
                 tex_coords: texcoords[3],
             },
-        ]);
+        ];
+        for vert in &mut vertices {
+            vert.position = transform.transform_point2(vert.position);
+        }
+        
+        layer.vertices.extend_from_slice(&vertices);
         layer
             .indices
             .extend_from_slice(&[i, i + 1, i + 2, i + 2, i + 3, i]);

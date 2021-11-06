@@ -1,6 +1,6 @@
 use std::{f32::consts::TAU, mem};
 
-use glam::{vec2, vec4, Mat4, Vec2, Vec4};
+use glam::{vec2, vec4, Affine2, Mat4, Vec2, Vec4};
 use palette::Srgba;
 
 use crate::{
@@ -21,6 +21,8 @@ pub struct Canvas {
     current_paint: Paint,
     current_path: Path,
     stroke_width: f32,
+
+    current_transform: Affine2,
 }
 
 /// Painting
@@ -35,6 +37,8 @@ impl Canvas {
             current_paint: Paint::SolidColor(Vec4::ONE),
             current_path: Path::default(),
             stroke_width: 1.,
+
+            current_transform: Affine2::IDENTITY,
         }
     }
 
@@ -54,7 +58,7 @@ impl Canvas {
     /// logical pixels. The height is automatically computed from the texture's aspect ratio.
     pub fn draw_sprite(&mut self, texture: TextureId, pos: Vec2, width: f32) -> &mut Self {
         self.renderer
-            .draw_sprite(&self.context, texture, pos, width);
+            .draw_sprite(&self.context, self.current_transform, texture, pos, width);
         self
     }
 
@@ -69,6 +73,7 @@ impl Canvas {
             match &glyph.c {
                 GlyphCharacter::Glyph(glyph_id, size, _) => self.renderer.draw_glyph(
                     &self.context,
+                    self.current_transform,
                     self.scale_factor,
                     *glyph_id,
                     pos + glyph.pos + glyph.offset,
@@ -127,8 +132,12 @@ impl Canvas {
     pub fn fill(&mut self) -> &mut Self {
         let path = mem::take(&mut self.current_path);
         let path = (path, TesselateKind::Fill);
-        self.renderer
-            .draw_path(&self.context, &path, self.current_paint);
+        self.renderer.draw_path(
+            &self.context,
+            self.current_transform,
+            &path,
+            self.current_paint,
+        );
         self.current_path = path.0;
         self
     }
@@ -148,8 +157,12 @@ impl Canvas {
                 width: (self.stroke_width * 100.).round() as u32,
             },
         );
-        self.renderer
-            .draw_path(&self.context, &path, self.current_paint);
+        self.renderer.draw_path(
+            &self.context,
+            self.current_transform,
+            &path,
+            self.current_paint,
+        );
         self.current_path = path.0;
         self
     }
@@ -244,6 +257,27 @@ impl Canvas {
     }
 }
 
+/// Canvas transformation functions
+impl Canvas {
+    /// Resets the current transformation to the identity matrix.
+    pub fn reset_transform(&mut self) -> &mut Self {
+        self.current_transform = Affine2::IDENTITY;
+        self
+    }
+
+    /// Translates the canvas.
+    pub fn translate(&mut self, translation: Vec2) -> &mut Self {
+        self.current_transform.translation += translation;
+        self
+    }
+
+    /// Scales the canvas.
+    pub fn scale(&mut self, scale: f32) -> &mut Self {
+        self.current_transform = self.current_transform * Affine2::from_scale(Vec2::splat(scale));
+        self
+    }
+}
+
 /// Rendering functions
 impl Canvas {
     /// Renders a frame, flushing all current draw commands.
@@ -269,6 +303,8 @@ impl Canvas {
                 .prepare_render(&self.context, self.context.device(), projection_matrix);
         self.renderer
             .render(encoder, &prepared, target_texture, target_sample_texture);
+
+        self.reset_transform();
     }
 
     /// Updates the target size of the canvas in logical pixels.

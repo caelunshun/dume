@@ -6,7 +6,7 @@ use guillotiere::{Allocation, AtlasAllocator, Size};
 
 use super::{AtlasEntry, TextureKey};
 
-const STARTING_DIM: u32 = 1024;
+const STARTING_DIM: u32 = 4096;
 
 /// A dynamic texture atlas that supports adding and removing
 /// textures on demand. Space from deallocated textures can be reused.

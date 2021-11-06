@@ -1,7 +1,7 @@
 use std::{convert::TryInto, mem::size_of};
 
 use bytemuck::{Pod, Zeroable};
-use glam::{vec2, Vec2, Vec4};
+use glam::{vec2, Affine2, Vec2, Vec4};
 use swash::GlyphId;
 use wgpu::util::DeviceExt;
 
@@ -166,9 +166,11 @@ impl TextRenderer {
         Rect::new(pos, vec2(width, height))
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn draw_glyph(
         &self,
         cx: &Context,
+        transform: Affine2,
         hidpi_factor: f32,
         batch: &mut TextBatch,
         glyph: GlyphId,
@@ -179,7 +181,16 @@ impl TextRenderer {
     ) {
         let mut glyphs = cx.glyph_cache();
 
-        let glyph = glyphs.glyph_or_rasterize(cx, font, glyph, size * hidpi_factor, pos);
+        // Determine scale in transformation
+        let scale = hidpi_factor * transform.transform_vector2(Vec2::ONE).x;
+
+        let glyph = glyphs.glyph_or_rasterize(
+            cx,
+            font,
+            glyph,
+            size * scale,
+            transform.transform_point2(pos),
+        );
         let (key, placement) = match glyph {
             Glyph::Empty => return, // nothing to render
             Glyph::InAtlas(k, p) => (k, p),
@@ -188,6 +199,7 @@ impl TextRenderer {
         let texcoords = glyphs.atlas().texcoords(key);
 
         let pos = pos.floor() + vec2(placement.left as f32, -placement.top as f32) / hidpi_factor;
+        let pos = transform.transform_point2(pos);
 
         let width = placement.width as f32 / hidpi_factor;
         let height = placement.height as f32 / hidpi_factor;

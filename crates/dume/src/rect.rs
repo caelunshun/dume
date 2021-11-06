@@ -1,4 +1,4 @@
-use glam::Vec2;
+use glam::{Affine2, Vec2};
 
 /// A rectangle.
 #[derive(Copy, Clone, Debug, PartialEq, Default)]
@@ -34,5 +34,12 @@ impl Rect {
             && pos.y >= self.pos.y
             && pos.x < (self.pos.x + self.size.x)
             && pos.y < (self.pos.y + self.size.y)
+    }
+
+    pub fn transformed(self, transform: Affine2) -> Self {
+        Self {
+            pos: transform.transform_point2(self.pos),
+            size: transform.transform_vector2(self.size),
+        }
     }
 }
