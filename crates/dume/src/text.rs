@@ -1,7 +1,5 @@
 //! Rich text implementation.
 
-use std::hash::Hash;
-
 use palette::Srgba;
 use smallvec::SmallVec;
 use smartstring::{LazyCompact, SmartString};
@@ -10,8 +8,14 @@ use crate::font::{Query, Style, Weight};
 
 pub mod layout;
 
+pub const DEFAULT_SIZE: f32 = 12.;
+
+pub fn default_color() -> Srgba<u8> {
+    Srgba::new(0, 0, 0, u8::MAX)
+}
+
 /// Some rich text. Implemented as a list of [`TextSection`]s.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Text {
     sections: SmallVec<[TextSection; 1]>,
 }
@@ -25,6 +29,30 @@ impl Text {
 
     pub fn sections(&self) -> &[TextSection] {
         &self.sections
+    }
+
+    pub fn set_default_size(&mut self, size: f32) {
+        self.for_each_style(|s| {
+            if s.size.is_none() {
+                s.size = Some(size);
+            }
+        });
+    }
+
+    pub fn set_default_color(&mut self, color: Srgba<u8>) {
+        self.for_each_style(|s| {
+            if s.color.is_none() {
+                s.color = Some(color);
+            }
+        });
+    }
+
+    fn for_each_style(&mut self, mut f: impl FnMut(&mut TextStyle)) {
+        for section in &mut self.sections {
+            if let TextSection::Text { style, .. } = section {
+                f(style);
+            }
+        }
     }
 
     pub fn to_unstyled_string(&self) -> SmartString<LazyCompact> {
@@ -60,30 +88,15 @@ pub enum TextSection {
 
 impl Eq for TextSection {}
 
-impl Hash for TextSection {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        match self {
-            TextSection::Text { text, style } => {
-                0u8.hash(state);
-                text.hash(state);
-                style.hash(state);
-            }
-            TextSection::Icon { name, size } => {
-                1u8.hash(state);
-                name.hash(state);
-                size.to_bits().hash(state);
-            }
-        };
-    }
-}
-
 /// Style of a text section.
+///
+/// Optional fields will use a default value if set to `None`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextStyle {
     /// Text color.
-    pub color: Srgba<u8>,
+    pub color: Option<Srgba<u8>>,
     /// Font size in logical pixels.
-    pub size: f32,
+    pub size: Option<f32>,
     /// The font to use. Accounts for bold and italics too.
     pub font: Query,
 }
@@ -91,25 +104,14 @@ pub struct TextStyle {
 impl Default for TextStyle {
     fn default() -> Self {
         Self {
-            color: Srgba::new(u8::MAX, u8::MAX, u8::MAX, u8::MAX),
-            size: 12.0,
+            color: None,
+            size: None,
             font: Query {
                 family: None,
                 style: Style::Normal,
                 weight: Weight::Normal,
             },
         }
-    }
-}
-
-impl Hash for TextStyle {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.color.red.hash(state);
-        self.color.green.hash(state);
-        self.color.blue.hash(state);
-        self.color.alpha.hash(state);
-        self.size.to_bits().hash(state);
-        self.font.hash(state);
     }
 }
 

@@ -1,7 +1,8 @@
 [workspace]
 members = [
     "crates/dume",
-    "crates/dume-winit"
+    "crates/dume-winit",
+    "crates/dume-markup",
 ]
 resolver = "2"
 

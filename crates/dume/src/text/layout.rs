@@ -18,6 +18,8 @@ use unicode_bidi::{BidiInfo, Level};
 
 use crate::{Context, FontId, Text, TextSection, TextStyle, TextureId};
 
+use super::{default_color, DEFAULT_SIZE};
+
 thread_local! {
     static SHAPE_CONTEXT: RefCell<ShapeContext> = RefCell::new(ShapeContext::new());
 }
@@ -230,7 +232,7 @@ impl TextBlob {
                             .builder(font)
                             .script(*script)
                             .direction(dir)
-                            .size(style.size)
+                            .size(style.size.unwrap_or(DEFAULT_SIZE))
                             .build();
 
                         shaper.add_str(text);
@@ -243,15 +245,15 @@ impl TextBlob {
                                     advance: glyph.advance,
                                     c: GlyphCharacter::Glyph(
                                         glyph.id,
-                                        style.size,
+                                        style.size.unwrap_or(DEFAULT_SIZE),
                                         (&text[cluster.source.start as usize..])
                                             .chars()
                                             .next()
                                             .unwrap(),
                                     ),
                                     font: font_id,
-                                    color: style.color,
-                                    size: style.size,
+                                    color: style.color.unwrap_or_else(default_color),
+                                    size: style.size.unwrap_or(DEFAULT_SIZE),
                                 });
                             }
                         });

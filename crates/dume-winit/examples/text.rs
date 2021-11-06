@@ -1,53 +1,33 @@
 //! Renders a bunch of text.
 
-use std::iter;
+use std::time::Instant;
 
-use dume::{Canvas, Context, Text, TextBlob, TextSection, TextStyle};
+use dume::{Canvas, Context, TextBlob};
 use dume_winit::{block_on, Application, DumeWinit};
 use glam::{vec2, Vec2};
 use winit::{event_loop::EventLoop, window::WindowBuilder};
 
-static TEXT: &str = r#"
-The spotted hawk swoops by and accuses me, he complains of my gab and my loitering.
-I too am not a bit tamed, I too am untranslatable,
-I sound my barbaric yawp over the roofs of the world.
-The last scud of day holds back for me,
-It flings my likeness after the rest and true as any on the shadow’d wilds,
-It coaxes me to the vapor and the dusk.
-I depart as air, I shake my white locks at the runaway sun,
-I effuse my flesh in eddies, and drift it in lacy jags.
-I bequeath myself to the dirt to grow from the grass I love,
-If you want me again look for me under your boot-soles.
-You will hardly know who I am or what I mean,
-But I shall be good health to you nevertheless,
-And filter and fibre your blood.
-Failing to fetch me at first keep encouraged,
-Missing me one place search another,
-I stop somewhere waiting for you.
-"#;
-
 struct App {
     text: TextBlob,
+    start_time: Instant,
 }
 
 impl App {
     pub fn new(cx: &Context) -> Self {
         cx.add_font(include_bytes!("../../../assets/ZenAntiqueSoft-Regular.ttf").to_vec())
             .unwrap();
+        cx.add_font(include_bytes!("../../../assets/Allison-Regular.ttf").to_vec())
+            .unwrap();
         cx.set_default_font_family("Zen Antique Soft");
 
         let text = cx.create_text_blob(
-            Text::from_sections(iter::once(TextSection::Text {
-                text: TEXT.into(),
-                style: TextStyle {
-                    size: 20.,
-                    color: (0, 0, 0, 255).into(),
-                    ..Default::default()
-                },
-            })),
+            dume::text!("@size[50][@color[0,0,0][Dume can render text.] @color[200,30,50][Here is some in scarlet.] @font[Allison][Here's a different font.]]"),
             Default::default(),
         );
-        Self { text }
+        Self {
+            text,
+            start_time: Instant::now(),
+        }
     }
 }
 
@@ -64,6 +44,13 @@ impl Application for App {
             .context()
             .resize_text_blob(&mut self.text, canvas.size());
         canvas.draw_text(&self.text, vec2(10., 50.), 1.);
+
+        let elapsed = self.start_time.elapsed().as_secs();
+        let counter_text = canvas.context().create_text_blob(
+            dume::text!("@size[60][{} seconds]", elapsed),
+            Default::default(),
+        );
+        canvas.draw_text(&counter_text, vec2(10., 500.), 1.);
     }
 }
 
