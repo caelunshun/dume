@@ -1,5 +1,6 @@
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::TokenStream;
 use quote::quote;
+use syn::Expr;
 
 #[derive(Debug, Default)]
 pub struct Text {
@@ -43,7 +44,7 @@ impl Default for TextStyle {
 }
 
 impl Text {
-    pub fn to_rust_code(&self, fmt_args: &[Ident]) -> TokenStream {
+    pub fn to_rust_code(&self, fmt_args: &[Expr]) -> TokenStream {
         let mut sections = Vec::new();
 
         for section in &self.sections {

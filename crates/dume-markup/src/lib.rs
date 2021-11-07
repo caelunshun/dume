@@ -3,7 +3,6 @@
 //! expression.
 
 use proc_macro::TokenStream;
-use proc_macro2::{Ident, Span};
 use quote::quote;
 use syn::{parse::Parse, punctuated::Punctuated, Expr, LitStr, Token};
 
@@ -37,30 +36,11 @@ pub fn markup(input: TokenStream) -> TokenStream {
 
     let text = parser::parse(&input.markup.value()).expect("failed to parse markup");
 
-    let fmt_args: Vec<_> = input
-        .fmt_args
-        .iter()
-        .enumerate()
-        .map(|(i, arg)| {
-            let ident = identnumber(i);
-            quote! { let #ident = #arg; }
-        })
-        .collect();
-
-    let result = text.to_rust_code(
-        &(0..input.fmt_args.len())
-            .map(identnumber)
-            .collect::<Vec<_>>(),
-    );
+    let result = text.to_rust_code(&input.fmt_args.into_iter().collect::<Vec<_>>());
     let result = quote! {
         {
-            #(#fmt_args)*
             #result
         }
     };
     result.into()
-}
-
-fn identnumber(n: usize) -> Ident {
-    Ident::new(&format!("arg{}", n), Span::call_site())
 }
