@@ -1,4 +1,4 @@
-use std::{f32::consts::TAU, mem};
+use std::{f32::consts::TAU, iter, mem};
 
 use glam::{vec2, vec4, Affine2, Mat4, Vec2, Vec4};
 use palette::Srgba;
@@ -281,15 +281,16 @@ impl Canvas {
 /// Rendering functions
 impl Canvas {
     /// Renders a frame, flushing all current draw commands.
-    ///
-    /// You need to submit the provided `CommandEncoder` to a `Queue`
-    /// for rendering to work.
     pub fn render(
         &mut self,
-        encoder: &mut wgpu::CommandEncoder,
         target_texture: &wgpu::TextureView,
         target_sample_texture: &wgpu::TextureView,
     ) {
+        let mut encoder = self
+            .context
+            .device()
+            .create_command_encoder(&Default::default());
+
         let projection_matrix = Mat4::orthographic_lh(
             0.,
             self.target_logical_size.x,
@@ -301,10 +302,16 @@ impl Canvas {
         let prepared =
             self.renderer
                 .prepare_render(&self.context, self.context.device(), projection_matrix);
-        self.renderer
-            .render(encoder, &prepared, target_texture, target_sample_texture);
+        self.renderer.render(
+            &mut encoder,
+            &prepared,
+            target_texture,
+            target_sample_texture,
+        );
 
         self.reset_transform();
+
+        self.context.queue().submit(iter::once(encoder.finish()));
     }
 
     /// Updates the target size of the canvas in logical pixels.

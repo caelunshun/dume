@@ -21,3 +21,7 @@ pollster = "0.2"
 console_error_panic_hook = "0.1"
 wasm-bindgen-futures = "0.4"
 web-sys = "0.3"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+log = "0.4"
+simple_logger = "1"

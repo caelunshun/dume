@@ -47,10 +47,28 @@ impl Application for App {
 
         let elapsed = self.start_time.elapsed().as_secs();
         let counter_text = canvas.context().create_text_blob(
-            dume::text!("@size[60][{} seconds]", elapsed),
+            dume::text!("@size[12][{} seconds]", elapsed),
             Default::default(),
         );
+        let time = self.start_time.elapsed().as_secs_f32();
+        let offset = (time.sin() / 2. + 1.) / 2. * 100.;
+        canvas.translate(Vec2::splat(offset));
         canvas.draw_text(&counter_text, vec2(10., 500.), 1.);
+        canvas.reset_transform();
+
+        let pos = Vec2::splat((time.sin() + 1.) / 2. * 500.);
+        canvas
+            .begin_path()
+            .translate(pos)
+            .rounded_rect(Vec2::ZERO, Vec2::splat(200.), 5.)
+            .linear_gradient(pos, pos + 200., (0, 0, 0, u8::MAX), (200, 30, 60, u8::MAX))
+            .fill();
+        canvas
+            .solid_color((0, 0, 0, u8::MAX))
+            .stroke_width(2.)
+            .stroke();
+
+        canvas.reset_transform();
     }
 }
 
@@ -58,6 +76,10 @@ fn main() {
     #[cfg(target_arch = "wasm32")]
     {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        simple_logger::SimpleLogger::new().with_level(log::LevelFilter::Error).init().unwrap();
     }
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()

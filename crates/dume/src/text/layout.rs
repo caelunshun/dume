@@ -119,7 +119,7 @@ pub struct TextBlob {
 }
 
 impl TextBlob {
-    pub(crate) fn new(cx: &Context, text: Text, options: TextOptions) -> Self {
+    pub(crate) fn new(cx: &Context, text: &Text, options: TextOptions) -> Self {
         let unstyled_text = text.to_unstyled_string();
         let BidiInfo { levels, .. } = BidiInfo::new(&unstyled_text, None);
 
@@ -150,21 +150,24 @@ impl TextBlob {
         blob
     }
 
-    fn compute_runs(&mut self, cx: &Context, text: Text) {
+    fn compute_runs(&mut self, cx: &Context, text: &Text) {
         // Merge BiDi, style, and script runs.
         let mut byte_index = 0;
-        for section in text.sections {
+        for section in &text.sections {
             match section {
                 TextSection::Text { text, style } => {
-                    self.build_runs(&text, &style, byte_index);
+                    self.build_runs(text, style, byte_index);
                     byte_index += text.len();
                 }
                 TextSection::Icon { name, size } => {
                     let texture = cx
-                        .texture_for_name(&name)
+                        .texture_for_name(name)
                         .or_else(|_| cx.texture_for_name(&format!("icon/{}", name)))
                         .expect("missing texture for embedded icon in text");
-                    self.runs.push(BlobRun::Icon { texture, size });
+                    self.runs.push(BlobRun::Icon {
+                        texture,
+                        size: *size,
+                    });
                 }
             }
         }

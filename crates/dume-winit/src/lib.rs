@@ -1,4 +1,4 @@
-use std::{future::Future, iter, sync::Arc};
+use std::{future::Future, sync::Arc};
 
 use dume::{Canvas, Context};
 use glam::{vec2, Vec2};
@@ -84,11 +84,6 @@ impl DumeWinit {
             match event {
                 Event::MainEventsCleared => self.window.request_redraw(),
                 Event::RedrawRequested(_) => {
-                    let mut encoder = self
-                        .context
-                        .device()
-                        .create_command_encoder(&Default::default());
-
                     let frame = self
                         .surface
                         .get_current_texture()
@@ -97,12 +92,9 @@ impl DumeWinit {
                     application.draw(&mut self.main_canvas);
 
                     self.main_canvas.render(
-                        &mut encoder,
                         &frame.texture.create_view(&Default::default()),
                         &self.sample_texture,
                     );
-
-                    self.context.queue().submit(iter::once(encoder.finish()));
 
                     frame.present();
                 }

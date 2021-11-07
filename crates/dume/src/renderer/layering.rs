@@ -68,6 +68,12 @@ impl LayeringEngine {
                         if pos != tile.affected_by_batches.len() - 1 {
                             return LayeringResult::CreateNewBatch;
                         }
+                    } else if tile
+                        .affected_by_batches
+                        .iter()
+                        .any(|&b| b > potential_batch)
+                    {
+                        return LayeringResult::CreateNewBatch;
                     } else {
                         tile.affected_by_batches.push(potential_batch);
                     }
@@ -86,7 +92,7 @@ impl LayeringEngine {
 }
 
 /// The size of each square tile in logical pixels.
-const TILE_SIZE: f32 = 50.;
+const TILE_SIZE: f32 = 10.;
 
 fn pixel_to_tile_coords(px: Vec2) -> IVec2 {
     ivec2(

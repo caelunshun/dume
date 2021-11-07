@@ -47,6 +47,14 @@ impl Text {
         });
     }
 
+    pub fn set_default_font_family(&mut self, family: SmartString<LazyCompact>) {
+        self.for_each_style(|s| {
+            if s.font.family.is_none() {
+                s.font.family = Some(family.clone());
+            }
+        });
+    }
+
     fn for_each_style(&mut self, mut f: impl FnMut(&mut TextStyle)) {
         for section in &mut self.sections {
             if let TextSection::Text { style, .. } = section {
@@ -116,3 +124,9 @@ impl Default for TextStyle {
 }
 
 impl Eq for TextStyle {}
+
+impl AsRef<Text> for Text {
+    fn as_ref(&self) -> &Text {
+        self
+    }
+}

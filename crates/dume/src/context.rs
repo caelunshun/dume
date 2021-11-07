@@ -133,8 +133,8 @@ impl Context {
         Canvas::new(self.clone(), target_size, hidpi_factor)
     }
 
-    pub fn create_text_blob(&self, text: Text, options: TextOptions) -> TextBlob {
-        TextBlob::new(self, text, options)
+    pub fn create_text_blob(&self, text: impl AsRef<Text>, options: TextOptions) -> TextBlob {
+        TextBlob::new(self, text.as_ref(), options)
     }
 
     pub fn resize_text_blob(&self, blob: &mut TextBlob, new_size: Vec2) {

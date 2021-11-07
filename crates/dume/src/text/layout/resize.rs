@@ -1,13 +1,17 @@
+use std::ops::Range;
+
 use ahash::AHashSet;
 use glam::Vec2;
 use parking_lot::RwLockReadGuard;
 
-use crate::{font::Fonts, text::layout::GlyphCharacter, Context, TextBlob};
+use crate::{font::Fonts, text::layout::GlyphCharacter, Align, Baseline, Context, TextBlob};
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct Line {
     next_line_offset: f32,
     num_glyphs: usize,
+    range: Range<usize>,
+    width: f32,
 }
 
 /// Does line wrapping on a list of `ShapedGlyph`.
@@ -18,6 +22,7 @@ pub struct Layouter<'a> {
     cursor: Vec2,
 
     current_line: Line,
+    lines: Vec<Line>,
 
     next_glyph: usize,
 
@@ -35,6 +40,7 @@ impl<'a> Layouter<'a> {
             cursor: Vec2::ZERO,
 
             current_line: Line::default(),
+            lines: Vec::new(),
 
             next_glyph: 0,
 
@@ -44,11 +50,16 @@ impl<'a> Layouter<'a> {
     }
 
     fn next_line(&mut self) {
+        self.current_line.range.end = self.next_glyph;
+        self.lines.push(self.current_line.clone());
+
         self.blob.size.x = self.blob.size.x.max(self.cursor.x);
         self.cursor.x = 0.;
         self.cursor.y += self.current_line.next_line_offset;
         self.blob.size.y += self.current_line.next_line_offset;
         self.current_line.num_glyphs = 0;
+        self.current_line.range.start = self.next_glyph;
+        self.current_line.width = 0.;
     }
 
     fn process_next_glyph(&mut self) {
@@ -61,16 +72,25 @@ impl<'a> Layouter<'a> {
 
         let glyph = &mut self.blob.glyphs[self.next_glyph];
 
-        glyph.pos = self.cursor;
-
-        self.cursor.x += glyph.advance;
-
         // Apply the line offset for this line
         let font = self.fonts.get(glyph.font);
         let metrics = font.metrics(&[]);
         let font_scale = glyph.size / metrics.units_per_em as f32;
         let line_offset = font_scale * (metrics.ascent + metrics.descent + metrics.leading);
         self.current_line.next_line_offset = self.current_line.next_line_offset.max(line_offset);
+
+        glyph.pos = self.cursor;
+        // Account for the baseline setting
+        let baseline_offset = match self.blob.options.baseline {
+            Baseline::Top => metrics.ascent,
+            Baseline::Middle => (metrics.ascent + metrics.descent) / 2.,
+            Baseline::Alphabetic => 0.,
+            Baseline::Bottom => metrics.descent,
+        };
+        glyph.pos.y += baseline_offset * font_scale;
+
+        self.cursor.x += glyph.advance;
+        self.current_line.width += glyph.advance;
 
         if let GlyphCharacter::Glyph(_, _, c) = &glyph.c {
             if *c == ' '
@@ -82,7 +102,10 @@ impl<'a> Layouter<'a> {
             }
         }
 
-        if self.cursor.x > self.blob.max_size.x && self.current_line.num_glyphs > 0 {
+        if self.cursor.x > self.blob.max_size.x
+            && self.current_line.num_glyphs > 0
+            && self.blob.options.wrap_lines
+        {
             // We need to wrap to the next line.
             //
             // If there is an available word boundary, we move back
@@ -106,5 +129,38 @@ impl<'a> Layouter<'a> {
         }
 
         self.next_line();
+        self.apply_align();
+    }
+
+    fn apply_align(&mut self) {
+        // Apply horizontal alignment.
+        for line in &self.lines {
+            let line_width = line.width;
+            let relative_pos =
+                relative_align_pos(self.blob.options.align_h, line_width, self.blob.max_size.x);
+
+            for glyph in &mut self.blob.glyphs[line.range.clone()] {
+                glyph.pos.x += relative_pos;
+            }
+        }
+
+        // Apply vertical alignment.
+        let height = self.blob.size().y;
+        let relative_pos =
+            relative_align_pos(self.blob.options.align_v, height, self.blob.max_size.y);
+        for glyph in &mut self.blob.glyphs {
+            glyph.pos.y += relative_pos;
+        }
+    }
+}
+
+fn relative_align_pos(align: Align, length: f32, max_length: f32) -> f32 {
+    match align {
+        Align::Start => 0.0,
+        Align::Center => {
+            let center_pos = max_length / 2.0;
+            center_pos - (length / 2.0)
+        }
+        Align::End => max_length - length,
     }
 }

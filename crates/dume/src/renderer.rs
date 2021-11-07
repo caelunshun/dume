@@ -265,7 +265,7 @@ fn find_batch_with_layering(
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct BatchId(usize);
 
 #[derive(Default)]
