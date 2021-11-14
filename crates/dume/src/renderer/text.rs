@@ -198,7 +198,8 @@ impl TextRenderer {
 
         let texcoords = glyphs.atlas().texcoords(key);
 
-        let pos = transform.transform_point2(pos) + vec2(placement.left as f32, -placement.top as f32) / hidpi_factor;
+        let pos = transform.transform_point2(pos)
+            + vec2(placement.left as f32, -placement.top as f32) / hidpi_factor;
 
         let width = placement.width as f32 / hidpi_factor;
         let height = placement.height as f32 / hidpi_factor;

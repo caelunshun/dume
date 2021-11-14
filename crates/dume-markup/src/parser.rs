@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use crate::{
     lexer::{ColorToken, Token},
-    output::{Text, TextChunk, TextSection, TextStyle},
+    output::{Color, Text, TextChunk, TextSection, TextStyle},
 };
 
 #[derive(Debug, Copy, Clone)]
@@ -204,8 +204,14 @@ impl Command {
             Command::Color => {
                 p.expect(Token::LBracket)?;
 
-                let text = p.expect(Token::Text)?;
-                let color = parse_color(text).context("failed to parse color")?;
+                let color = if p.peek().tok == Token::Display {
+                    p.consume();
+                    Color::FmtArg(p.next_fmt_index())
+                } else {
+                    let text = p.expect(Token::Text)?;
+                    Color::Constant(parse_color(text).context("failed to parse color")?)
+                };
+
                 style.color = Some(color);
 
                 p.expect(Token::RBracket)?;

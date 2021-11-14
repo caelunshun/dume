@@ -27,6 +27,10 @@ impl Text {
         }
     }
 
+    pub fn extend(&mut self, other: Text) {
+        self.sections.extend(other.sections);
+    }
+
     pub fn sections(&self) -> &[TextSection] {
         &self.sections
     }

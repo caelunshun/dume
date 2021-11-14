@@ -1,6 +1,6 @@
 //! Renders a bunch of text.
 
-use std::time::Instant;
+use instant::Instant;
 
 use dume::{Canvas, Context, TextBlob};
 use dume_winit::{block_on, Application, DumeWinit};

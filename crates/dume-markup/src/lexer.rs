@@ -14,7 +14,7 @@ pub enum Token {
 
     #[token("@")]
     At,
-    
+
     #[regex("[ \n\t]+", priority = 2)]
     Whitespace,
 

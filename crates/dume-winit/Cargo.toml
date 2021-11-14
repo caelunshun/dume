@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 dume = { path = "../dume" }
 glam = "0.17"
+instant = "0.1"
 wgpu = { version = "0.11", features = ["webgl"] }
 winit = { version = "0.25", default-features = false, features = ["web-sys"] }
 

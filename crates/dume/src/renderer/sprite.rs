@@ -202,7 +202,7 @@ impl SpriteRenderer {
         for vert in &mut vertices {
             vert.position = transform.transform_point2(vert.position);
         }
-        
+
         layer.vertices.extend_from_slice(&vertices);
         layer
             .indices

@@ -22,7 +22,7 @@ pub enum TextChunk {
 
 #[derive(Debug, Clone)]
 pub struct TextStyle {
-    pub color: Option<[u8; 4]>,
+    pub color: Option<Color>,
     pub size: Option<f32>,
     pub bold: bool,
     pub light: bool,
@@ -41,6 +41,12 @@ impl Default for TextStyle {
             font: None,
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum Color {
+    Constant([u8; 4]),
+    FmtArg(usize),
 }
 
 impl Text {
@@ -80,11 +86,19 @@ impl Text {
                         font,
                     } = style;
 
-                    let color = if let Some([r, g, b, a]) = color {
-                        quote! { Some(::dume::Srgba::new(#r, #g, #b, #a)) }
-                    } else {
-                        quote! { None }
+                    let color = match color {
+                        Some(Color::Constant([r, g, b, a])) => {
+                            quote! { Some(::dume::Srgba::new(#r, #g, #b, #a)) }
+                        }
+                        Some(Color::FmtArg(arg)) => {
+                            let arg = &fmt_args[*arg];
+                            quote! {
+                                Some(#arg)
+                            }
+                        }
+                        None => quote! { None },
                     };
+
                     let size = if let Some(size) = size {
                         quote! { Some(#size) }
                     } else {
@@ -126,7 +140,7 @@ impl Text {
                 }
                 TextSection::Icon { texture, size } => quote! {
                     ::dume::TextSection::Icon {
-                        name: #texture,
+                        name: #texture.into(),
                         size: #size,
                     }
                 },
