@@ -80,6 +80,7 @@ impl<'a> Layouter<'a> {
         self.current_line.next_line_offset = self.current_line.next_line_offset.max(line_offset);
 
         glyph.pos = self.cursor;
+
         // Account for the baseline setting
         let baseline_offset = match self.blob.options.baseline {
             Baseline::Top => metrics.ascent,

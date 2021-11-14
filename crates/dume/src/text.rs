@@ -78,6 +78,21 @@ impl Text {
     }
 }
 
+impl From<String> for Text {
+    fn from(s: String) -> Self {
+        Text::from(s.as_str())
+    }
+}
+
+impl<'a> From<&'a str> for Text {
+    fn from(s: &'a str) -> Self {
+        Text::from_sections([TextSection::Text {
+            text: s.into(),
+            style: Default::default(),
+        }])
+    }
+}
+
 /// A block of text with the same style.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TextSection {

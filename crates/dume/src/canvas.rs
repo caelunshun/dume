@@ -71,18 +71,22 @@ impl Canvas {
         for glyph in text.glyphs() {
             let color = glyph.color.into_format::<f32, f32>().into_linear();
             match &glyph.c {
-                GlyphCharacter::Glyph(glyph_id, size, _) => self.renderer.draw_glyph(
-                    &self.context,
-                    self.current_transform,
-                    self.scale_factor,
-                    *glyph_id,
-                    pos + glyph.pos + glyph.offset,
-                    *size,
-                    glyph.font,
-                    vec4(color.red, color.green, color.blue, color.alpha * alpha),
-                ),
+                GlyphCharacter::Glyph(glyph_id, size, _) => {
+                    self.renderer.draw_glyph(
+                        &self.context,
+                        self.current_transform,
+                        self.scale_factor,
+                        *glyph_id,
+                        pos + glyph.pos + glyph.offset,
+                        *size,
+                        glyph.font,
+                        vec4(color.red, color.green, color.blue, color.alpha * alpha),
+                    );
+                }
                 GlyphCharacter::LineBreak => {}
-                _ => todo!(),
+                GlyphCharacter::Icon(texture_id, size) => {
+                    self.draw_sprite(*texture_id, glyph.pos, *size);
+                }
             }
         }
         self

@@ -95,6 +95,7 @@ impl GlyphCache {
 
                 let fonts = cx.fonts();
                 let font = fonts.get(font);
+
                 let mut scaler = self
                     .scale_context
                     .builder(font)
