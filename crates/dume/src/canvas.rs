@@ -112,8 +112,8 @@ impl Canvas {
         color_b: impl Into<Srgba<u8>>,
     ) -> &mut Self {
         self.current_paint = Paint::LinearGradient {
-            p_a: point_a,
-            p_b: point_b,
+            p_a: self.current_transform.transform_point2(point_a),
+            p_b: self.current_transform.transform_point2(point_b),
             c_a: srgba_to_vec4(color_a),
             c_b: srgba_to_vec4(color_b),
         };
@@ -129,7 +129,7 @@ impl Canvas {
         edge_color: impl Into<Srgba<u8>>,
     ) -> &mut Self {
         self.current_paint = Paint::RadialGradient {
-            center,
+            center: self.current_transform.transform_point2(center),
             radius,
             c_center: srgba_to_vec4(center_color),
             c_outer: srgba_to_vec4(edge_color),

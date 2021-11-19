@@ -62,6 +62,7 @@ fn linear_gradient(pos: vec2<f32>, point_a: vec2<f32>, point_b: vec2<f32>, color
 
 fn radial_gradient(pos: vec2<f32>, center: vec2<f32>, radius: f32, color_a: vec4<f32>, color_b: vec4<f32>) -> vec4<f32> {
     let t = distance(center, pos) / radius;
+    let t = max(t, 1.0);
     return color_a * (1.0 - t) + color_b * t;
 }
 

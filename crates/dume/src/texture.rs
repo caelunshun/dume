@@ -177,8 +177,8 @@ impl TextureSetBuilder {
         )
         .expect("dimensions do not match image data size");
 
-        while current_level_size.x > 0
-            && current_level_size.y > 0
+        while current_level_size.x > 1
+            && current_level_size.y > 1
             && (mipmap_levels.len() as u32) < self.context.settings().max_mipmap_levels
         {
             self.mul_div
