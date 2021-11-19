@@ -99,7 +99,7 @@ impl Texture {
     pub fn mipmap_level_for_target_size(&self, target_width: u32) -> u32 {
         let ratio = target_width as f64 / self.size.x as f64;
 
-        let level = (ratio.log2().max(ratio.log2())).abs().floor() as u32;
+        let level = (ratio.log2().abs().floor()) as u32;
 
         level.min(self.num_mipmap_levels() - 1)
     }
@@ -168,7 +168,7 @@ impl TextureSetBuilder {
 
         // Generate mipmap layers
         let mut mipmap_levels = vec![key];
-        let mut current_level_size = size / 2;
+        let mut current_level_size = size;
         let mut current_image = Image::from_vec_u8(
             NonZeroU32::new(width).unwrap(),
             NonZeroU32::new(height).unwrap(),
@@ -185,7 +185,7 @@ impl TextureSetBuilder {
                 .multiply_alpha_inplace(&mut current_image.view_mut())
                 .expect("failed to premultiply alpha");
 
-            let next_level_size = current_level_size;
+            let next_level_size = current_level_size / 2;
             let mut next_image = Image::new(
                 NonZeroU32::new(next_level_size.x).unwrap(),
                 NonZeroU32::new(next_level_size.y).unwrap(),
@@ -194,6 +194,8 @@ impl TextureSetBuilder {
             self.resizer
                 .resize(&current_image.view(), &mut next_image.view_mut())
                 .unwrap();
+
+            self.mul_div.divide_alpha_inplace(&mut next_image.view_mut()).expect("failed to unpremultiply alpha");
 
             mipmap_levels.push(
                 self.atlas_builder

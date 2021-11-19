@@ -71,6 +71,8 @@ struct TextureBuffer {
     size: UVec2,
 }
 
+const PADDING: u32 = 2;
+
 /// Builder for a [`StaticTextureAtlas`].
 pub struct StaticTextureAtlasBuilder {
     rects: GroupedRectsToPlace<TextureKey>,
@@ -95,7 +97,7 @@ impl StaticTextureAtlasBuilder {
         let key = TextureKey::new();
         self.textures.insert(key, TextureBuffer { data, size });
         self.rects
-            .push_rect(key, None, RectToInsert::new(size.x, size.y, 1));
+            .push_rect(key, None, RectToInsert::new(size.x + PADDING, size.y + PADDING, 1));
         key
     }
 
@@ -167,7 +169,7 @@ impl StaticTextureAtlasBuilder {
             entries.insert(
                 key,
                 AtlasEntry {
-                    pos: uvec2(placement.x(), placement.y()),
+                    pos: uvec2(placement.x() + PADDING / 2, placement.y() + PADDING / 2),
                     size: buffer.size,
                 },
             );
@@ -177,8 +179,8 @@ impl StaticTextureAtlasBuilder {
                     texture: &texture,
                     mip_level: 0,
                     origin: wgpu::Origin3d {
-                        x: placement.x(),
-                        y: placement.y(),
+                        x: placement.x() + PADDING / 2,
+                        y: placement.y() + PADDING / 2,
                         z: 0,
                     },
                     aspect: wgpu::TextureAspect::All,

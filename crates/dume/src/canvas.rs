@@ -59,7 +59,6 @@ impl Canvas {
     pub fn draw_sprite(&mut self, texture: TextureId, pos: Vec2, width: f32) -> &mut Self {
         self.renderer.draw_sprite(
             &self.context,
-            self.scale_factor,
             self.current_transform,
             texture,
             pos,

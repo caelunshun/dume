@@ -142,15 +142,17 @@ impl SpriteRenderer {
     fn texture_height_and_coords(
         &self,
         cx: &Context,
+        transform: Affine2,
         set: TextureSetId,
         texture: TextureId,
         width: f32,
-        hidpi_factor: f32,
     ) -> (f32, [Vec2; 4]) {
+        let scale = transform.transform_vector2(Vec2::ONE).x;
+
         let textures = cx.textures();
         let set = textures.texture_set(set);
         let texture = set.get(texture);
-        let mipmap_level = texture.mipmap_level_for_target_size(width.floor() as u32);
+        let mipmap_level = texture.mipmap_level_for_target_size((scale * width.floor()) as u32);
 
         let texcoords = set.atlas().texcoords(*texture.mipmap_level(mipmap_level));
         let size = texture.size();
@@ -162,15 +164,13 @@ impl SpriteRenderer {
     pub fn affected_region(
         &self,
         cx: &Context,
+        transform: Affine2,
         set: TextureSetId,
         texture: TextureId,
         pos: Vec2,
         width: f32,
-        hidpi_factor: f32,
     ) -> Rect {
-        let height = self
-            .texture_height_and_coords(cx, set, texture, width, hidpi_factor)
-            .0;
+        let height = self.texture_height_and_coords(cx, transform, set, texture, width).0;
         Rect::new(pos, vec2(width, height))
     }
 
@@ -182,10 +182,9 @@ impl SpriteRenderer {
         texture: TextureId,
         position: Vec2,
         width: f32,
-        hidpi_factor: f32,
     ) {
         let (height, texcoords) =
-            self.texture_height_and_coords(cx, layer.texture_set, texture, width, hidpi_factor);
+            self.texture_height_and_coords(cx, transform, layer.texture_set, texture, width);
 
         let i = layer.vertices.len() as u32;
         let mut vertices = [
