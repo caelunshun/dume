@@ -145,12 +145,15 @@ impl SpriteRenderer {
         set: TextureSetId,
         texture: TextureId,
         width: f32,
+        hidpi_factor: f32,
     ) -> (f32, [Vec2; 4]) {
         let textures = cx.textures();
         let set = textures.texture_set(set);
+        let texture = set.get(texture);
+        let mipmap_level = texture.mipmap_level_for_target_size(width.floor() as u32);
 
-        let texcoords = set.atlas().texcoords(set.key_by_id(texture));
-        let size = set.texture_size(texture);
+        let texcoords = set.atlas().texcoords(*texture.mipmap_level(mipmap_level));
+        let size = texture.size();
         let aspect_ratio = size.y as f32 / size.x as f32;
         let height = width * aspect_ratio;
         (height, texcoords)
@@ -163,8 +166,11 @@ impl SpriteRenderer {
         texture: TextureId,
         pos: Vec2,
         width: f32,
+        hidpi_factor: f32,
     ) -> Rect {
-        let height = self.texture_height_and_coords(cx, set, texture, width).0;
+        let height = self
+            .texture_height_and_coords(cx, set, texture, width, hidpi_factor)
+            .0;
         Rect::new(pos, vec2(width, height))
     }
 
@@ -176,9 +182,10 @@ impl SpriteRenderer {
         texture: TextureId,
         position: Vec2,
         width: f32,
+        hidpi_factor: f32,
     ) {
         let (height, texcoords) =
-            self.texture_height_and_coords(cx, layer.texture_set, texture, width);
+            self.texture_height_and_coords(cx, layer.texture_set, texture, width, hidpi_factor);
 
         let i = layer.vertices.len() as u32;
         let mut vertices = [

@@ -82,6 +82,7 @@ impl Renderer {
     pub fn draw_sprite(
         &mut self,
         cx: &Context,
+        hidpi_factor: f32,
         transform: Affine2,
         texture: TextureId,
         pos: Vec2,
@@ -95,7 +96,7 @@ impl Renderer {
             BatchKey::Sprite { texture_set },
             Batch::Sprite(self.sprite_renderer.create_batch(texture_set)),
             self.sprite_renderer
-                .affected_region(cx, texture_set, texture, pos, width)
+                .affected_region(cx, texture_set, texture, pos, width, hidpi_factor)
                 .transformed(transform),
         );
 
@@ -106,6 +107,7 @@ impl Renderer {
             texture,
             pos,
             width,
+            hidpi_factor,
         );
     }
 

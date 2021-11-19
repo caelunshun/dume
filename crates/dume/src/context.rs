@@ -40,6 +40,15 @@ impl ContextBuilder {
         self
     }
 
+    /// Sets the maximum number of mipmap levels to generate for each texture.
+    /// Using a value of 1 disables mipmapping.
+    ///
+    /// The default value is 4.
+    pub fn max_mipmap_levels(mut self, levels: u32) -> Self {
+        self.settings.max_mipmap_levels = levels;
+        self
+    }
+
     /// Builds the context.
     pub fn build(self) -> Context {
         Context(Arc::new(Inner {
@@ -60,6 +69,7 @@ impl ContextBuilder {
 pub(crate) struct Settings {
     pub(crate) glyph_subpixel_steps: UVec2,
     pub(crate) glyph_expire_duration: Duration,
+    pub(crate) max_mipmap_levels: u32,
 }
 
 impl Default for Settings {
@@ -67,6 +77,7 @@ impl Default for Settings {
         Self {
             glyph_subpixel_steps: uvec2(2, 4),
             glyph_expire_duration: Duration::from_secs(10),
+            max_mipmap_levels: 4,
         }
     }
 }
@@ -117,7 +128,8 @@ impl Context {
     pub fn texture_dimensions(&self, texture: TextureId) -> UVec2 {
         self.textures()
             .texture_set(self.textures().set_for_texture(texture))
-            .texture_size(texture)
+            .get(texture)
+            .size()
     }
 
     pub fn add_font(&self, font_data: Vec<u8>) -> Result<(), MalformedFont> {

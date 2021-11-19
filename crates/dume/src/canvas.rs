@@ -57,8 +57,14 @@ impl Canvas {
     /// `width` is the width of the image on the canvas, also in
     /// logical pixels. The height is automatically computed from the texture's aspect ratio.
     pub fn draw_sprite(&mut self, texture: TextureId, pos: Vec2, width: f32) -> &mut Self {
-        self.renderer
-            .draw_sprite(&self.context, self.current_transform, texture, pos, width);
+        self.renderer.draw_sprite(
+            &self.context,
+            self.scale_factor,
+            self.current_transform,
+            texture,
+            pos,
+            width,
+        );
         self
     }
 
