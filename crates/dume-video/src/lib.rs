@@ -24,6 +24,7 @@ pub struct Video {
     texture: Arc<YuvTexture>,
     events: Receiver<Event>,
     is_finished: bool,
+    start_time: Instant,
 }
 
 impl Video {
@@ -50,6 +51,7 @@ impl Video {
         Ok(Self {
             texture,
             events,
+            start_time: Instant::now(),
             is_finished: false,
         })
     }
@@ -82,6 +84,10 @@ impl Video {
 
         canvas.draw_yuv_texture(&self.texture, pos, width, alpha);
         Ok(())
+    }
+
+    pub fn current_time(&self) -> Duration {
+        self.start_time.elapsed()
     }
 }
 
