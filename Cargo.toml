@@ -3,6 +3,7 @@ members = [
     "crates/dume",
     "crates/dume-winit",
     "crates/dume-markup",
+    "crates/dume-video",
 ]
 resolver = "2"
 

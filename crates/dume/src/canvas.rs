@@ -7,7 +7,7 @@ use crate::{
     path::{Path, PathSegment, TesselateKind},
     renderer::{Paint, Renderer},
     text::layout::GlyphCharacter,
-    Context, TextBlob, TextureId,
+    Context, TextBlob, TextureId, YuvTexture,
 };
 
 /// A 2D canvas using `wgpu`. Modeled after the HTML5 canvas
@@ -57,13 +57,8 @@ impl Canvas {
     /// `width` is the width of the image on the canvas, also in
     /// logical pixels. The height is automatically computed from the texture's aspect ratio.
     pub fn draw_sprite(&mut self, texture: TextureId, pos: Vec2, width: f32) -> &mut Self {
-        self.renderer.draw_sprite(
-            &self.context,
-            self.current_transform,
-            texture,
-            pos,
-            width,
-        );
+        self.renderer
+            .draw_sprite(&self.context, self.current_transform, texture, pos, width);
         self
     }
 
@@ -94,6 +89,19 @@ impl Canvas {
                 }
             }
         }
+        self
+    }
+
+    /// Draws a YUV texture.
+    pub fn draw_yuv_texture(
+        &mut self,
+        texture: &YuvTexture,
+        pos: Vec2,
+        width: f32,
+        alpha: f32,
+    ) -> &mut Self {
+        self.renderer
+            .draw_yuv_texture(self.current_transform, texture, pos, width, alpha);
         self
     }
 

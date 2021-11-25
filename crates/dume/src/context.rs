@@ -8,7 +8,7 @@ use crate::{
     glyph::GlyphCache,
     path::PathCache,
     texture::{MissingTexture, TextureId, TextureSet, TextureSetBuilder, Textures},
-    Canvas, Text, TextBlob, TextOptions,
+    yuv, Canvas, Text, TextBlob, TextOptions, YuvTexture,
 };
 
 /// Builder for a [`Context`].
@@ -151,6 +151,16 @@ impl Context {
 
     pub fn resize_text_blob(&self, blob: &mut TextBlob, new_size: Vec2) {
         blob.resize(self, new_size);
+    }
+
+    pub fn create_yuv_texture(
+        &self,
+        size: UVec2,
+        y_size: yuv::Size,
+        u_size: yuv::Size,
+        v_size: yuv::Size,
+    ) -> YuvTexture {
+        YuvTexture::new(self, size, y_size, u_size, v_size)
     }
 
     pub(crate) fn textures(&self) -> RwLockReadGuard<Textures> {

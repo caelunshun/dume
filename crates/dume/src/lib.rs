@@ -15,6 +15,7 @@ mod rect;
 mod renderer;
 mod text;
 mod texture;
+pub mod yuv;
 
 #[cfg(target_arch = "wasm32")]
 pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
@@ -32,6 +33,7 @@ pub use text::{
     Text, TextSection, TextStyle,
 };
 pub use texture::{MissingTexture, TextureId, TextureSet, TextureSetBuilder, TextureSetId};
+pub use yuv::YuvTexture;
 
 pub use palette::Srgba;
 

@@ -1,6 +1,6 @@
 use crate::{
     path::{Path, TesselateKind},
-    Context, FontId, Rect, TextureId, TextureSetId,
+    Context, FontId, Rect, TextureId, TextureSetId, YuvTexture,
 };
 
 use ahash::AHashMap;
@@ -14,12 +14,14 @@ use self::{
     path::{PathBatch, PathRenderer, PreparedPathBatch},
     sprite::{PreparedSpriteBatch, SpriteBatch, SpriteRenderer},
     text::{PreparedTextBatch, TextBatch, TextRenderer},
+    yuv::{PreparedYuvBatch, YuvBatch, YuvRenderer},
 };
 
 mod layering;
 mod path;
 mod sprite;
 mod text;
+mod yuv;
 
 pub use path::Paint;
 
@@ -50,6 +52,7 @@ pub struct Renderer {
     sprite_renderer: SpriteRenderer,
     text_renderer: TextRenderer,
     path_renderer: PathRenderer,
+    yuv_renderer: YuvRenderer,
 
     batches: Batches,
 
@@ -64,6 +67,7 @@ enum PreparedBatch {
     Sprite(PreparedSpriteBatch),
     Text(PreparedTextBatch),
     Path(PreparedPathBatch),
+    Yuv(PreparedYuvBatch),
 }
 
 impl Renderer {
@@ -74,6 +78,7 @@ impl Renderer {
             sprite_renderer: SpriteRenderer::new(device),
             text_renderer: TextRenderer::new(device),
             path_renderer: PathRenderer::new(device),
+            yuv_renderer: YuvRenderer::new(device),
             batches: Batches::default(),
             layering,
         }
@@ -171,6 +176,24 @@ impl Renderer {
         });
     }
 
+    pub fn draw_yuv_texture(
+        &mut self,
+        transform: Affine2,
+        texture: &YuvTexture,
+        pos: Vec2,
+        width: f32,
+        alpha: f32,
+    ) {
+        let batch = self.batches.insert_batch(
+            BatchKey::Yuv,
+            Batch::Yuv(self.yuv_renderer.create_batch(texture)),
+        );
+        let batch = self.batches.get(batch).unwrap_yuv();
+
+        self.yuv_renderer
+            .draw_texture(transform, batch, pos, width, alpha);
+    }
+
     pub fn prepare_render(
         &mut self,
         cx: &Context,
@@ -202,6 +225,9 @@ impl Renderer {
                     s,
                     &locals,
                 )),
+                Batch::Yuv(s) => {
+                    PreparedBatch::Yuv(self.yuv_renderer.prepare_batch(cx, device, s, &locals))
+                }
             };
             prepared.push(prep);
         }
@@ -236,6 +262,7 @@ impl Renderer {
                 PreparedBatch::Sprite(s) => self.sprite_renderer.render_layer(&mut render_pass, s),
                 PreparedBatch::Text(s) => self.text_renderer.render_layer(&mut render_pass, s),
                 PreparedBatch::Path(s) => self.path_renderer.render_layer(&mut render_pass, s),
+                PreparedBatch::Yuv(s) => self.yuv_renderer.render_layer(&mut render_pass, s),
             }
         }
     }
@@ -308,6 +335,7 @@ enum Batch {
     Sprite(SpriteBatch),
     Text(TextBatch),
     Path(PathBatch),
+    Yuv(YuvBatch),
 }
 
 impl Batch {
@@ -331,6 +359,13 @@ impl Batch {
             _ => panic!("expected path batch"),
         }
     }
+
+    pub fn unwrap_yuv(&mut self) -> &mut YuvBatch {
+        match self {
+            Batch::Yuv(s) => s,
+            _ => panic!("expected YUV batch"),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -338,6 +373,7 @@ enum BatchKey {
     Sprite { texture_set: TextureSetId },
     Text,
     Path,
+    Yuv,
 }
 
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]

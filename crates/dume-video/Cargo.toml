@@ -1,0 +1,16 @@
+[package]
+name = "dume-video"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+dume = { path = "../dume" }
+flume = "0.10"
+glam = "0.17"
+thiserror = "1"
+vp9 = { git = "https://github.com/caelunshun/vp9-rs" }
+winit = { version = "0.25", default-features = false }
+
+[dev-dependencies]
+dume-winit = { path = "../dume-winit" }
