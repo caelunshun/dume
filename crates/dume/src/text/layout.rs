@@ -18,8 +18,6 @@ use unicode_bidi::{BidiInfo, Level};
 
 use crate::{Context, FontId, Text, TextSection, TextStyle, TextureId};
 
-use super::{default_color, DEFAULT_SIZE};
-
 thread_local! {
     static SHAPE_CONTEXT: RefCell<ShapeContext> = RefCell::new(ShapeContext::new());
 }
@@ -145,7 +143,7 @@ impl TextBlob {
             size: Vec2::ZERO,
         };
         blob.compute_runs(cx, text);
-        blob.shape_glyphs(cx);
+        blob.shape_glyphs(cx, text);
         blob.resize(cx, Vec2::splat(f32::INFINITY));
         blob
     }
@@ -207,7 +205,7 @@ impl TextBlob {
         }
     }
 
-    fn shape_glyphs(&mut self, cx: &Context) {
+    fn shape_glyphs(&mut self, cx: &Context, root_text: &Text) {
         // Shape each run.
         let fonts = cx.fonts();
         SHAPE_CONTEXT.with(move |cell| {
@@ -235,7 +233,7 @@ impl TextBlob {
                             .builder(font)
                             .script(*script)
                             .direction(dir)
-                            .size(style.size.unwrap_or(DEFAULT_SIZE))
+                            .size(style.size.unwrap_or(root_text.default_size))
                             .build();
 
                         shaper.add_str(text);
@@ -248,15 +246,15 @@ impl TextBlob {
                                     advance: glyph.advance,
                                     c: GlyphCharacter::Glyph(
                                         glyph.id,
-                                        style.size.unwrap_or(DEFAULT_SIZE),
+                                        style.size.unwrap_or(root_text.default_size),
                                         (&text[cluster.source.start as usize..])
                                             .chars()
                                             .next()
                                             .unwrap(),
                                     ),
                                     font: font_id,
-                                    color: style.color.unwrap_or_else(default_color),
-                                    size: style.size.unwrap_or(DEFAULT_SIZE),
+                                    color: style.color.unwrap_or(root_text.default_color),
+                                    size: style.size.unwrap_or(root_text.default_size),
                                 });
                             }
                         });

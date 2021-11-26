@@ -15,15 +15,21 @@ pub fn default_color() -> Srgba<u8> {
 }
 
 /// Some rich text. Implemented as a list of [`TextSection`]s.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Text {
     sections: SmallVec<[TextSection; 1]>,
+    default_size: f32,
+    default_color: Srgba<u8>,
+    default_font_family: Option<SmartString<LazyCompact>>,
 }
 
 impl Text {
     pub fn from_sections(sections: impl IntoIterator<Item = TextSection>) -> Self {
         Self {
             sections: sections.into_iter().collect(),
+            default_size: DEFAULT_SIZE,
+            default_color: default_color(),
+            default_font_family: None,
         }
     }
 
@@ -36,35 +42,15 @@ impl Text {
     }
 
     pub fn set_default_size(&mut self, size: f32) {
-        self.for_each_style(|s| {
-            if s.size.is_none() {
-                s.size = Some(size);
-            }
-        });
+        self.default_size = size;
     }
 
     pub fn set_default_color(&mut self, color: Srgba<u8>) {
-        self.for_each_style(|s| {
-            if s.color.is_none() {
-                s.color = Some(color);
-            }
-        });
+        self.default_color = color;
     }
 
     pub fn set_default_font_family(&mut self, family: SmartString<LazyCompact>) {
-        self.for_each_style(|s| {
-            if s.font.family.is_none() {
-                s.font.family = Some(family.clone());
-            }
-        });
-    }
-
-    fn for_each_style(&mut self, mut f: impl FnMut(&mut TextStyle)) {
-        for section in &mut self.sections {
-            if let TextSection::Text { style, .. } = section {
-                f(style);
-            }
-        }
+       self.default_font_family = Some(family);
     }
 
     pub fn to_unstyled_string(&self) -> SmartString<LazyCompact> {
