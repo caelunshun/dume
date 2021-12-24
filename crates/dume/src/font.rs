@@ -114,11 +114,11 @@ impl Query {
                 .find_by_id(StringId::Family, None)
                 .expect("missing font family string")
                 .to_string()
-                == self.family.as_ref().map(|c| c.as_ref()).unwrap_or_else(|| {
+                .starts_with(self.family.as_ref().map(|c| c.as_ref()).unwrap_or_else(|| {
                     default_family.expect(
                         "no default font family was set, but font::Query uses None as the family",
                     )
-                })
+                }))
     }
 }
 
