@@ -296,6 +296,12 @@ impl Canvas {
         self.current_transform = self.current_transform * Affine2::from_scale(Vec2::splat(scale));
         self
     }
+
+    /// Rotates the canvas (in radians).
+    pub fn rotate(&mut self, theta: f32) -> &mut Self {
+        self.current_transform = self.current_transform * Affine2::from_angle(theta);
+        self
+    }
 }
 
 /// Rendering functions
