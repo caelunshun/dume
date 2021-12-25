@@ -58,10 +58,7 @@ impl SpriteRenderer {
                 wgpu::BindGroupLayoutEntry {
                     binding: 2,
                     visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler {
-                        filtering: true,
-                        comparison: false,
-                    },
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
             ],
@@ -92,7 +89,7 @@ impl SpriteRenderer {
                 strip_index_format: None,
                 front_face: wgpu::FrontFace::Cw,
                 cull_mode: Some(wgpu::Face::Back),
-                clamp_depth: false,
+                unclipped_depth: false,
                 polygon_mode: wgpu::PolygonMode::Fill,
                 conservative: false,
             },
@@ -122,6 +119,7 @@ impl SpriteRenderer {
                     write_mask: wgpu::ColorWrites::ALL,
                 }],
             }),
+            multiview: None,
         });
 
         Self {
@@ -156,7 +154,7 @@ impl SpriteRenderer {
             texture.mipmap_level_for_target_size((transform_scale * width.floor()) as u32);
 
         let mut texcoords = set.atlas().texcoords(*texture.mipmap_level(mipmap_level));
-       texcoords.rotate_right(rotation as usize);
+        texcoords.rotate_right(rotation as usize);
         let size = texture.size();
         let aspect_ratio = size.y as f32 / size.x as f32;
         let height = width * aspect_ratio;

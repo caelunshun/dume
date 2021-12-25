@@ -50,7 +50,7 @@ impl Text {
     }
 
     pub fn set_default_font_family(&mut self, family: SmartString<LazyCompact>) {
-       self.default_font_family = Some(family);
+        self.default_font_family = Some(family);
     }
 
     pub fn to_unstyled_string(&self) -> SmartString<LazyCompact> {

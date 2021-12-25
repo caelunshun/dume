@@ -5,7 +5,6 @@ struct VertexOutput {
     [[builtin(position)]] position: vec4<f32>;
 };
 
-[[block]]
 struct Locals {
     projection_matrix: mat4x4<f32>;
 };
@@ -28,11 +27,11 @@ fn vs_main(
 [[group(0), binding(1)]]
 var sprite_atlas: texture_2d<f32>;
 [[group(0), binding(2)]]
-var sampler: sampler;
+var samp: sampler;
 
 [[stage(fragment)]]
 fn fs_main(
     in: VertexOutput
 ) -> [[location(0)]] vec4<f32> {
-    return textureSample(sprite_atlas, sampler, in.tex_coords);
+    return textureSample(sprite_atlas, samp, in.tex_coords);
 }

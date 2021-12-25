@@ -79,7 +79,10 @@ fn main() {
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
-        simple_logger::SimpleLogger::new().with_level(log::LevelFilter::Error).init().unwrap();
+        simple_logger::SimpleLogger::new()
+            .with_level(log::LevelFilter::Error)
+            .init()
+            .unwrap();
     }
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()

@@ -96,8 +96,11 @@ impl StaticTextureAtlasBuilder {
     pub fn add_texture(&mut self, data: Vec<u8>, size: UVec2) -> TextureKey {
         let key = TextureKey::new();
         self.textures.insert(key, TextureBuffer { data, size });
-        self.rects
-            .push_rect(key, None, RectToInsert::new(size.x + PADDING, size.y + PADDING, 1));
+        self.rects.push_rect(
+            key,
+            None,
+            RectToInsert::new(size.x + PADDING, size.y + PADDING, 1),
+        );
         key
     }
 

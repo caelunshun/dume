@@ -9,7 +9,6 @@ struct VertexOutput {
     [[builtin(position)]] position: vec4<f32>;
 };
 
-[[block]]
 struct Locals {
     projection_matrix: mat4x4<f32>;
 };
@@ -29,7 +28,7 @@ fn vs_main(
     return out;
 }
 
-[[group(0), binding(1)]] var sampler: sampler;
+[[group(0), binding(1)]] var samp: sampler;
 [[group(0), binding(2)]] var texture_y: texture_2d<f32>;
 [[group(0), binding(3)]] var texture_u: texture_2d<f32>;
 [[group(0), binding(4)]] var texture_v: texture_2d<f32>;
@@ -45,9 +44,9 @@ fn srgb_to_linear(srgb: vec3<f32>) -> vec3<f32> {
 [[stage(fragment)]]
 fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     var yuv: vec3<f32>;
-    yuv.x = textureSample(texture_y, sampler, in.tex_coords).r;
-    yuv.y = textureSample(texture_u, sampler, in.tex_coords).r;
-    yuv.z = textureSample(texture_v, sampler, in.tex_coords).r;
+    yuv.x = textureSample(texture_y, samp, in.tex_coords).r;
+    yuv.y = textureSample(texture_u, samp, in.tex_coords).r;
+    yuv.z = textureSample(texture_v, samp, in.tex_coords).r;
     
     yuv = yuv + vec3<f32>(-0.0627451017, -0.501960814, -0.501960814);
     

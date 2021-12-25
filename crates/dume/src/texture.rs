@@ -44,7 +44,7 @@ impl Textures {
             if self.by_name.insert(name.clone(), id).is_some() {
                 log::warn!("Duplicate textures with name '{}'", name);
             }
-            set.by_id.insert(id,texture.clone());
+            set.by_id.insert(id, texture.clone());
         }
 
         texture_set_id
@@ -195,7 +195,9 @@ impl TextureSetBuilder {
                 .resize(&current_image.view(), &mut next_image.view_mut())
                 .unwrap();
 
-            self.mul_div.divide_alpha_inplace(&mut next_image.view_mut()).expect("failed to unpremultiply alpha");
+            self.mul_div
+                .divide_alpha_inplace(&mut next_image.view_mut())
+                .expect("failed to unpremultiply alpha");
 
             mipmap_levels.push(
                 self.atlas_builder
