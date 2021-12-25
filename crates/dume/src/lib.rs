@@ -57,3 +57,11 @@ pub fn convert_rgba_to_bgra(data: &mut [u8]) {
         chunk[2] = r;
     }
 }
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum SpriteRotate {
+    Zero,
+    One,
+    Two,
+    Three,
+}

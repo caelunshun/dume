@@ -1,6 +1,6 @@
 use crate::{
     path::{Path, TesselateKind},
-    Context, FontId, Rect, TextureId, TextureSetId, YuvTexture,
+    Context, FontId, Rect, SpriteRotate, TextureId, TextureSetId, YuvTexture,
 };
 
 use ahash::AHashMap;
@@ -92,6 +92,7 @@ impl Renderer {
         texture: TextureId,
         pos: Vec2,
         width: f32,
+        rotation: SpriteRotate,
     ) {
         let texture_set = cx.textures().set_for_texture(texture);
 
@@ -101,7 +102,15 @@ impl Renderer {
             BatchKey::Sprite { texture_set },
             Batch::Sprite(self.sprite_renderer.create_batch(texture_set)),
             self.sprite_renderer
-                .affected_region(cx, transform, transform_scale, texture_set, texture, pos, width)
+                .affected_region(
+                    cx,
+                    transform,
+                    transform_scale,
+                    texture_set,
+                    texture,
+                    pos,
+                    width,
+                )
                 .transformed(transform),
         );
 
@@ -113,6 +122,7 @@ impl Renderer {
             texture,
             pos,
             width,
+            rotation,
         );
     }
 

@@ -7,7 +7,7 @@ use crate::{
     path::{Path, PathSegment, TesselateKind},
     renderer::{Paint, Renderer},
     text::layout::GlyphCharacter,
-    Context, TextBlob, TextureId, YuvTexture,
+    Context, SpriteRotate, TextBlob, TextureId, YuvTexture,
 };
 
 /// A 2D canvas using `wgpu`. Modeled after the HTML5 canvas
@@ -59,8 +59,26 @@ impl Canvas {
     /// `width` is the width of the image on the canvas, also in
     /// logical pixels. The height is automatically computed from the texture's aspect ratio.
     pub fn draw_sprite(&mut self, texture: TextureId, pos: Vec2, width: f32) -> &mut Self {
-        self.renderer
-            .draw_sprite(&self.context, self.current_transform, self.current_transform_scale, texture, pos, width);
+        self.draw_sprite_with_rotation(texture, pos, width, SpriteRotate::Zero)
+    }
+
+    /// Draws a sprite, rotating the texture by the given amount.
+    pub fn draw_sprite_with_rotation(
+        &mut self,
+        texture: TextureId,
+        pos: Vec2,
+        width: f32,
+        rotation: SpriteRotate,
+    ) -> &mut Self {
+        self.renderer.draw_sprite(
+            &self.context,
+            self.current_transform,
+            self.current_transform_scale,
+            texture,
+            pos,
+            width,
+            rotation,
+        );
         self
     }
 

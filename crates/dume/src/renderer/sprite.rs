@@ -4,7 +4,7 @@ use bytemuck::{Pod, Zeroable};
 use glam::{vec2, Affine2, Vec2};
 use wgpu::util::DeviceExt;
 
-use crate::{Context, Rect, TextureId, TextureSetId, SAMPLE_COUNT, TARGET_FORMAT};
+use crate::{Context, Rect, SpriteRotate, TextureId, TextureSetId, SAMPLE_COUNT, TARGET_FORMAT};
 
 use super::Locals;
 
@@ -142,18 +142,21 @@ impl SpriteRenderer {
     fn texture_height_and_coords(
         &self,
         cx: &Context,
-        transform: Affine2,
+        _transform: Affine2,
         transform_scale: f32,
         set: TextureSetId,
         texture: TextureId,
-        width: f32
+        width: f32,
+        rotation: SpriteRotate,
     ) -> (f32, [Vec2; 4]) {
         let textures = cx.textures();
         let set = textures.texture_set(set);
         let texture = set.get(texture);
-        let mipmap_level = texture.mipmap_level_for_target_size((transform_scale * width.floor()) as u32);
+        let mipmap_level =
+            texture.mipmap_level_for_target_size((transform_scale * width.floor()) as u32);
 
-        let texcoords = set.atlas().texcoords(*texture.mipmap_level(mipmap_level));
+        let mut texcoords = set.atlas().texcoords(*texture.mipmap_level(mipmap_level));
+       texcoords.rotate_right(rotation as usize);
         let size = texture.size();
         let aspect_ratio = size.y as f32 / size.x as f32;
         let height = width * aspect_ratio;
@@ -170,7 +173,17 @@ impl SpriteRenderer {
         pos: Vec2,
         width: f32,
     ) -> Rect {
-        let height = self.texture_height_and_coords(cx, transform, transform_scale, set, texture, width).0;
+        let height = self
+            .texture_height_and_coords(
+                cx,
+                transform,
+                transform_scale,
+                set,
+                texture,
+                width,
+                SpriteRotate::Zero,
+            )
+            .0;
         Rect::new(pos, vec2(width, height))
     }
 
@@ -183,9 +196,17 @@ impl SpriteRenderer {
         texture: TextureId,
         position: Vec2,
         width: f32,
+        rotation: SpriteRotate,
     ) {
-        let (height, texcoords) =
-            self.texture_height_and_coords(cx, transform, transform_scale, layer.texture_set, texture, width);
+        let (height, texcoords) = self.texture_height_and_coords(
+            cx,
+            transform,
+            transform_scale,
+            layer.texture_set,
+            texture,
+            width,
+            rotation,
+        );
 
         let i = layer.vertices.len() as u32;
         let mut vertices = [
