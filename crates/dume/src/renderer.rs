@@ -88,6 +88,7 @@ impl Renderer {
         &mut self,
         cx: &Context,
         transform: Affine2,
+        transform_scale: f32,
         texture: TextureId,
         pos: Vec2,
         width: f32,
@@ -100,13 +101,14 @@ impl Renderer {
             BatchKey::Sprite { texture_set },
             Batch::Sprite(self.sprite_renderer.create_batch(texture_set)),
             self.sprite_renderer
-                .affected_region(cx, transform, texture_set, texture, pos, width)
+                .affected_region(cx, transform, transform_scale, texture_set, texture, pos, width)
                 .transformed(transform),
         );
 
         self.sprite_renderer.draw_sprite(
             cx,
             transform,
+            transform_scale,
             self.batches.get(batch_id).unwrap_sprite(),
             texture,
             pos,

@@ -23,6 +23,7 @@ pub struct Canvas {
     stroke_width: f32,
 
     current_transform: Affine2,
+    current_transform_scale: f32,
 }
 
 /// Painting
@@ -39,6 +40,7 @@ impl Canvas {
             stroke_width: 1.,
 
             current_transform: Affine2::IDENTITY,
+            current_transform_scale: 1.,
         }
     }
 
@@ -58,7 +60,7 @@ impl Canvas {
     /// logical pixels. The height is automatically computed from the texture's aspect ratio.
     pub fn draw_sprite(&mut self, texture: TextureId, pos: Vec2, width: f32) -> &mut Self {
         self.renderer
-            .draw_sprite(&self.context, self.current_transform, texture, pos, width);
+            .draw_sprite(&self.context, self.current_transform, self.current_transform_scale, texture, pos, width);
         self
     }
 
@@ -282,6 +284,7 @@ impl Canvas {
     /// Resets the current transformation to the identity matrix.
     pub fn reset_transform(&mut self) -> &mut Self {
         self.current_transform = Affine2::IDENTITY;
+        self.current_transform_scale = 1.;
         self
     }
 
@@ -294,6 +297,7 @@ impl Canvas {
     /// Scales the canvas.
     pub fn scale(&mut self, scale: f32) -> &mut Self {
         self.current_transform = self.current_transform * Affine2::from_scale(Vec2::splat(scale));
+        self.current_transform_scale *= scale;
         self
     }
 
