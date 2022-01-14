@@ -107,7 +107,7 @@ impl PathRenderer {
                 buffers: &[wgpu::VertexBufferLayout {
                     array_stride: size_of::<Vertex>() as u64,
                     step_mode: wgpu::VertexStepMode::Vertex,
-                    attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Sint32x2],
+                    attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Sint32x2],
                 }],
             },
             primitive: wgpu::PrimitiveState {
@@ -198,6 +198,7 @@ impl PathRenderer {
         for vertex in &path.vertices {
             batch.vertices.push(Vertex {
                 position: transform.transform_point2(*vertex),
+                local_position: *vertex,
                 paint,
             });
         }
@@ -289,6 +290,7 @@ impl PathRenderer {
 #[repr(C)]
 struct Vertex {
     position: Vec2,
+    local_position: Vec2,
     paint: UVec2,
 }
 

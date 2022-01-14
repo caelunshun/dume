@@ -9,7 +9,7 @@
 // on WebGL.
 
 struct VertexOutput {
-    [[location(0)]] world_pos: vec2<f32>;
+    [[location(0)]] local_pos: vec2<f32>;
     [[location(1)]] paint: vec2<i32>;
     [[builtin(position)]] position: vec4<f32>;
 };
@@ -23,11 +23,12 @@ var<uniform> locals: Locals;
 [[stage(vertex)]]
 fn vs_main(
     [[location(0)]] world_pos: vec2<f32>,
-    [[location(1)]] paint: vec2<i32>,
+    [[location(1)]] local_pos: vec2<f32>,
+    [[location(2)]] paint: vec2<i32>,
 ) -> VertexOutput {
     var out: VertexOutput;
 
-    out.world_pos = world_pos;
+    out.local_pos = local_pos;
     out.paint = paint;
 
     out.position = locals.projection_matrix * vec4<f32>(world_pos, 0.0, 1.0);
@@ -77,12 +78,12 @@ fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
             let point = get_color(color_index + 2);
             let point_a = point.xy;
             let point_b = point.zw;
-            return linear_gradient(in.world_pos, point_a, point_b, get_color(color_index), get_color(color_index + 1));
+            return linear_gradient(in.local_pos, point_a, point_b, get_color(color_index), get_color(color_index + 1));
         } else {
             let point = get_color(color_index + 2);
             let center = point.xy;
             let radius = point.z;
-            return radial_gradient(in.world_pos, center, radius, get_color(color_index), get_color(color_index + 1));
+            return radial_gradient(in.local_pos, center, radius, get_color(color_index), get_color(color_index + 1));
         }
     }
 }

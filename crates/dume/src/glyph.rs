@@ -99,7 +99,7 @@ impl GlyphCache {
                 let mut scaler = self
                     .scale_context
                     .builder(font)
-                    .hint(false)
+                    .hint(true)
                     .size(size)
                     .build();
 

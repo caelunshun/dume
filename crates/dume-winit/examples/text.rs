@@ -9,6 +9,7 @@ use winit::{event_loop::EventLoop, window::WindowBuilder};
 
 struct App {
     text: TextBlob,
+    text2: TextBlob,
     start_time: Instant,
 }
 
@@ -20,12 +21,28 @@ impl App {
             .unwrap();
         cx.set_default_font_family("Zen Antique Soft");
 
-        let text = cx.create_text_blob(
-            dume::text!("@size[50][@color[0,0,0][Dume can render text.] @color[200,30,50][Here is some in scarlet.] @font[Allison][Here's a different font.]]"),
-            Default::default(),
+        let text = dume::text!("@size[50][@color[0,0,0][Dume can render text.] @color[200,30,50][Here is some in scarlet.] @font[Allison][Here's a different font.]]");
+        let text2 = dume::text!(
+            "@color[0,0,0][I met a traveller from an antique land,
+            Who said—“Two vast and trunkless legs of stone
+            Stand in the desert.... Near them, on the sand,
+            Half sunk a shattered visage lies, whose frown,
+            And wrinkled lip, and sneer of cold command,
+            Tell that its sculptor well those passions read
+            Which yet survive, stamped on these lifeless things,
+            The hand that mocked them, and the heart that fed;
+            And on the pedestal, these words appear:
+            My name is Ozymandias, King of Kings;
+            Look on my Works, ye Mighty, and despair!
+            Nothing beside remains. Round the decay
+            Of that colossal Wreck, boundless and bare
+            The lone and level sands stretch far away.]"
         );
+        let text = cx.create_text_blob(text, Default::default());
+        let text2 = cx.create_text_blob(text2, Default::default());
         Self {
             text,
+            text2,
             start_time: Instant::now(),
         }
     }
@@ -44,6 +61,7 @@ impl Application for App {
             .context()
             .resize_text_blob(&mut self.text, canvas.size());
         canvas.draw_text(&self.text, vec2(10., 50.), 1.);
+        canvas.draw_text(&self.text2, vec2(10., 200.), 1.);
 
         let elapsed = self.start_time.elapsed().as_secs();
         let counter_text = canvas.context().create_text_blob(
@@ -61,7 +79,7 @@ impl Application for App {
             .begin_path()
             .translate(pos)
             .rounded_rect(Vec2::ZERO, Vec2::splat(200.), 5.)
-            .linear_gradient(pos, pos + 200., (0, 0, 0, u8::MAX), (200, 30, 60, u8::MAX))
+            .linear_gradient(Vec2::ZERO, Vec2::splat(200.), (0, 0, 0, u8::MAX), (200, 30, 60, u8::MAX))
             .fill();
         canvas
             .solid_color((0, 0, 0, u8::MAX))
