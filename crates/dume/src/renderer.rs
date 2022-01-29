@@ -16,6 +16,9 @@ const SHAPE_RECT: i32 = 0;
 const SHAPE_CIRCLE: i32 = 1;
 
 const PAINT_TYPE_SOLID: i32 = 0;
+const PAINT_TYPE_LINEAR_GRADIENT: i32 = 1;
+const PAINT_TYPE_RADIAL_GRADIENT: i32 = 2;
+const PAINT_TYPE_GLYPH: i32 = 3;
 
 /// Drives the GPU renderer.
 ///
@@ -50,6 +53,9 @@ impl Renderer {
         target_texture: &wgpu::TextureView,
     ) -> PreparedRender {
         let device = context.device();
+
+        let glyphs = context.glyph_cache();
+        let glyph_atlas = glyphs.atlas().texture_view();
 
         let globals = batch.globals();
         let globals = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -128,6 +134,14 @@ impl Renderer {
                     binding: 5,
                     resource: wgpu::BindingResource::TextureView(target_texture),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: wgpu::BindingResource::Sampler(&self.pipelines.linear_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 7,
+                    resource: wgpu::BindingResource::TextureView(glyph_atlas),
+                },
             ],
         });
 
@@ -155,7 +169,8 @@ impl Renderer {
         pass.set_bind_group(0, &prepared.bind_group, &[]);
         pass.dispatch(
             (prepared.tile_count.x + SORT_WORKGROUP_SIZE - 1) / SORT_WORKGROUP_SIZE,
-            (prepared.tile_count.y + SORT_WORKGROUP_SIZE - 1) / SORT_WORKGROUP_SIZE,1
+            (prepared.tile_count.y + SORT_WORKGROUP_SIZE - 1) / SORT_WORKGROUP_SIZE,
+            1,
         );
 
         // Paint
@@ -217,6 +232,7 @@ struct Pipelines {
     blit_bg_layout: wgpu::BindGroupLayout,
 
     nearest_sampler: wgpu::Sampler,
+    linear_sampler: wgpu::Sampler,
 }
 
 impl Pipelines {
@@ -283,6 +299,22 @@ impl Pipelines {
                         access: wgpu::StorageTextureAccess::ReadWrite,
                         format: INTERMEDIATE_FORMAT,
                         view_dimension: wgpu::TextureViewDimension::D2,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 6,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 7,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
                     },
                     count: None,
                 },
@@ -403,6 +435,20 @@ impl Pipelines {
             anisotropy_clamp: None,
             border_color: None,
         });
+        let linear_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("linear_sampler"),
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            address_mode_w: wgpu::AddressMode::Repeat,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            lod_min_clamp: 0.,
+            lod_max_clamp: 100.,
+            compare: None,
+            anisotropy_clamp: None,
+            border_color: None,
+        });
 
         Self {
             tile_pipeline,
@@ -412,6 +458,7 @@ impl Pipelines {
             blit_pipeline,
             blit_bg_layout,
             nearest_sampler,
+            linear_sampler,
         }
     }
 }
@@ -428,6 +475,18 @@ struct Globals {
 #[derive(Copy, Clone, Debug)]
 pub enum PaintType {
     Solid(Srgba<u8>),
+    LinearGradient {
+        point_a: Vec2,
+        point_b: Vec2,
+        color_a: Srgba<u8>,
+        color_b: Srgba<u8>,
+    },
+    RadialGradient {
+        center: Vec2,
+        radius: f32,
+        color_center: Srgba<u8>,
+        color_outer: Srgba<u8>,
+    },
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -578,6 +637,30 @@ impl Batch {
             PaintType::Solid(color) => {
                 packed.paint_type = PAINT_TYPE_SOLID;
                 packed.color_a = self.pack_color(color);
+            }
+            PaintType::LinearGradient {
+                point_a,
+                point_b,
+                color_a,
+                color_b,
+            } => {
+                packed.paint_type = PAINT_TYPE_LINEAR_GRADIENT;
+                packed.color_a = self.pack_color(color_a);
+                packed.color_b = self.pack_color(color_b);
+                packed.gradient_point_a = self.pack_pos(point_a);
+                packed.gradient_point_b = self.pack_pos(point_b);
+            }
+            PaintType::RadialGradient {
+                center,
+                radius,
+                color_center,
+                color_outer,
+            } => {
+                packed.paint_type = PAINT_TYPE_RADIAL_GRADIENT;
+                packed.color_a = self.pack_color(color_center);
+                packed.color_b = self.pack_color(color_outer);
+                packed.gradient_point_a = self.pack_pos(center);
+                packed.gradient_point_b = self.pack_pos(vec2(radius, 0.));
             }
         }
 

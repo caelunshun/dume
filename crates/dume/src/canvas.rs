@@ -39,8 +39,42 @@ impl Canvas {
         self.batch.logical_size()
     }
 
-    pub fn solid_color(&mut self, color: Srgba<u8>) -> &mut Self {
-        self.current_paint = PaintType::Solid(color);
+    pub fn solid_color(&mut self, color: impl Into<Srgba<u8>>) -> &mut Self {
+        self.current_paint = PaintType::Solid(color.into());
+        self
+    }
+
+    /// Sets the current paint to a linear gradient between two points.
+    pub fn linear_gradient(
+        &mut self,
+        point_a: Vec2,
+        point_b: Vec2,
+        color_a: impl Into<Srgba<u8>>,
+        color_b: impl Into<Srgba<u8>>,
+    ) -> &mut Self {
+        self.current_paint = PaintType::LinearGradient {
+            point_a,
+            point_b,
+            color_a: color_a.into(),
+            color_b: color_b.into(),
+        };
+        self
+    }
+
+    /// Sets the current paint to a radial gradient.
+    pub fn radial_gradient(
+        &mut self,
+        center: Vec2,
+        radius: f32,
+        center_color: impl Into<Srgba<u8>>,
+        edge_color: impl Into<Srgba<u8>>,
+    ) -> &mut Self {
+        self.current_paint = PaintType::RadialGradient {
+            center,
+            radius,
+            color_center: center_color.into(),
+            color_outer: edge_color.into(),
+        };
         self
     }
 
@@ -143,40 +177,6 @@ impl Canvas {
         /// Sets the current paint color to a solid color.
         pub fn solid_color(&mut self, color: impl Into<Srgba<u8>>) -> &mut Self {
             self.current_paint = Paint::SolidColor(srgba_to_vec4(color));
-            self
-        }
-
-        /// Sets the current paint to a linear gradient between two points.
-        pub fn linear_gradient(
-            &mut self,
-            point_a: Vec2,
-            point_b: Vec2,
-            color_a: impl Into<Srgba<u8>>,
-            color_b: impl Into<Srgba<u8>>,
-        ) -> &mut Self {
-            self.current_paint = Paint::LinearGradient {
-                p_a: point_a,
-                p_b: point_b,
-                c_a: srgba_to_vec4(color_a),
-                c_b: srgba_to_vec4(color_b),
-            };
-            self
-        }
-
-        /// Sets the current paint to a radial gradient.
-        pub fn radial_gradient(
-            &mut self,
-            center: Vec2,
-            radius: f32,
-            center_color: impl Into<Srgba<u8>>,
-            edge_color: impl Into<Srgba<u8>>,
-        ) -> &mut Self {
-            self.current_paint = Paint::RadialGradient {
-                center,
-                radius,
-                c_center: srgba_to_vec4(center_color),
-                c_outer: srgba_to_vec4(edge_color),
-            };
             self
         }
 

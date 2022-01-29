@@ -68,8 +68,18 @@ struct TileNodeCounters {
 [[group(0), binding(4)]] var<storage, read_write> tile_counters: TileNodeCounters;
 [[group(0), binding(5)]] var target_texture: texture_storage_2d<rgba8unorm, read_write>;
 
+[[group(0), binding(6)]] var samp_linear: sampler;
+[[group(0), binding(7)]] var glyph_atlas: texture_2d<f32>;
+
 fn unpack_pos(pos: u32) -> vec2<f32> {
     return unpack2x16unorm(pos) * globals.target_size * 2.0 * globals.scale_factor - globals.target_size / 2.0;
+}
+
+fn unpack_upos(pos: u32) -> vec2<u32> {
+    return vec2<u32>(
+        pos & u32(0xFFFF),
+        (pos >> u32(16)) & u32(0xFFFF),
+    );
 }
 
 // Shader that assigns an array of nodes
@@ -190,6 +200,9 @@ let SHAPE_RECT: i32 = 0;
 let SHAPE_CIRCLE: i32 = 1;
 
 let PAINT_TYPE_SOLID: i32 = 0;
+let PAINT_TYPE_LINEAR_GRADIENT: i32 = 1;
+let PAINT_TYPE_RADIAL_GRADIENT: i32 = 2;
+let PAINT_TYPE_GLYPH: i32 = 3;
 
 fn srgb_to_linear(srgb: vec3<f32>) -> vec3<f32> {
     let cutoff = srgb < vec3<f32>(0.04045);
@@ -212,10 +225,51 @@ fn unpack_color(color: u32) -> vec4<f32> {
     return vec4<f32>(srgb, color.a);
 }
 
-fn node_color(node: Node) -> vec4<f32> {
-    if (node.paint_type == PAINT_TYPE_SOLID) {
+fn linear_gradient(pos: vec2<f32>, point_a: vec2<f32>, point_b: vec2<f32>, color_a: vec4<f32>, color_b: vec4<f32>) -> vec4<f32> {
+    // https://stackoverflow.com/questions/1459368/snap-point-to-a-line
+    let ap = pos - point_a;
+    let ab = point_b - point_a;
+
+    let ab2 = ab.x * ab.x + ab.y * ab.y;
+    let ap_ab = ap.x * ab.x + ab.y * ap.y;
+    var t: f32 = ap_ab / ab2;
+    t = clamp(t, 0.0, 1.0);
+
+    return color_a * (1.0 - t) + color_b * t;
+}
+
+fn radial_gradient(pos: vec2<f32>, center: vec2<f32>, radius: f32, color_a: vec4<f32>, color_b: vec4<f32>) -> vec4<f32> {
+    let t = distance(center, pos) / radius;
+    let t = clamp(t, 0.0, 1.0);
+    return color_a * (1.0 - t) + color_b * t;
+}
+
+fn node_color(node: Node, pixel_pos: vec2<f32>) -> vec4<f32> {
+    let paint = node.paint_type;
+    if (paint == PAINT_TYPE_SOLID) {
         return unpack_color(node.color_a);
+    } else if (paint == PAINT_TYPE_LINEAR_GRADIENT) {
+        let point_a = unpack_pos(node.gradient_point_a);
+        let point_b = unpack_pos(node.gradient_point_b);
+        let color_a = unpack_color(node.color_a);
+        let color_b = unpack_color(node.color_b);
+        return linear_gradient(pixel_pos, point_a, point_b, color_a, color_b);
+    } else if (paint == PAINT_TYPE_RADIAL_GRADIENT) {
+        let center = unpack_pos(node.gradient_point_a);
+        let radius = unpack_pos(node.gradient_point_b).x;
+        let color_a = unpack_color(node.color_a);
+        let color_b = unpack_color(node.color_b);
+        return radial_gradient(pixel_pos, center, radius, color_a, color_b); 
+    } else if (paint == PAINT_TYPE_GLYPH) {
+        let offset = unpack_upos(node.gradient_point_a);
+        let origin = unpack_upos(node.gradient_point_b);
+        let color = unpack_color(node.color_a);
+        
+        let texcoords = offset + (vec2<u32>(pixel_pos) - origin);
+        let alpha = textureLoad(glyph_atlas, vec2<i32>(texcoords), 0).r;
+        return vec4<f32>(color.rgb, alpha * color.a);
     } else {
+        // Should never happen.
         return vec4<f32>(1.0, 0.0, 0.0, 1.0);
     }
 }
@@ -275,7 +329,7 @@ fn paint_kernel(
 
         let node: Node = nodes.nodes[node_index];
 
-        let node_color = node_color(node);
+        let node_color = node_color(node, pixel_pos);
         let node_coverage = node_coverage(node, pixel_pos);
         color = mix(color, node_color.rgb, node_coverage * node_color.a);
 
