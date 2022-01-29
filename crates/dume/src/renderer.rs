@@ -175,7 +175,7 @@ impl Renderer {
         });
         pass.set_pipeline(&self.pipelines.blit_pipeline);
         pass.set_bind_group(0, &prepared.bind_group, &[]);
-        pass.draw(0..6, 0..1);
+        pass.draw(0..3, 0..1);
     }
 }
 
@@ -309,8 +309,8 @@ impl Pipelines {
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
+                front_face: wgpu::FrontFace::Cw,
+                cull_mode: Some(wgpu::Face::Back),
                 unclipped_depth: false,
                 polygon_mode: wgpu::PolygonMode::Fill,
                 conservative: false,
@@ -443,8 +443,18 @@ pub struct Batch {
 impl Batch {
     pub fn draw_node(&mut self, node: Node) {
         let bbox = node.bounding_box();
+        if !self.will_draw(bbox) {
+            return;
+        }
         self.nodes.push(self.pack_node(node));
         self.node_bounding_boxes.push(self.pack_bounding_box(bbox));
+    }
+
+    /// Clipping step on the CPU.
+    fn will_draw(&self, bbox: Rect) -> bool {
+        let min = bbox.pos;
+        let max = min + bbox.size;
+        !(max.x < 0. || max.y < 0. || min.x > self.logical_size.x || min.y > self.logical_size.y)
     }
 
     pub fn logical_size(&self) -> Vec2 {
@@ -465,7 +475,7 @@ impl Batch {
 
     fn tile_buffer_size(&self) -> u64 {
         let num_tiles = self.tile_count().x * self.tile_count().y;
-        (num_tiles as u64) * (self.nodes.len() as u64) * (size_of::<u32>() as u64)
+        (num_tiles as u64) * 64 * (size_of::<u32>() as u64)
     }
 
     fn globals(&self) -> Globals {
@@ -482,9 +492,11 @@ impl Batch {
     }
 
     fn pack_pos(&self, pos: Vec2) -> u32 {
-        let pos = pos.clamp(Vec2::ZERO, self.logical_size);
-        let x = ((pos.x / self.logical_size.x) * (u16::MAX as f32)) as u16;
-        let y = ((pos.y / self.logical_size.y) * (u16::MAX as f32)) as u16;
+        let pos = pos.clamp(-self.logical_size * 0.5, self.logical_size * 1.5);
+        let x = (((pos.x + self.logical_size.x / 2.) / (2. * self.logical_size.x))
+            * (u16::MAX as f32)) as u16;
+        let y = (((pos.y + self.logical_size.y / 2.) / (2. * self.logical_size.y))
+            * (u16::MAX as f32)) as u16;
         x as u32 | ((y as u32) << 16)
     }
 

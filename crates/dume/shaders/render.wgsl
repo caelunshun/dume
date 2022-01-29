@@ -65,6 +65,10 @@ struct TileNodes {
 [[group(0), binding(3)]] var<storage, read_write> tiles: TileNodes;
 [[group(0), binding(4)]] var target_texture: texture_storage_2d<rgba8unorm, read_write>;
 
+fn unpack_pos(pos: u32) -> vec2<f32> {
+    return unpack2x16unorm(pos) * globals.target_size * 2.0 * globals.scale_factor - globals.target_size / 2.0;
+}
+
 // Shader that assigns an array of nodes
 // to each tile of 16x16 physical pixels.
 //
@@ -74,13 +78,13 @@ struct TileNodes {
 
 fn unpack_bounding_box(bbox: PackedBoundingBox) -> BoundingBox {
     var result: BoundingBox;
-    result.pos = unpack2x16unorm(bbox.pos) * globals.target_size;
-    result.size = unpack2x16unorm(bbox.size) * globals.target_size;
+    result.pos = unpack_pos(bbox.pos);
+    result.size = unpack_pos(bbox.size);
     return result;
 }
 
 fn tile_stride() -> u32 {
-    return globals.node_count;
+    return u32(64);
 }
 
 fn tile_index(tile_pos: vec2<u32>) -> u32 {
@@ -159,10 +163,6 @@ fn unpack_color(color: u32) -> vec4<f32> {
     let color = unpack4x8unorm(color);
     let srgb = srgb_to_linear(color.rgb);
     return vec4<f32>(srgb, color.a);
-}
-
-fn unpack_pos(pos: u32) -> vec2<f32> {
-    return unpack2x16unorm(pos) * globals.target_size * globals.scale_factor;
 }
 
 fn node_color(node: Node) -> vec4<f32> {

@@ -29,8 +29,7 @@ impl App {
                 .pos
                 .as_i32()
                 .clamp(IVec2::splat(0), IVec2::splat(999));
-            particle.vel =
-                particle.vel * (1. - dt) + self.velocity_field[pos.x as usize][pos.y as usize] * dt;
+            particle.vel += self.velocity_field[pos.x as usize][pos.y as usize] * dt;
         }
     }
 }
