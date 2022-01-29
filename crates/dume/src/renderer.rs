@@ -8,7 +8,8 @@ use wgpu::util::DeviceExt;
 use crate::{Context, Rect, INTERMEDIATE_FORMAT, TARGET_FORMAT};
 
 // Must match definitions in render.wgsl.
-const TILE_WORKGROUP_SIZE: UVec2 = glam::const_uvec2!([16, 16]);
+const TILE_WORKGROUP_SIZE: u32 = 256;
+const SORT_WORKGROUP_SIZE: u32 = 16;
 const TILE_SIZE: u32 = 16;
 
 const SHAPE_RECT: i32 = 0;
@@ -72,6 +73,12 @@ impl Renderer {
             usage: wgpu::BufferUsages::STORAGE,
             mapped_at_creation: false,
         });
+        let tile_counters = device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: batch.tile_counters_buffer_size(),
+            usage: wgpu::BufferUsages::STORAGE,
+            mapped_at_creation: false,
+        });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
@@ -111,6 +118,14 @@ impl Renderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 4,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &tile_counters,
+                        offset: 0,
+                        size: None,
+                    }),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
                     resource: wgpu::BindingResource::TextureView(target_texture),
                 },
             ],
@@ -119,18 +134,31 @@ impl Renderer {
         PreparedRender {
             bind_group,
             tile_count: batch.tile_count(),
+            node_count: batch.nodes.len() as u32,
         }
     }
 
     pub fn render(&self, prepared: PreparedRender, encoder: &mut wgpu::CommandEncoder) {
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
+
+        // Tiles
         pass.set_pipeline(&self.pipelines.tile_pipeline);
         pass.set_bind_group(0, &prepared.bind_group, &[]);
         pass.dispatch(
-            (prepared.tile_count.x + TILE_WORKGROUP_SIZE.x - 1) / TILE_WORKGROUP_SIZE.x,
-            (prepared.tile_count.y + TILE_WORKGROUP_SIZE.y - 1) / TILE_WORKGROUP_SIZE.y,
+            (prepared.node_count + TILE_WORKGROUP_SIZE - 1) / TILE_WORKGROUP_SIZE,
+            1,
             1,
         );
+
+        // Sort
+        pass.set_pipeline(&self.pipelines.sort_pipeline);
+        pass.set_bind_group(0, &prepared.bind_group, &[]);
+        pass.dispatch(
+            (prepared.tile_count.x + SORT_WORKGROUP_SIZE - 1) / SORT_WORKGROUP_SIZE,
+            (prepared.tile_count.y + SORT_WORKGROUP_SIZE - 1) / SORT_WORKGROUP_SIZE,1
+        );
+
+        // Paint
         pass.set_pipeline(&self.pipelines.paint_pipeline);
         pass.set_bind_group(0, &prepared.bind_group, &[]);
         pass.dispatch(prepared.tile_count.x, prepared.tile_count.y, 1);
@@ -181,6 +209,7 @@ impl Renderer {
 
 struct Pipelines {
     tile_pipeline: wgpu::ComputePipeline,
+    sort_pipeline: wgpu::ComputePipeline,
     paint_pipeline: wgpu::ComputePipeline,
     render_bg_layout: wgpu::BindGroupLayout,
 
@@ -240,6 +269,16 @@ impl Pipelines {
                 wgpu::BindGroupLayoutEntry {
                     binding: 4,
                     visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 5,
+                    visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::StorageTexture {
                         access: wgpu::StorageTextureAccess::ReadWrite,
                         format: INTERMEDIATE_FORMAT,
@@ -269,6 +308,12 @@ impl Pipelines {
             layout: Some(&pipeline_layout),
             module: &render_module,
             entry_point: "paint_kernel",
+        });
+        let sort_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: None,
+            layout: Some(&pipeline_layout),
+            module: &render_module,
+            entry_point: "sort_kernel",
         });
 
         let blit_module = device.create_shader_module(&wgpu::include_wgsl!("../shaders/blit.wgsl"));
@@ -361,6 +406,7 @@ impl Pipelines {
 
         Self {
             tile_pipeline,
+            sort_pipeline,
             paint_pipeline,
             render_bg_layout,
             blit_pipeline,
@@ -478,6 +524,11 @@ impl Batch {
         (num_tiles as u64) * 64 * (size_of::<u32>() as u64)
     }
 
+    fn tile_counters_buffer_size(&self) -> u64 {
+        let num_tiles = self.tile_count().x * self.tile_count().y;
+        num_tiles as u64 * size_of::<u32>() as u64
+    }
+
     fn globals(&self) -> Globals {
         Globals {
             target_size: self.logical_size,
@@ -545,6 +596,7 @@ impl Batch {
 pub struct PreparedRender {
     bind_group: wgpu::BindGroup,
     tile_count: UVec2,
+    node_count: u32,
 }
 
 pub struct PreparedBlit {

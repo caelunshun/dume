@@ -2,7 +2,6 @@
 // subdividing elements into tiles and one for
 // actually painting to the target texture.
 
-
 struct PackedBoundingBox {
     pos: u32;
     size: u32;
@@ -31,7 +30,7 @@ struct Node {
 
     paint_type: i32;
     
-    // Some fields unused depending on paint_type
+    // Some fields are unused depending on paint_type
     color_a: u32;
     color_b: u32;
     gradient_point_a: u32;
@@ -49,21 +48,25 @@ struct Nodes {
 
 // Stores the nodes that intersect each tile.
 //
-// In a pathological case, every node intersects each tile. So
-// each tile in this buffer needs enough space to store
-// `node_count` intersecting nodes.
-//
-// Thus, the stride between tiles in the array is `node_count * 4` (since
-// one node index consumes 4 bytes).
+// Thus, the stride between tiles in the array is `64 * 4` (since
+// one node index consumes 4 bytes). We assume no more than
+// 64 elements will intersect one tile. (TODO handle this case.)
 struct TileNodes {
     tile_nodes: array<u32>;
+};
+
+// Stores atomic counters for how many
+// nodes are in each tile in `TileNodes`.
+struct TileNodeCounters {
+    counters: array<atomic<u32>>;
 };
 
 [[group(0), binding(0)]] var<uniform> globals: Globals;
 [[group(0), binding(1)]] var<storage, read> nodes: Nodes;
 [[group(0), binding(2)]] var<storage, read> node_bounding_boxes: NodeBoundingBoxes;
 [[group(0), binding(3)]] var<storage, read_write> tiles: TileNodes;
-[[group(0), binding(4)]] var target_texture: texture_storage_2d<rgba8unorm, read_write>;
+[[group(0), binding(4)]] var<storage, read_write> tile_counters: TileNodeCounters;
+[[group(0), binding(5)]] var target_texture: texture_storage_2d<rgba8unorm, read_write>;
 
 fn unpack_pos(pos: u32) -> vec2<f32> {
     return unpack2x16unorm(pos) * globals.target_size * 2.0 * globals.scale_factor - globals.target_size / 2.0;
@@ -72,9 +75,10 @@ fn unpack_pos(pos: u32) -> vec2<f32> {
 // Shader that assigns an array of nodes
 // to each tile of 16x16 physical pixels.
 //
-// This kernel traverses the entire list of nodes
-// for each tile. (Clearly there is room for optimization,
-// e.g. by using a quadtree-like traversal.)
+// This kernel runs for each node and determines
+// the list of tiles the node intersects. For each tile
+// in the resulting list, it adds the node index to the tile's
+// list of intersecting nodes.
 
 fn unpack_bounding_box(bbox: PackedBoundingBox) -> BoundingBox {
     var result: BoundingBox;
@@ -91,41 +95,84 @@ fn tile_index(tile_pos: vec2<u32>) -> u32 {
     return (tile_pos.x + tile_pos.y * globals.tile_count.x) * tile_stride();
 }
 
-[[stage(compute), workgroup_size(16, 16)]]
+fn to_tile_pos(pos: vec2<f32>) -> vec2<u32> {
+    let pos = clamp(pos, vec2<f32>(0.0), globals.target_size);
+    return vec2<u32>(pos / 16.0);
+}
+
+[[stage(compute), workgroup_size(256, 1)]]
 fn tile_kernel(
     [[builtin(global_invocation_id)]] global_id: vec3<u32>,
 ) {
-    let tile_pos = global_id.xy;
-    let tile_min = vec2<f32>(tile_pos) * 16.0 / globals.scale_factor;
-    let tile_max = tile_min + vec2<f32>(16.0) / globals.scale_factor;
-
-    if (tile_pos.x >= globals.tile_count.x || tile_pos.y >= globals.tile_count.y) {
+    let node_index = global_id.x;
+    if (node_index >= globals.node_count) {
         return;
     }
 
-    var index: u32 = tile_index(tile_pos);
-    var node_index: u32 = u32(0);
+    let bbox = unpack_bounding_box(node_bounding_boxes.bounding_boxes[node_index]);
+    if (bbox.pos.x + bbox.size.x < 0.0 || bbox.pos.y + bbox.size.y < 0.0) {
+        return;
+    }
+
+    let min = to_tile_pos(bbox.pos);
+    let max = to_tile_pos(bbox.pos + bbox.size);
+
+    var x = min.x;
+    var y = min.y;
     loop {
-        let node_bbox = unpack_bounding_box(node_bounding_boxes.bounding_boxes[node_index]);
-
-        let node_min = node_bbox.pos;
-        let node_max = node_min + node_bbox.size;
-
-        // Do intersection test.
-        if (node_max.x < tile_min.x || node_max.y < tile_min.y
-            || node_min.x > tile_max.x || node_min.y > tile_max.y) {
-            // No intersection; do nothing.
-        } else {
-            // NB a value of zero means the end of the list, so we add one to ensure the index is
-            // always greater than zero. (The paint shader needs to subtract one to compensate.)
-            tiles.tile_nodes[index] = node_index + u32(1);
-            index = index + u32(1);
+         if (x > max.x || x >= globals.tile_count.x) {
+            y = y + u32(1);
+            x = min.x;
+            if (y > max.y || y >= globals.tile_count.y) {
+                break;
+            }
         }
 
-        node_index = node_index + u32(1);
-        if (node_index == globals.node_count) {
+        let tile_index = tile_index(vec2<u32>(x, y));
+        let ip = &tile_counters.counters[x + y * globals.tile_count.x];
+        let i = atomicAdd(ip, u32(1));
+        tiles.tile_nodes[tile_index + i] = node_index;
+
+        x = x + u32(1);
+    }
+}
+
+
+// Shader that sorts nodes in each tile to keep
+// a stable draw order.
+//
+// We use insertion sort.
+
+[[stage(compute), workgroup_size(16, 16)]]
+fn sort_kernel([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
+    let tile_id = global_id.xy;
+
+    if (tile_id.x >= globals.tile_count.x || tile_id.y >= globals.tile_count.y) {
+        return;
+    }
+
+    let num_nodes = i32(tile_counters.counters[tile_id.x + tile_id.y * globals.tile_count.x]);
+    let base_index = i32(tile_index(tile_id));
+
+    var i = base_index + 1;
+    loop {
+        if (i - base_index >= num_nodes) {
             break;
         }
+
+        let x = tiles.tile_nodes[i];
+        var j = i - 1;
+        loop {
+            if (!(j >= 0 && tiles.tile_nodes[j] > x)) {
+                break;
+            }
+
+            tiles.tile_nodes[j + 1] = tiles.tile_nodes[j];
+            j = j - 1;
+        }
+        tiles.tile_nodes[j + 1] = x;
+
+        i = i + 1;
     }
 }
 
@@ -218,17 +265,15 @@ fn paint_kernel(
 
     var index = tile_index(tile_id.xy);
     let base_index = index;
+    let num_nodes = tile_counters.counters[tile_id.x + tile_id.y * globals.tile_count.x];
     loop {
-        if (index - base_index == globals.node_count) {
+        if (index - base_index == num_nodes) {
             break;
         }
 
         let node_index = tiles.tile_nodes[index];
-        if (node_index == u32(0)) {
-            break;
-        }
 
-        let node: Node = nodes.nodes[node_index - u32(1)];
+        let node: Node = nodes.nodes[node_index];
 
         let node_color = node_color(node);
         let node_coverage = node_coverage(node, pixel_pos);
