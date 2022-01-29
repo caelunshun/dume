@@ -1,35 +1,28 @@
-// Shader to blit a layer onto another layer.
+// Since compute shaders can't write directly
+// to the surface texture, we use this
+// render pipeline to blit onto the framebuffer.
 
 struct VertexOutput {
-    [[location(0)]] tex_coords: vec2<f32>;
+    [[location(0)]] texcoord: vec2<f32>;
     [[builtin(position)]] position: vec4<f32>;
 };
 
-struct Locals {
-    projection_matrix: mat4x4<f32>;
-};
-[[group(0), binding(0)]]
-var<uniform> locals: Locals;
+[[group(0), binding(0)]] var tex: texture_2d<f32>;
+[[group(0), binding(1)]] var samp: sampler;
 
+// Vertex shader to generate a fullscreen quad without vertex buffers. See:
+// https://www.saschawillems.de/blog/2016/08/13/vulkan-tutorial-on-rendering-a-fullscreen-quad-without-buffers/.
 [[stage(vertex)]]
-fn vs_main(
-    [[location(0)]] tex_coords: vec2<f32>,
-    [[location(1)]] position: vec2<f32>,
-) -> VertexOutput {
+fn vs_main([[builtin(vertex_index)]] vertex_index: u32) -> VertexOutput {
     var out: VertexOutput;
 
-    out.tex_coords = tex_coords;
-    out.position = locals.projection_matrix * vec4<f32>(position, 0.0, 1.0);
+    out.texcoord = vec2<f32>(f32((i32(vertex_index) << u32(1)) & 2), f32(i32(vertex_index) & 2));
+    out.position = vec4<f32>(out.texcoord.x * 2.0 - 1.0, -(out.texcoord.y * 2.0 - 1.0), 0.0, 1.0);
 
     return out;
 }
 
-[[group(0), binding(1)]] 
-var layer: texture_2d<f32>;
-[[group(0), binding(2)]] 
-var sampler: sampler;
-
 [[stage(fragment)]]
 fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
-    return textureSample(layer, sampler, in.tex_coords);
+    return textureSample(tex, samp, in.texcoord);
 }

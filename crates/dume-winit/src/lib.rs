@@ -1,7 +1,7 @@
 use std::{future::Future, sync::Arc};
 
 use dume::{Canvas, Context};
-use glam::{vec2, Vec2};
+use glam::{uvec2, UVec2};
 use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
@@ -13,7 +13,6 @@ pub struct DumeWinit {
     context: Context,
     main_canvas: Canvas,
 
-    sample_texture: wgpu::TextureView,
     surface: wgpu::Surface,
 
     window: Window,
@@ -49,13 +48,12 @@ impl DumeWinit {
 
     /// Creates an `App` from an existing `Context`.
     pub fn from_context(context: Context, surface: wgpu::Surface, window: Window) -> Self {
-        let sample_texture = create_sample_texture(window.inner_size(), context.device());
         configure_surface(&surface, context.device(), window.inner_size());
 
         Self {
-            main_canvas: context.create_canvas(logical_size(&window), window.scale_factor() as f32),
+            main_canvas: context
+                .create_canvas(physical_size(&window), window.scale_factor() as f32),
             context,
-            sample_texture,
             surface,
             window,
         }
@@ -91,10 +89,8 @@ impl DumeWinit {
 
                     application.draw(&mut self.main_canvas);
 
-                    self.main_canvas.render(
-                        &frame.texture.create_view(&Default::default()),
-                        &self.sample_texture,
-                    );
+                    self.main_canvas
+                        .render(&frame.texture.create_view(&Default::default()));
 
                     frame.present();
                 }
@@ -104,11 +100,9 @@ impl DumeWinit {
                         WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                         WindowEvent::Resized(new_size) => {
                             configure_surface(&self.surface, self.context.device(), new_size);
-                            self.sample_texture =
-                                create_sample_texture(new_size, self.context.device());
 
                             self.main_canvas.resize(
-                                logical_size(&self.window),
+                                physical_size(&self.window),
                                 self.window.scale_factor() as f32,
                             );
                         }
@@ -119,24 +113,6 @@ impl DumeWinit {
             }
         });
     }
-}
-
-fn create_sample_texture(size: PhysicalSize<u32>, device: &wgpu::Device) -> wgpu::TextureView {
-    device
-        .create_texture(&wgpu::TextureDescriptor {
-            label: None,
-            size: wgpu::Extent3d {
-                width: size.width,
-                height: size.height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: dume::SAMPLE_COUNT,
-            dimension: wgpu::TextureDimension::D2,
-            format: dume::TARGET_FORMAT,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        })
-        .create_view(&Default::default())
 }
 
 fn configure_surface(surface: &wgpu::Surface, device: &wgpu::Device, size: PhysicalSize<u32>) {
@@ -160,9 +136,8 @@ pub trait Application {
     }
 }
 
-fn logical_size(window: &Window) -> Vec2 {
-    let size = window.inner_size().to_logical(window.scale_factor());
-    vec2(size.width, size.height)
+fn physical_size(window: &Window) -> UVec2 {
+    uvec2(window.inner_size().width, window.inner_size().height)
 }
 
 async fn init_context(window: &Window) -> (Context, wgpu::Surface) {
@@ -189,10 +164,7 @@ async fn init_wgpu(window: &Window) -> (wgpu::Device, wgpu::Queue, wgpu::Surface
         .request_device(
             &wgpu::DeviceDescriptor {
                 label: None,
-                features: wgpu::Features::default(),
-                #[cfg(target_arch = "wasm32")]
-                limits: wgpu::Limits::downlevel_webgl2_defaults(),
-                #[cfg(not(target_arch = "wasm32"))]
+                features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
                 limits: wgpu::Limits::default(),
             },
             None,

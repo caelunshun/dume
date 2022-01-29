@@ -17,11 +17,8 @@ mod text;
 mod texture;
 pub mod yuv;
 
-#[cfg(target_arch = "wasm32")]
-pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
-#[cfg(not(target_arch = "wasm32"))]
-pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
-pub const SAMPLE_COUNT: u32 = 4;
+const INTERMEDIATE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 
 pub use canvas::Canvas;
 pub use context::Context;

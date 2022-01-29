@@ -7,6 +7,7 @@ use crate::{
     font::{Font, Fonts, MalformedFont},
     glyph::GlyphCache,
     path::PathCache,
+    renderer::Renderer,
     texture::{MissingTexture, TextureId, TextureSet, TextureSetBuilder, Textures},
     yuv, Canvas, Text, TextBlob, TextOptions, YuvTexture,
 };
@@ -52,6 +53,8 @@ impl ContextBuilder {
     /// Builds the context.
     pub fn build(self) -> Context {
         Context(Arc::new(Inner {
+            renderer: Renderer::new(&self.device),
+
             textures: RwLock::new(Textures::default()),
             fonts: RwLock::new(Fonts::default()),
             glyph_cache: Mutex::new(GlyphCache::new(&self.device, &self.queue, &self.settings)),
@@ -94,6 +97,8 @@ pub struct Context(Arc<Inner>);
 
 struct Inner {
     settings: Settings,
+
+    renderer: Renderer,
 
     device: Arc<wgpu::Device>,
     queue: Arc<wgpu::Queue>,
@@ -141,8 +146,8 @@ impl Context {
         self.0.fonts.write().set_default_family(family.into());
     }
 
-    pub fn create_canvas(&self, target_size: Vec2, hidpi_factor: f32) -> Canvas {
-        Canvas::new(self.clone(), target_size, hidpi_factor)
+    pub fn create_canvas(&self, target_physical_size: UVec2, hidpi_factor: f32) -> Canvas {
+        Canvas::new(self.clone(), target_physical_size, hidpi_factor)
     }
 
     pub fn create_text_blob(&self, text: impl AsRef<Text>, options: TextOptions) -> TextBlob {
@@ -161,6 +166,10 @@ impl Context {
         v_size: yuv::Size,
     ) -> YuvTexture {
         YuvTexture::new(self, size, y_size, u_size, v_size)
+    }
+
+    pub(crate) fn renderer(&self) -> &Renderer {
+        &self.0.renderer
     }
 
     pub(crate) fn textures(&self) -> RwLockReadGuard<Textures> {

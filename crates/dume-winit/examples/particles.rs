@@ -1,0 +1,94 @@
+use dume::{Canvas, Srgba};
+use dume_winit::{block_on, Application, DumeWinit};
+use glam::{vec2, IVec2, Vec2};
+use instant::Instant;
+use noise::{Fbm, MultiFractal, NoiseFn, Seedable};
+use rand::Rng;
+use winit::{event_loop::EventLoop, window::Window};
+
+struct Particle {
+    pos: Vec2,
+    vel: Vec2,
+    color: Srgba<u8>,
+}
+
+struct App {
+    last_time: Instant,
+    particles: Vec<Particle>,
+    velocity_field: Vec<Vec<Vec2>>,
+}
+
+impl App {
+    fn update_particles(&mut self) {
+        let dt = self.last_time.elapsed().as_secs_f32();
+        self.last_time = Instant::now();
+
+        for particle in &mut self.particles {
+            particle.pos += particle.vel * dt;
+            let pos = particle
+                .pos
+                .as_i32()
+                .clamp(IVec2::splat(0), IVec2::splat(999));
+            particle.vel =
+                particle.vel * (1. - dt) + self.velocity_field[pos.x as usize][pos.y as usize] * dt;
+        }
+    }
+}
+
+impl Application for App {
+    fn draw(&mut self, canvas: &mut Canvas) {
+        self.update_particles();
+
+        for particle in &self.particles {
+            canvas
+                .solid_color(particle.color)
+                .fill_circle(particle.pos, 10.);
+        }
+    }
+}
+
+fn main() {
+    let event_loop = EventLoop::new();
+    let window = Window::new(&event_loop).unwrap();
+
+    block_on(async move {
+        let dume = DumeWinit::new(window).await;
+        let app = App {
+            last_time: Instant::now(),
+            particles: init_particles(),
+            velocity_field: init_velocity_field(),
+        };
+        dume.run(event_loop, app);
+    });
+}
+
+fn init_particles() -> Vec<Particle> {
+    let mut rng = rand::thread_rng();
+    (0..10_000)
+        .map(|_| Particle {
+            pos: vec2(rng.gen(), rng.gen()) * 1000.,
+            vel: Vec2::ZERO,
+            color: Srgba::new(rng.gen(), rng.gen(), rng.gen(), 180),
+        })
+        .collect()
+}
+
+fn init_velocity_field() -> Vec<Vec<Vec2>> {
+    let noise_a = Fbm::new().set_frequency(0.1).set_seed(100);
+    let noise_b = Fbm::new().set_frequency(0.1).set_seed(500);
+    let mut grid = vec![vec![Vec2::ZERO; 1000]; 1000];
+
+    for x in 0..1000 {
+        for y in 0..1000 {
+            let a = noise_a.get([x as f64, y as f64]);
+            let b = noise_b.get([x as f64, y as f64]);
+            let mut vel = vec2(a as f32 * 20., b as f32 * 20.);
+            if vel.length() < 1. {
+                vel /= vel.length();
+            }
+            grid[x][y] = vel;
+        }
+    }
+
+    grid
+}

@@ -25,4 +25,7 @@ web-sys = "0.3"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 log = "0.4"
+noise = "0.7"
+palette = "0.6"
+rand = "0.8"
 simple_logger = "1"
