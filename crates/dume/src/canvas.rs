@@ -1,16 +1,14 @@
-use std::{f32::consts::TAU, iter, mem};
+use std::{iter, mem};
 
-use glam::{uvec2, vec2, vec4, Affine2, Mat4, UVec2, Vec2, Vec4};
+use glam::{uvec2, vec2, UVec2, Vec2};
 use palette::Srgba;
-use parking_lot::MutexGuard;
 use swash::GlyphId;
 
 use crate::{
-    glyph::{Glyph, GlyphCache},
-    path::{Path, PathSegment, TesselateKind},
-    renderer::{Batch, Node, PaintType, Renderer, Shape},
+    glyph::Glyph,
+    renderer::{Batch, LineSegment, Node, PaintType, Shape},
     text::layout::GlyphCharacter,
-    Context, FontId, Rect, SpriteRotate, TextBlob, TextureId, YuvTexture, INTERMEDIATE_FORMAT,
+    Context, FontId, Rect, TextBlob, INTERMEDIATE_FORMAT,
 };
 
 /// A 2D canvas using `wgpu`. Modeled after the HTML5 canvas
@@ -20,7 +18,8 @@ pub struct Canvas {
     batch: Batch,
 
     current_paint: PaintType,
-    current_shape: Shape,
+    current_path: Vec<LineSegment>,
+    stroke_width: f32,
 }
 
 /// Painting
@@ -33,7 +32,8 @@ impl Canvas {
             context,
             batch,
             current_paint: PaintType::Solid(Srgba::default()),
-            current_shape: Shape::Rect(Rect::default()),
+            current_path: Vec::new(),
+            stroke_width: 1.,
         }
     }
 
@@ -81,9 +81,69 @@ impl Canvas {
         self
     }
 
+    pub fn begin_path(&mut self) -> &mut Self {
+        self.current_path.clear();
+        self
+    }
+
+    pub fn move_to(&mut self, pos: Vec2) -> &mut Self {
+        self.current_path.push(LineSegment {
+            start: pos,
+            end: pos,
+        });
+        self
+    }
+
+    fn last_pos(&self) -> Vec2 {
+        self.current_path
+            .last()
+            .expect("no segments in path; call move_to first")
+            .end
+    }
+
+    pub fn line_to(&mut self, pos: Vec2) -> &mut Self {
+        let last = self.last_pos();
+        self.current_path.push(LineSegment {
+            start: last,
+            end: pos,
+        });
+        self
+    }
+
+    /// Appends a rectangle to the current path.
+    pub fn rect(&mut self, pos: Vec2, size: Vec2) -> &mut Self {
+        self.move_to(pos)
+            .line_to(pos + vec2(size.x, 0.0))
+            .line_to(pos + size)
+            .line_to(pos + vec2(0.0, size.y))
+            .line_to(pos)
+    }
+
+    pub fn stroke_width(&mut self, width: f32) -> &mut Self {
+        self.stroke_width = width;
+        self
+    }
+
+    pub fn stroke(&mut self) -> &mut Self {
+        let shape = Shape::Stroke {
+            segments: mem::take(&mut self.current_path),
+            width: self.stroke_width,
+        };
+        self.batch.draw_node(Node {
+            shape: &shape,
+            paint_type: self.current_paint,
+        });
+        // Re-use segments for further draws
+        self.current_path = match shape {
+            Shape::Stroke { segments, .. } => segments,
+            _ => unreachable!(),
+        };
+        self
+    }
+
     pub fn fill_rect(&mut self, pos: Vec2, size: Vec2) -> &mut Self {
         self.batch.draw_node(Node {
-            shape: Shape::Rect(Rect { pos, size }),
+            shape: &Shape::Rect(Rect { pos, size }),
             paint_type: self.current_paint,
         });
         self
@@ -91,7 +151,7 @@ impl Canvas {
 
     pub fn fill_circle(&mut self, center: Vec2, radius: f32) -> &mut Self {
         self.batch.draw_node(Node {
-            shape: Shape::Circle { center, radius },
+            shape: &Shape::Circle { center, radius },
             paint_type: self.current_paint,
         });
         self
@@ -144,7 +204,7 @@ impl Canvas {
                 origin: pos.as_u32(),
                 color,
             },
-            shape: Shape::Rect(Rect {
+            shape: &Shape::Rect(Rect {
                 pos,
                 size: uvec2(placement.width, placement.height).as_f32(),
             }),
@@ -297,15 +357,6 @@ impl Canvas {
                 .segments
                 .push(PathSegment::Arc(center, radius, start_angle, end_angle));
             self
-        }
-
-        /// Appends a rectangle to the current path.
-        pub fn rect(&mut self, pos: Vec2, size: Vec2) -> &mut Self {
-            self.move_to(pos)
-                .line_to(pos + vec2(size.x, 0.0))
-                .line_to(pos + size)
-                .line_to(pos + vec2(0.0, size.y))
-                .line_to(pos)
         }
 
         /// Appends a rounded rectangle to the current path.

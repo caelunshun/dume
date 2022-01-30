@@ -5,7 +5,7 @@ use instant::Instant;
 use dume::{Canvas, Context, TextBlob};
 use dume_winit::{block_on, Application, DumeWinit};
 use glam::{vec2, Vec2};
-use winit::{event_loop::EventLoop, window::WindowBuilder};
+use winit::{dpi::LogicalSize, event_loop::EventLoop, window::WindowBuilder};
 
 struct App {
     text: TextBlob,
@@ -62,6 +62,13 @@ impl Application for App {
                 (255, 255, 255, 255),
             )
             .fill_rect(Vec2::ZERO, size);
+        canvas
+            .begin_path()
+            .move_to(vec2(1000., 0.))
+            .line_to(vec2(1400., 1080.))
+            .solid_color((0, 0, 0, u8::MAX))
+            .stroke_width(10.)
+            .stroke();
 
         canvas
             .context()
@@ -73,12 +80,17 @@ impl Application for App {
         let pos = Vec2::splat((time.sin() + 1.) / 2. * 500.);
         canvas
             .radial_gradient(
-                pos,
+                pos + 100.,
                 100.,
                 (227, 101, 105, u8::MAX),
                 (151, 146, 216, 50),
             )
-            .fill_circle(pos, 100.);
+            .fill_rect(pos, Vec2::splat(200.))
+            .solid_color((0, 0, 0, u8::MAX))
+            .begin_path()
+            .rect(pos, Vec2::splat(200.))
+            .stroke_width(5.)
+            .stroke();
     }
 }
 
@@ -86,6 +98,7 @@ fn main() {
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .with_title("Dume Text Example")
+        .with_inner_size(LogicalSize::new(1920, 1080))
         .build(&event_loop)
         .unwrap();
 

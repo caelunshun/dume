@@ -1,7 +1,7 @@
 use std::{mem::size_of, num::NonZeroU64};
 
 use bytemuck::{Pod, Zeroable};
-use glam::{vec2, UVec2, Vec2};
+use glam::{uvec2, vec2, UVec2, Vec2};
 use palette::Srgba;
 use wgpu::util::DeviceExt;
 
@@ -14,6 +14,7 @@ const TILE_SIZE: u32 = 16;
 
 const SHAPE_RECT: i32 = 0;
 const SHAPE_CIRCLE: i32 = 1;
+const SHAPE_STROKE: i32 = 2;
 
 const PAINT_TYPE_SOLID: i32 = 0;
 const PAINT_TYPE_LINEAR_GRADIENT: i32 = 1;
@@ -43,15 +44,20 @@ impl Renderer {
 
             nodes: Vec::new(),
             node_bounding_boxes: Vec::new(),
+            points: Vec::new(),
         }
     }
 
     pub fn prepare_render(
         &self,
-        batch: Batch,
+        mut batch: Batch,
         context: &Context,
         target_texture: &wgpu::TextureView,
     ) -> PreparedRender {
+        if batch.points.is_empty() {
+            batch.points.push(0);
+        }
+
         let device = context.device();
 
         let glyphs = context.glyph_cache();
@@ -84,6 +90,11 @@ impl Renderer {
             size: batch.tile_counters_buffer_size(),
             usage: wgpu::BufferUsages::STORAGE,
             mapped_at_creation: false,
+        });
+        let points = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(&batch.points),
+            usage: wgpu::BufferUsages::STORAGE,
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -141,6 +152,14 @@ impl Renderer {
                 wgpu::BindGroupEntry {
                     binding: 7,
                     resource: wgpu::BindingResource::TextureView(glyph_atlas),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 8,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &points,
+                        offset: 0,
+                        size: None,
+                    }),
                 },
             ],
         });
@@ -315,6 +334,16 @@ impl Pipelines {
                         sample_type: wgpu::TextureSampleType::Float { filterable: false },
                         view_dimension: wgpu::TextureViewDimension::D2,
                         multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 8,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
                     },
                     count: None,
                 },
@@ -494,26 +523,56 @@ pub enum PaintType {
     },
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub enum Shape {
     Rect(Rect),
-    Circle { center: Vec2, radius: f32 },
+    Circle {
+        center: Vec2,
+        radius: f32,
+    },
+    Stroke {
+        segments: Vec<LineSegment>,
+        width: f32,
+    },
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct LineSegment {
+    pub start: Vec2,
+    pub end: Vec2,
 }
 
 #[derive(Debug)]
-pub struct Node {
-    pub shape: Shape,
+pub struct Node<'a> {
+    pub shape: &'a Shape,
     pub paint_type: PaintType,
 }
 
-impl Node {
+impl Node<'_> {
     fn bounding_box(&self) -> Rect {
         match self.shape {
-            Shape::Rect(rect) => rect,
+            Shape::Rect(rect) => *rect,
             Shape::Circle { center, radius } => Rect {
-                pos: center - Vec2::splat(radius),
-                size: Vec2::splat(radius * 2.),
+                pos: *center - Vec2::splat(*radius),
+                size: Vec2::splat(*radius * 2.),
             },
+            Shape::Stroke { segments, width } => {
+                let mut min_x = 1e9f32;
+                let mut min_y = 1e9f32;
+                let mut max_x = -1e9f32;
+                let mut max_y = -129f32;
+                for segment in segments {
+                    min_x = min_x.min(segment.start.x).min(segment.end.x);
+                    min_y = min_y.min(segment.start.y).min(segment.end.y);
+                    max_x = max_x.max(segment.start.x).max(segment.end.x);
+                    max_y = max_y.max(segment.start.y).max(segment.end.y);
+                }
+                let pos = vec2(min_x, min_y);
+                Rect {
+                    pos: pos - *width,
+                    size: vec2(max_x, max_y) - pos + *width * 2.,
+                }
+            }
         }
     }
 }
@@ -544,6 +603,7 @@ struct PackedBoundingBox {
 pub struct Batch {
     nodes: Vec<PackedNode>,
     node_bounding_boxes: Vec<PackedBoundingBox>,
+    points: Vec<u32>,
 
     physical_size: UVec2,
     logical_size: Vec2,
@@ -556,7 +616,8 @@ impl Batch {
         if !self.will_draw(bbox) {
             return;
         }
-        self.nodes.push(self.pack_node(node));
+        let node = self.pack_node(node);
+        self.nodes.push(node);
         self.node_bounding_boxes.push(self.pack_bounding_box(bbox));
     }
 
@@ -626,7 +687,7 @@ impl Batch {
             | ((color.alpha as u32) << 24)
     }
 
-    fn pack_node(&self, node: Node) -> PackedNode {
+    fn pack_node(&mut self, node: Node) -> PackedNode {
         let mut packed = PackedNode::default();
 
         match node.shape {
@@ -637,8 +698,20 @@ impl Batch {
             }
             Shape::Circle { center, radius } => {
                 packed.shape = SHAPE_CIRCLE;
-                packed.pos_a = self.pack_pos(center);
-                packed.pos_b = self.pack_pos(vec2(radius, 0.));
+                packed.pos_a = self.pack_pos(*center);
+                packed.pos_b = self.pack_pos(vec2(*radius, 0.));
+            }
+            Shape::Stroke { segments, width } => {
+                packed.shape = SHAPE_STROKE;
+
+                let base_index = self.points.len() as u32;
+                for segment in segments {
+                    self.points.push(self.pack_pos(segment.start));
+                    self.points.push(self.pack_pos(segment.end));
+                }
+
+                packed.pos_a = self.pack_upos(uvec2(base_index, segments.len() as u32));
+                packed.pos_b = self.pack_pos(vec2(*width, 0.));
             }
         }
 
@@ -671,7 +744,11 @@ impl Batch {
                 packed.gradient_point_a = self.pack_pos(center);
                 packed.gradient_point_b = self.pack_pos(vec2(radius, 0.));
             }
-            PaintType::Glyph { offset_in_atlas, origin, color } => {
+            PaintType::Glyph {
+                offset_in_atlas,
+                origin,
+                color,
+            } => {
                 packed.paint_type = PAINT_TYPE_GLYPH;
                 packed.color_a = self.pack_color(color);
                 packed.gradient_point_a = self.pack_upos(offset_in_atlas);

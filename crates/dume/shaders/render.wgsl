@@ -61,6 +61,11 @@ struct TileNodeCounters {
     counters: array<atomic<u32>>;
 };
 
+// Stores points used for filling and stroking paths.
+struct Points {
+    list: array<u32>;
+};
+
 [[group(0), binding(0)]] var<uniform> globals: Globals;
 [[group(0), binding(1)]] var<storage, read> nodes: Nodes;
 [[group(0), binding(2)]] var<storage, read> node_bounding_boxes: NodeBoundingBoxes;
@@ -70,6 +75,8 @@ struct TileNodeCounters {
 
 [[group(0), binding(6)]] var samp_linear: sampler;
 [[group(0), binding(7)]] var glyph_atlas: texture_2d<f32>;
+
+[[group(0), binding(8)]] var<storage, read> points: Points;
 
 fn unpack_pos(pos: u32) -> vec2<f32> {
     return unpack2x16unorm(pos) * globals.target_size * 2.0 * globals.scale_factor - globals.target_size / 2.0;
@@ -204,6 +211,7 @@ fn sort_kernel([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
 
 let SHAPE_RECT: i32 = 0;
 let SHAPE_CIRCLE: i32 = 1;
+let SHAPE_STROKE: i32 = 2;
 
 let PAINT_TYPE_SOLID: i32 = 0;
 let PAINT_TYPE_LINEAR_GRADIENT: i32 = 1;
@@ -280,34 +288,84 @@ fn node_color(node: Node, pixel_pos: vec2<f32>) -> vec4<f32> {
     }
 }
 
-fn node_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
+fn rect_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
     let pixel_min = pixel_pos;
     let pixel_max = pixel_min + 1.0;
     let pixel_mid = pixel_min + 0.5;
-    if (node.shape == SHAPE_RECT) {
-        let size = unpack_pos(node.pos_b);
-        let rect_min = unpack_pos(node.pos_a);
-        let rect_max = rect_min + size;
-        // Compute intersection area
-        // between the pixel and the rectangle.
-        if (rect_max.x < pixel_min.x || rect_max.y < pixel_min.y 
-            || rect_min.x > pixel_max.x || rect_min.y > pixel_max.y) {
-            return 0.0;
+    let size = unpack_pos(node.pos_b);
+    let rect_min = unpack_pos(node.pos_a);
+    let rect_max = rect_min + size;
+    // Compute intersection area
+    // between the pixel and the rectangle.
+    if (rect_max.x < pixel_min.x || rect_max.y < pixel_min.y 
+        || rect_min.x > pixel_max.x || rect_min.y > pixel_max.y) {
+        return 0.0;
+    }
+
+    let length_x = min(rect_max.x, pixel_max.x) - max(rect_min.x, pixel_min.x);
+    let length_y = min(rect_max.y, pixel_max.y) - max(rect_min.y, pixel_min.y);
+    let area = length_x * length_y;
+    return clamp(area, 0.0, 1.0);
+}
+
+fn circle_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
+    let pixel_mid = pixel_pos + 0.5;
+    let center = unpack_pos(node.pos_a);
+    let radius = unpack_pos(node.pos_b).x;
+
+    let distance = length(pixel_mid - center);
+    // Not the exact coverage, but close enough to look fine.
+    let alpha = clamp(radius - distance, 0.0, 1.0);
+    return alpha;
+}
+
+fn distance_to_line(a: vec2<f32>, b: vec2<f32>, pos: vec2<f32>) -> f32 {
+    let l = distance(a, b);
+    if (l == 0.0) {
+        return distance(a, pos);
+    }
+    let t = max(0.0, min(1.0, dot(pos - a, b - a) / (l * l)));
+    let projection = a + t * (b - a);
+    return distance(pos, projection);
+}
+
+fn stroke_coverage(node: Node, pos: vec2<f32>) -> f32 {
+    let params = unpack_upos(node.pos_a);
+    let segments_base = i32(params.x);
+    let num_segments = i32(params.y);
+
+    let params2 = unpack_pos(node.pos_b);
+    let stroke_width = params2.x;
+
+    // Compute the distance to the closest segment.
+    var min_distance = 1e9;
+    var index = segments_base;
+    loop {
+        if (index - segments_base >= num_segments * 2) {
+            break;
         }
 
-        let length_x = min(rect_max.x, pixel_max.x) - max(rect_min.x, pixel_min.x);
-        let length_y = min(rect_max.y, pixel_max.y) - max(rect_min.y, pixel_min.y);
-        let area = length_x * length_y;
-        return clamp(area, 0.0, 1.0);
-    } else if (node.shape == SHAPE_CIRCLE) {
-        let center = unpack_pos(node.pos_a);
-        let radius = unpack_pos(node.pos_b).x;
+        let point_a = unpack_pos(points.list[index]);
+        let point_b = unpack_pos(points.list[index + 1]);
+        let dist = distance_to_line(point_a, point_b, pos + 0.5);
+        min_distance = min(dist, min_distance);
 
-        let distance = length(pixel_mid - center);
-        // Not the exact coverage, but close enough to look fine.
-        let alpha = clamp(radius - distance, 0.0, 1.0);
-        return alpha;
+        index = index + 2;
+    }
+
+    let alpha = clamp(stroke_width - min_distance, 0.0, 1.0);
+    return alpha;
+}
+
+fn node_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
+    if (node.shape == SHAPE_RECT) {
+        return rect_coverage(node, pixel_pos);
+    } else if (node.shape == SHAPE_CIRCLE) {
+        return circle_coverage(node, pixel_pos);
+    } else if (node.shape == SHAPE_STROKE) {
+        return stroke_coverage(node, pixel_pos);
     } else {
+        // Should never happen
         return 1.0;
     }
 }
