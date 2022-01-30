@@ -233,10 +233,52 @@ fn linear_to_srgb(linear: vec3<f32>) -> vec3<f32> {
     return mix(higher, lower, vec3<f32>(cutoff));
 }
 
+fn linear_to_oklab(linear: vec3<f32>) -> vec3<f32> {
+    let l = pow(0.4122214708 * linear.r + 0.5363325363 * linear.g + 0.0514459929 * linear.b, 0.33);
+    let m = pow(0.2119034982 * linear.r + 0.6806995451 * linear.g + 0.1073969566 * linear.b, 0.33);
+    let s = pow(0.0883024619 * linear.r + 0.2817188376 * linear.g + 0.6299787005 * linear.b, 0.33);
+    return vec3<f32>(l * 0.2104542553 + m * 0.7936177850 + s * -0.0040720468,
+        l * 1.9779984951 + m * -2.4285922050 + s * 0.4505937099,
+        l * 0.0259040371 + m * 0.7827717662 + s * -0.8086757660);
+}
+
+fn oklab_to_linear(oklab: vec3<f32>) -> vec3<f32> {
+    var l = oklab.x + oklab.y * 0.3963377774 + oklab.z * 0.2158037573;
+    var m = oklab.x + oklab.y * -0.1055613458 + oklab.z * -0.0638541728;
+    var s = oklab.x + oklab.y * -0.0894841775 + oklab.z * -1.2914855480;
+    l = l * l * l; m = m * m * m; s = s * s * s;
+    var r = l * 4.0767416621 + m * -3.3077115913 + s * 0.2309699292;
+    var g = l * -1.2684380046 + m * 2.6097574011 + s * -0.3413193965;
+    var b = l * -0.0041960863 + m * -0.7034186147 + s * 1.7076147010;
+    return vec3<f32>(r, g, b);
+}
+
+fn oklab_to_lch(oklab: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(oklab.x, length(oklab.yz), atan2(oklab.z, oklab.y));
+}
+
+fn lch_to_oklab(lch: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(lch.x, lch.y * cos(lch.z), lch.y * sin(lch.z));
+}
+
 fn unpack_color(color: u32) -> vec4<f32> {
     let color = unpack4x8unorm(color);
     let srgb = srgb_to_linear(color.rgb);
     return vec4<f32>(srgb, color.a);
+}
+
+// Interpolates between two colors.
+//
+// The colors should be in linear RGB. Internally,
+// this function uses the Oklab color space to generate
+// smoother gradients.
+fn interpolate_colors(color_a: vec4<f32>, color_b: vec4<f32>, t: f32) -> vec4<f32> {
+    let ca = linear_to_oklab(color_a.rgb);
+    let cb = linear_to_oklab(color_b.rgb);
+
+    var result = ca * (1.0 - t) + cb * t;
+    result = oklab_to_linear(result);
+    return vec4<f32>(result, color_a.a * (1.0 - t) + color_b.a * t);
 }
 
 fn linear_gradient(pos: vec2<f32>, point_a: vec2<f32>, point_b: vec2<f32>, color_a: vec4<f32>, color_b: vec4<f32>) -> vec4<f32> {
@@ -249,13 +291,13 @@ fn linear_gradient(pos: vec2<f32>, point_a: vec2<f32>, point_b: vec2<f32>, color
     var t: f32 = ap_ab / ab2;
     t = clamp(t, 0.0, 1.0);
 
-    return color_a * (1.0 - t) + color_b * t;
+    return interpolate_colors(color_a, color_b, t);
 }
 
 fn radial_gradient(pos: vec2<f32>, center: vec2<f32>, radius: f32, color_a: vec4<f32>, color_b: vec4<f32>) -> vec4<f32> {
     let t = distance(center, pos) / radius;
     let t = clamp(t, 0.0, 1.0);
-    return color_a * (1.0 - t) + color_b * t;
+    return interpolate_colors(color_a, color_b, t);
 }
 
 fn node_color(node: Node, pixel_pos: vec2<f32>) -> vec4<f32> {
