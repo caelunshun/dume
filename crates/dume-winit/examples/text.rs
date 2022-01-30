@@ -50,13 +50,16 @@ impl App {
 
 impl Application for App {
     fn draw(&mut self, canvas: &mut Canvas) {
+        let time = self.start_time.elapsed().as_secs_f32();
         let size = canvas.size();
+
+        // Background
         canvas
             .linear_gradient(
                 Vec2::ZERO,
                 vec2(size.x, 0.),
-                (255, 255, 255, 255),
                 (255, 200, 30, 255),
+                (255, 255, 255, 255),
             )
             .fill_rect(Vec2::ZERO, size);
 
@@ -64,23 +67,8 @@ impl Application for App {
             .context()
             .resize_text_blob(&mut self.text, canvas.size());
 
-        /*
         canvas.draw_text(&self.text, vec2(10., 50.), 1.);
         canvas.draw_text(&self.text2, vec2(10., 200.), 1.);
-        */
-
-        let elapsed = self.start_time.elapsed().as_secs();
-        let counter_text = canvas.context().create_text_blob(
-            dume::text!("@size[12][{} seconds]", elapsed),
-            Default::default(),
-        );
-        let time = self.start_time.elapsed().as_secs_f32();
-        let offset = (time.sin() / 2. + 1.) / 2. * 100.;
-        /*
-        canvas.translate(Vec2::splat(offset));
-        canvas.draw_text(&counter_text, vec2(10., 500.), 1.);
-        canvas.reset_transform();
-        */
 
         let pos = Vec2::splat((time.sin() + 1.) / 2. * 500.);
         canvas
@@ -88,7 +76,7 @@ impl Application for App {
                 pos,
                 100.,
                 (227, 101, 105, u8::MAX),
-                (151, 146, 216, u8::MAX),
+                (151, 146, 216, 50),
             )
             .fill_circle(pos, 100.);
     }

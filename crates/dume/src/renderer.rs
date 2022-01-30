@@ -487,6 +487,11 @@ pub enum PaintType {
         color_center: Srgba<u8>,
         color_outer: Srgba<u8>,
     },
+    Glyph {
+        offset_in_atlas: UVec2,
+        origin: UVec2,
+        color: Srgba<u8>,
+    },
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -610,6 +615,10 @@ impl Batch {
         x as u32 | ((y as u32) << 16)
     }
 
+    fn pack_upos(&self, pos: UVec2) -> u32 {
+        pos.x | (pos.y << 16)
+    }
+
     fn pack_color(&self, color: Srgba<u8>) -> u32 {
         color.red as u32
             | ((color.green as u32) << 8)
@@ -661,6 +670,12 @@ impl Batch {
                 packed.color_b = self.pack_color(color_outer);
                 packed.gradient_point_a = self.pack_pos(center);
                 packed.gradient_point_b = self.pack_pos(vec2(radius, 0.));
+            }
+            PaintType::Glyph { offset_in_atlas, origin, color } => {
+                packed.paint_type = PAINT_TYPE_GLYPH;
+                packed.color_a = self.pack_color(color);
+                packed.gradient_point_a = self.pack_upos(offset_in_atlas);
+                packed.gradient_point_b = self.pack_upos(origin);
             }
         }
 

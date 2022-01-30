@@ -1,13 +1,16 @@
 use std::{f32::consts::TAU, iter, mem};
 
-use glam::{vec2, vec4, Affine2, Mat4, UVec2, Vec2, Vec4};
+use glam::{uvec2, vec2, vec4, Affine2, Mat4, UVec2, Vec2, Vec4};
 use palette::Srgba;
+use parking_lot::MutexGuard;
+use swash::GlyphId;
 
 use crate::{
+    glyph::{Glyph, GlyphCache},
     path::{Path, PathSegment, TesselateKind},
     renderer::{Batch, Node, PaintType, Renderer, Shape},
     text::layout::GlyphCharacter,
-    Context, Rect, SpriteRotate, TextBlob, TextureId, YuvTexture, INTERMEDIATE_FORMAT,
+    Context, FontId, Rect, SpriteRotate, TextBlob, TextureId, YuvTexture, INTERMEDIATE_FORMAT,
 };
 
 /// A 2D canvas using `wgpu`. Modeled after the HTML5 canvas
@@ -94,6 +97,60 @@ impl Canvas {
         self
     }
 
+    /// Draws a blob of text.
+    ///
+    /// `pos` is the position of the top-left corner of the text.
+    ///
+    /// `alpha` is a multiplier applied to the alpha of each text section.
+    pub fn draw_text(&mut self, text: &TextBlob, pos: Vec2, alpha: f32) -> &mut Self {
+        for glyph in text.glyphs() {
+            // Apply alpha multiplier
+            let mut color = glyph.color;
+            color.alpha = (color.alpha as f32 * alpha) as u8;
+
+            match &glyph.c {
+                GlyphCharacter::Glyph(glyph_id, size, _) => {
+                    self.draw_glyph(*glyph_id, glyph.font, *size, color, pos + glyph.pos);
+                }
+                GlyphCharacter::LineBreak => {}
+                GlyphCharacter::Icon(_, _) => todo!(),
+            }
+        }
+        self
+    }
+
+    fn draw_glyph(
+        &mut self,
+        glyph_id: GlyphId,
+        font: FontId,
+        size: f32,
+        color: Srgba<u8>,
+        pos: Vec2,
+    ) {
+        let mut glyphs = self.context.glyph_cache();
+        let glyph = glyphs.glyph_or_rasterize(&self.context, font, glyph_id, size, pos);
+
+        let (key, placement) = match glyph {
+            Glyph::Empty => return,
+            Glyph::InAtlas(k, p) => (k, p),
+        };
+        let pos = (pos + vec2(placement.left as f32, -placement.top as f32)).floor();
+
+        let entry = glyphs.atlas().get(key);
+
+        self.batch.draw_node(Node {
+            paint_type: PaintType::Glyph {
+                offset_in_atlas: entry.pos,
+                origin: pos.as_u32(),
+                color,
+            },
+            shape: Shape::Rect(Rect {
+                pos,
+                size: uvec2(placement.width, placement.height).as_f32(),
+            }),
+        });
+    }
+
     /*
         /// Draws a texture / sprite on the canvas.
         ///
@@ -125,39 +182,6 @@ impl Canvas {
                 width,
                 rotation,
             );
-            self
-        }
-
-        /// Draws a blob of text.
-        ///
-        /// `pos` is the position of the top-left corner of the text.
-        ///
-        /// `alpha` is a multiplier applied to the alpha of each text section.
-        pub fn draw_text(&mut self, text: &TextBlob, pos: Vec2, alpha: f32) -> &mut Self {
-            for glyph in text.glyphs() {
-                let color = glyph.color.into_format::<f32, f32>().into_linear();
-                match &glyph.c {
-                    GlyphCharacter::Glyph(glyph_id, size, _) => {
-                        self.renderer.draw_glyph(
-                            &self.context,
-                            self.current_transform,
-                            self.scale_factor,
-                            *glyph_id,
-                            pos + glyph.pos + glyph.offset,
-                            *size,
-                            glyph.font,
-                            vec4(color.red, color.green, color.blue, color.alpha * alpha),
-                        );
-                    }
-                    GlyphCharacter::LineBreak => {}
-                    GlyphCharacter::Icon(texture_id, size) => {
-                        let dims = self.context.texture_dimensions(*texture_id);
-                        let aspect_ratio = dims.y as f32 / dims.x as f32;
-                        let height = aspect_ratio * *size;
-                        self.draw_sprite(*texture_id, glyph.pos - vec2(0., height), *size);
-                    }
-                }
-            }
             self
         }
 

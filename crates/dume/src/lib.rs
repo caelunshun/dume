@@ -17,6 +17,8 @@ mod text;
 mod texture;
 pub mod yuv;
 
+// NB: the data stored in these textures is sRGB, but we handle
+// the sRGB conversions ourselves.
 const INTERMEDIATE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 

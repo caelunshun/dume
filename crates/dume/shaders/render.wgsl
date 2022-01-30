@@ -141,6 +141,12 @@ fn tile_kernel(
         let tile_index = tile_index(vec2<u32>(x, y));
         let ip = &tile_counters.counters[x + y * globals.tile_count.x];
         let i = atomicAdd(ip, u32(1));
+        if (i >= u32(64)) {
+            // The tile's buffer is full. For now, we'll
+            // just skip the excess nodes - in the future we might
+            // want some sort of overflow mechanism.
+            continue;
+        }
         tiles.tile_nodes[tile_index + i] = node_index;
 
         x = x + u32(1);
