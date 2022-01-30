@@ -526,14 +526,8 @@ pub enum PaintType {
 #[derive(Clone, Debug)]
 pub enum Shape {
     Rect(Rect),
-    Circle {
-        center: Vec2,
-        radius: f32,
-    },
-    Stroke {
-        segments: Vec<LineSegment>,
-        width: f32,
-    },
+    Circle { center: Vec2, radius: f32 },
+    Stroke { segment: LineSegment, width: f32 },
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -556,21 +550,12 @@ impl Node<'_> {
                 pos: *center - Vec2::splat(*radius),
                 size: Vec2::splat(*radius * 2.),
             },
-            Shape::Stroke { segments, width } => {
-                let mut min_x = 1e9f32;
-                let mut min_y = 1e9f32;
-                let mut max_x = -1e9f32;
-                let mut max_y = -129f32;
-                for segment in segments {
-                    min_x = min_x.min(segment.start.x).min(segment.end.x);
-                    min_y = min_y.min(segment.start.y).min(segment.end.y);
-                    max_x = max_x.max(segment.start.x).max(segment.end.x);
-                    max_y = max_y.max(segment.start.y).max(segment.end.y);
-                }
-                let pos = vec2(min_x, min_y);
+            Shape::Stroke { segment, width } => {
+                let min = segment.start.min(segment.end);
+                let max = segment.start.max(segment.end);
                 Rect {
-                    pos: pos - *width,
-                    size: vec2(max_x, max_y) - pos + *width * 2.,
+                    pos: min - *width,
+                    size: (max - min) + 2. * *width,
                 }
             }
         }
@@ -701,16 +686,14 @@ impl Batch {
                 packed.pos_a = self.pack_pos(*center);
                 packed.pos_b = self.pack_pos(vec2(*radius, 0.));
             }
-            Shape::Stroke { segments, width } => {
+            Shape::Stroke { segment, width } => {
                 packed.shape = SHAPE_STROKE;
 
                 let base_index = self.points.len() as u32;
-                for segment in segments {
-                    self.points.push(self.pack_pos(segment.start));
-                    self.points.push(self.pack_pos(segment.end));
-                }
+                self.points.push(self.pack_pos(segment.start));
+                self.points.push(self.pack_pos(segment.end));
 
-                packed.pos_a = self.pack_upos(uvec2(base_index, segments.len() as u32));
+                packed.pos_a = self.pack_upos(uvec2(base_index, 0));
                 packed.pos_b = self.pack_pos(vec2(*width, 0.));
             }
         }

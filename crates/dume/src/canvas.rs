@@ -125,19 +125,15 @@ impl Canvas {
     }
 
     pub fn stroke(&mut self) -> &mut Self {
-        let shape = Shape::Stroke {
-            segments: mem::take(&mut self.current_path),
-            width: self.stroke_width,
-        };
-        self.batch.draw_node(Node {
-            shape: &shape,
-            paint_type: self.current_paint,
-        });
-        // Re-use segments for further draws
-        self.current_path = match shape {
-            Shape::Stroke { segments, .. } => segments,
-            _ => unreachable!(),
-        };
+        for &segment in &self.current_path {
+            self.batch.draw_node(Node {
+                shape: &Shape::Stroke {
+                    segment,
+                    width: self.stroke_width,
+                },
+                paint_type: self.current_paint,
+            });
+        }
         self
     }
 

@@ -59,7 +59,7 @@ impl Application for App {
                 Vec2::ZERO,
                 vec2(size.x, 0.),
                 (255, 200, 30, 255),
-                (255, 255, 255, 255),
+                (11, 212, 226, 255),
             )
             .fill_rect(Vec2::ZERO, size);
         canvas

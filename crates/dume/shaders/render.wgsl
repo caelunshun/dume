@@ -372,30 +372,16 @@ fn distance_to_line(a: vec2<f32>, b: vec2<f32>, pos: vec2<f32>) -> f32 {
 }
 
 fn stroke_coverage(node: Node, pos: vec2<f32>) -> f32 {
-    let params = unpack_upos(node.pos_a);
-    let segments_base = i32(params.x);
-    let num_segments = i32(params.y);
+    let index = unpack_upos(node.pos_a).x;
+    let point_a = unpack_pos(points.list[index]);
+    let point_b = unpack_pos(points.list[index + u32(1)]);
 
     let params2 = unpack_pos(node.pos_b);
     let stroke_width = params2.x;
 
-    // Compute the distance to the closest segment.
-    var min_distance = 1e9;
-    var index = segments_base;
-    loop {
-        if (index - segments_base >= num_segments * 2) {
-            break;
-        }
+    let distance = distance_to_line(point_a, point_b, pos);
 
-        let point_a = unpack_pos(points.list[index]);
-        let point_b = unpack_pos(points.list[index + 1]);
-        let dist = distance_to_line(point_a, point_b, pos + 0.5);
-        min_distance = min(dist, min_distance);
-
-        index = index + 2;
-    }
-
-    let alpha = clamp(stroke_width - min_distance, 0.0, 1.0);
+    let alpha = clamp(stroke_width - distance, 0.0, 1.0);
     return alpha;
 }
 
