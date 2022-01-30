@@ -218,6 +218,9 @@ let PAINT_TYPE_LINEAR_GRADIENT: i32 = 1;
 let PAINT_TYPE_RADIAL_GRADIENT: i32 = 2;
 let PAINT_TYPE_GLYPH: i32 = 3;
 
+let STROKE_CAP_ROUND: i32 = 0;
+let STROKE_CAP_SQUARE: i32 = 1;
+
 fn srgb_to_linear(srgb: vec3<f32>) -> vec3<f32> {
     let cutoff = srgb < vec3<f32>(0.04045);
     let higher = pow((srgb + vec3<f32>(0.055)) / vec3<f32>(1.055), vec3<f32>(2.4));
@@ -361,13 +364,27 @@ fn circle_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
     return alpha;
 }
 
-fn distance_to_line(a: vec2<f32>, b: vec2<f32>, pos: vec2<f32>) -> f32 {
+fn projection_on_line(a: vec2<f32>, b: vec2<f32>, pos: vec2<f32>) -> f32 {
     let l = distance(a, b);
     if (l == 0.0) {
-        return distance(a, pos);
+        return 0.0;
+    }
+    let t = dot(pos - a, b - a) / (l * l);
+    return t;
+}
+
+fn projection_on_line_segment(a: vec2<f32>, b: vec2<f32>, pos: vec2<f32>) -> vec2<f32> {
+    let l = distance(a, b);
+    if (l == 0.0) {
+        return a;
     }
     let t = max(0.0, min(1.0, dot(pos - a, b - a) / (l * l)));
     let projection = a + t * (b - a);
+    return projection;
+}
+
+fn distance_to_line_segment(a: vec2<f32>, b: vec2<f32>, pos: vec2<f32>) -> f32 {
+    let projection = projection_on_line_segment(a, b, pos);
     return distance(pos, projection);
 }
 
@@ -378,10 +395,32 @@ fn stroke_coverage(node: Node, pos: vec2<f32>) -> f32 {
 
     let params2 = unpack_pos(node.pos_b);
     let stroke_width = params2.x;
+    let stroke_cap = i32(round(params2.y));
 
-    let distance = distance_to_line(point_a, point_b, pos);
+    var dist = 0.0;
+    if (stroke_cap == STROKE_CAP_ROUND) {
+        dist = distance_to_line_segment(point_a, point_b, pos);
+    } else if (stroke_cap == STROKE_CAP_SQUARE) {
+        let d = distance(point_a, point_b);
+        if (d == 0.0) {
+            dist = distance(point_a, pos);
+        } else {
+            let t = projection_on_line(point_a, point_b, pos);
+            let max_t = stroke_width / d;
+            let projection = point_a + t * (point_b - point_a);
 
-    let alpha = clamp(stroke_width - distance, 0.0, 1.0);
+            var end_factor = 0.0;
+            if (t > 1.0) {
+                end_factor = (t - 1.0) * d;
+            } else if (t < 0.0) {
+                end_factor = -t * d;
+            }
+
+            dist = max(distance(pos, projection), end_factor);
+        }
+    }
+
+    let alpha = clamp(stroke_width - dist, 0.0, 1.0);
     return alpha;
 }
 

@@ -21,6 +21,12 @@ const PAINT_TYPE_LINEAR_GRADIENT: i32 = 1;
 const PAINT_TYPE_RADIAL_GRADIENT: i32 = 2;
 const PAINT_TYPE_GLYPH: i32 = 3;
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum StrokeCap {
+    Round = 0,
+    Square = 1,
+}
+
 /// Drives the GPU renderer.
 ///
 /// One `Renderer` exists per `Context`.
@@ -526,8 +532,15 @@ pub enum PaintType {
 #[derive(Clone, Debug)]
 pub enum Shape {
     Rect(Rect),
-    Circle { center: Vec2, radius: f32 },
-    Stroke { segment: LineSegment, width: f32 },
+    Circle {
+        center: Vec2,
+        radius: f32,
+    },
+    Stroke {
+        segment: LineSegment,
+        width: f32,
+        cap: StrokeCap,
+    },
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -550,7 +563,7 @@ impl Node<'_> {
                 pos: *center - Vec2::splat(*radius),
                 size: Vec2::splat(*radius * 2.),
             },
-            Shape::Stroke { segment, width } => {
+            Shape::Stroke { segment, width, .. } => {
                 let min = segment.start.min(segment.end);
                 let max = segment.start.max(segment.end);
                 Rect {
@@ -686,7 +699,11 @@ impl Batch {
                 packed.pos_a = self.pack_pos(*center);
                 packed.pos_b = self.pack_pos(vec2(*radius, 0.));
             }
-            Shape::Stroke { segment, width } => {
+            Shape::Stroke {
+                segment,
+                width,
+                cap,
+            } => {
                 packed.shape = SHAPE_STROKE;
 
                 let base_index = self.points.len() as u32;
@@ -694,7 +711,7 @@ impl Batch {
                 self.points.push(self.pack_pos(segment.end));
 
                 packed.pos_a = self.pack_upos(uvec2(base_index, 0));
-                packed.pos_b = self.pack_pos(vec2(*width, 0.));
+                packed.pos_b = self.pack_pos(vec2(*width, (*cap as u32) as f32));
             }
         }
 

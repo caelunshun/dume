@@ -26,6 +26,7 @@ pub use canvas::Canvas;
 pub use context::Context;
 pub use font::{FontId, Style, Weight};
 pub use rect::Rect;
+pub use renderer::StrokeCap;
 use smartstring::LazyCompact;
 pub use text::{
     layout::{Align, Baseline, TextBlob, TextOptions},

@@ -6,7 +6,7 @@ use swash::GlyphId;
 
 use crate::{
     glyph::Glyph,
-    renderer::{Batch, LineSegment, Node, PaintType, Shape},
+    renderer::{Batch, LineSegment, Node, PaintType, Shape, StrokeCap},
     text::layout::GlyphCharacter,
     Context, FontId, Rect, TextBlob, INTERMEDIATE_FORMAT,
 };
@@ -20,6 +20,7 @@ pub struct Canvas {
     current_paint: PaintType,
     current_path: Vec<LineSegment>,
     stroke_width: f32,
+    stroke_cap: StrokeCap,
 }
 
 /// Painting
@@ -34,6 +35,7 @@ impl Canvas {
             current_paint: PaintType::Solid(Srgba::default()),
             current_path: Vec::new(),
             stroke_width: 1.,
+            stroke_cap: StrokeCap::Round,
         }
     }
 
@@ -124,12 +126,18 @@ impl Canvas {
         self
     }
 
+    pub fn stroke_cap(&mut self, cap: StrokeCap) -> &mut Self {
+        self.stroke_cap = cap;
+        self
+    }
+
     pub fn stroke(&mut self) -> &mut Self {
         for &segment in &self.current_path {
             self.batch.draw_node(Node {
                 shape: &Shape::Stroke {
                     segment,
                     width: self.stroke_width,
+                    cap: self.stroke_cap,
                 },
                 paint_type: self.current_paint,
             });

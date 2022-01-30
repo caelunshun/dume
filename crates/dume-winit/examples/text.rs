@@ -2,7 +2,7 @@
 
 use instant::Instant;
 
-use dume::{Canvas, Context, TextBlob};
+use dume::{Canvas, Context, StrokeCap, TextBlob};
 use dume_winit::{block_on, Application, DumeWinit};
 use glam::{vec2, Vec2};
 use winit::{dpi::LogicalSize, event_loop::EventLoop, window::WindowBuilder};
@@ -68,6 +68,7 @@ impl Application for App {
             .line_to(vec2(1400., 1080.))
             .solid_color((0, 0, 0, u8::MAX))
             .stroke_width(10.)
+            .stroke_cap(StrokeCap::Square)
             .stroke();
 
         canvas
@@ -89,7 +90,8 @@ impl Application for App {
             .solid_color((0, 0, 0, u8::MAX))
             .begin_path()
             .rect(pos, Vec2::splat(200.))
-            .stroke_width(5.)
+            .stroke_width(1.)
+            .stroke_cap(StrokeCap::Square)
             .stroke();
     }
 }
