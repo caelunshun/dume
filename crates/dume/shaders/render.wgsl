@@ -168,6 +168,10 @@ fn tile_kernel(
 //
 // We use insertion sort.
 
+// The array of nodes loaded into private memory to reduce
+// access times
+var<private> local_nodes: array<u32, 64>;
+
 [[stage(compute), workgroup_size(16, 16)]]
 fn sort_kernel([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
     let tile_id = global_id.xy;
@@ -176,27 +180,47 @@ fn sort_kernel([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
         return;
     }
 
-    let num_nodes = i32(tile_counters.counters[tile_id.x + tile_id.y * globals.tile_count.x]);
+    // Copy the node list from global memory into private memory
+    var num_nodes = i32(tile_counters.counters[tile_id.x + tile_id.y * globals.tile_count.x]);
+    num_nodes = min(num_nodes, 64);
     let base_index = i32(tile_index(tile_id));
-
-    var i = base_index + 1;
+    var i = base_index;
     loop {
         if (i - base_index >= num_nodes) {
             break;
         }
+        local_nodes[i - base_index] = tiles.tile_nodes[i];
+        i = i + 1;
+    }
 
-        let x = tiles.tile_nodes[i];
+    i = 0;
+    loop {
+        if (i >= num_nodes) {
+            break;
+        }
+
+        let x = local_nodes[i];
         var j = i - 1;
         loop {
-            if (!(j >= 0 && tiles.tile_nodes[j] > x)) {
+            if (!(j >= 0 && local_nodes[j] > x)) {
                 break;
             }
 
-            tiles.tile_nodes[j + 1] = tiles.tile_nodes[j];
+            local_nodes[j + 1] = local_nodes[j];
             j = j - 1;
         }
-        tiles.tile_nodes[j + 1] = x;
+        local_nodes[j + 1] = x;
 
+        i = i + 1;
+    }
+
+    // Copy the node list back into global memory
+    i = 0;
+    loop {
+        if (i >= num_nodes) {
+            break;
+        }
+        tiles.tile_nodes[i + base_index] = local_nodes[i];
         i = i + 1;
     }
 }
@@ -452,7 +476,8 @@ fn paint_kernel(
 
     var index = tile_index(tile_id.xy);
     let base_index = index;
-    let num_nodes = tile_counters.counters[tile_id.x + tile_id.y * globals.tile_count.x];
+    var num_nodes = tile_counters.counters[tile_id.x + tile_id.y * globals.tile_count.x];
+    num_nodes = min(num_nodes, u32(64));
     loop {
         if (index - base_index >= num_nodes) {
             break;
