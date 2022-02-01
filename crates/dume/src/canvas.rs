@@ -477,6 +477,13 @@ impl Canvas {
             .blit(&mut encoder, prepared_blit, target_texture);
 
         self.context.queue().submit(iter::once(encoder.finish()));
+
+        self.reset();
+    }
+
+    fn reset(&mut self) {
+        self.current_path.clear();
+        self.next_path_id = 1;
     }
 
     /// Updates the target size of the canvas in logical pixels.

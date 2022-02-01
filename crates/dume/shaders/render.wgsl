@@ -138,7 +138,7 @@ fn tile_kernel(
     var x = min.x;
     var y = min.y;
     loop {
-         if (x > max.x || x >= globals.tile_count.x) {
+        if (x > max.x || x >= globals.tile_count.x) {
             y = y + u32(1);
             x = min.x;
             if (y > max.y || y >= globals.tile_count.y) {
@@ -153,6 +153,7 @@ fn tile_kernel(
             // The tile's buffer is full. For now, we'll
             // just skip the excess nodes - in the future we might
             // want some sort of overflow mechanism.
+            x = x + u32(1);
             continue;
         }
         tiles.tile_nodes[tile_index + i] = node_index;
