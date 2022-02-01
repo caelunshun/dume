@@ -27,6 +27,7 @@ struct Node {
     shape: i32;
     pos_a: u32;
     pos_b: u32;
+    extra: u32;
 
     paint_type: i32;
     
@@ -452,19 +453,43 @@ fn paint_kernel(
     let base_index = index;
     let num_nodes = tile_counters.counters[tile_id.x + tile_id.y * globals.tile_count.x];
     loop {
-        if (index - base_index == num_nodes) {
+        if (index - base_index >= num_nodes) {
             break;
         }
 
         let node_index = tiles.tile_nodes[index];
 
-        let node: Node = nodes.nodes[node_index];
+        var node: Node = nodes.nodes[node_index];
+
+        var coverage = 0.0;
+        if (node.shape == SHAPE_STROKE) {
+            // Consume all segments in the same path (each is its own node)
+            // then choose the segment with the highest coverage.
+            let path_id = node.extra;
+            loop {
+                let i = tiles.tile_nodes[index];
+                let n = nodes.nodes[i];
+                coverage = max(coverage, node_coverage(n, pixel_pos));
+                index = index + u32(1);
+                if (index - base_index == num_nodes) {
+                    break;
+                }
+                let i = tiles.tile_nodes[index];
+                let next_node = nodes.nodes[i];
+                if (next_node.extra != path_id || next_node.shape != SHAPE_STROKE) {
+                    break;
+                }
+            }
+        } else {
+            coverage = node_coverage(node, pixel_pos);
+        }
 
         let node_color = node_color(node, pixel_pos);
-        let node_coverage = node_coverage(node, pixel_pos);
-        color = mix(color, node_color.rgb, node_coverage * node_color.a);
-
-        index = index + u32(1);
+        color = mix(color, node_color.rgb, coverage * node_color.a);
+        
+        if (node.shape != SHAPE_STROKE) {
+            index = index + u32(1);
+        }
     }
 
     // Blend onto the target texture. Note that we have

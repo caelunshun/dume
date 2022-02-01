@@ -21,6 +21,8 @@ pub struct Canvas {
     current_path: Vec<LineSegment>,
     stroke_width: f32,
     stroke_cap: StrokeCap,
+
+    next_path_id: u32,
 }
 
 /// Painting
@@ -36,6 +38,7 @@ impl Canvas {
             current_path: Vec::new(),
             stroke_width: 1.,
             stroke_cap: StrokeCap::Round,
+            next_path_id: 0,
         }
     }
 
@@ -134,20 +137,22 @@ impl Canvas {
     pub fn stroke(&mut self) -> &mut Self {
         for &segment in &self.current_path {
             self.batch.draw_node(Node {
-                shape: &Shape::Stroke {
+                shape: Shape::Stroke {
                     segment,
                     width: self.stroke_width,
                     cap: self.stroke_cap,
+                    path_id: self.next_path_id,
                 },
                 paint_type: self.current_paint,
             });
         }
+        self.next_path_id += 1;
         self
     }
 
     pub fn fill_rect(&mut self, pos: Vec2, size: Vec2) -> &mut Self {
         self.batch.draw_node(Node {
-            shape: &Shape::Rect(Rect { pos, size }),
+            shape: Shape::Rect(Rect { pos, size }),
             paint_type: self.current_paint,
         });
         self
@@ -155,7 +160,7 @@ impl Canvas {
 
     pub fn fill_circle(&mut self, center: Vec2, radius: f32) -> &mut Self {
         self.batch.draw_node(Node {
-            shape: &Shape::Circle { center, radius },
+            shape: Shape::Circle { center, radius },
             paint_type: self.current_paint,
         });
         self
@@ -208,7 +213,7 @@ impl Canvas {
                 origin: pos.as_u32(),
                 color,
             },
-            shape: &Shape::Rect(Rect {
+            shape: Shape::Rect(Rect {
                 pos,
                 size: uvec2(placement.width, placement.height).as_f32(),
             }),

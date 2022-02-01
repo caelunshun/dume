@@ -23,7 +23,8 @@ impl App {
 
         let text = dume::text!("@size[50][@color[0,0,0][Dume can render text.] @color[200,30,50][Here is some in scarlet.] @font[Allison][Here's a different font.]]");
         let text2 = dume::text!(
-            "@color[0,0,0][I met a traveller from an antique land,
+            "@color[0,0,0][
+            I met a traveller from an antique land,
             Who said—“Two vast and trunkless legs of stone
             Stand in the desert.... Near them, on the sand,
             Half sunk a shattered visage lies, whose frown,

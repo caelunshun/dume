@@ -529,7 +529,7 @@ pub enum PaintType {
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum Shape {
     Rect(Rect),
     Circle {
@@ -540,6 +540,7 @@ pub enum Shape {
         segment: LineSegment,
         width: f32,
         cap: StrokeCap,
+        path_id: u32,
     },
 }
 
@@ -550,25 +551,25 @@ pub struct LineSegment {
 }
 
 #[derive(Debug)]
-pub struct Node<'a> {
-    pub shape: &'a Shape,
+pub struct Node {
+    pub shape: Shape,
     pub paint_type: PaintType,
 }
 
-impl Node<'_> {
+impl Node {
     fn bounding_box(&self) -> Rect {
         match self.shape {
-            Shape::Rect(rect) => *rect,
+            Shape::Rect(rect) => rect,
             Shape::Circle { center, radius } => Rect {
-                pos: *center - Vec2::splat(*radius),
-                size: Vec2::splat(*radius * 2.),
+                pos: center - Vec2::splat(radius),
+                size: Vec2::splat(radius * 2.),
             },
             Shape::Stroke { segment, width, .. } => {
                 let min = segment.start.min(segment.end);
                 let max = segment.start.max(segment.end);
                 Rect {
-                    pos: min - *width,
-                    size: (max - min) + 2. * *width,
+                    pos: min - width,
+                    size: (max - min) + 2. * width,
                 }
             }
         }
@@ -581,6 +582,7 @@ struct PackedNode {
     shape: i32,
     pos_a: u32,
     pos_b: u32,
+    extra: u32,
 
     paint_type: i32,
     color_a: u32,
@@ -614,6 +616,7 @@ impl Batch {
         if !self.will_draw(bbox) {
             return;
         }
+
         let node = self.pack_node(node);
         self.nodes.push(node);
         self.node_bounding_boxes.push(self.pack_bounding_box(bbox));
@@ -696,13 +699,14 @@ impl Batch {
             }
             Shape::Circle { center, radius } => {
                 packed.shape = SHAPE_CIRCLE;
-                packed.pos_a = self.pack_pos(*center);
-                packed.pos_b = self.pack_pos(vec2(*radius, 0.));
+                packed.pos_a = self.pack_pos(center);
+                packed.pos_b = self.pack_pos(vec2(radius, 0.));
             }
             Shape::Stroke {
                 segment,
                 width,
                 cap,
+                path_id,
             } => {
                 packed.shape = SHAPE_STROKE;
 
@@ -711,7 +715,8 @@ impl Batch {
                 self.points.push(self.pack_pos(segment.end));
 
                 packed.pos_a = self.pack_upos(uvec2(base_index, 0));
-                packed.pos_b = self.pack_pos(vec2(*width, (*cap as u32) as f32));
+                packed.pos_b = self.pack_pos(vec2(width, (cap as u32) as f32));
+                packed.extra = path_id;
             }
         }
 
