@@ -1,11 +1,16 @@
+use std::f32::consts::{PI, TAU};
+
 use dume::{Canvas, StrokeCap};
 use dume_winit::{block_on, Application, DumeWinit};
-use glam::{vec2, Vec2};
+use glam::vec2;
+use noise::{Fbm, MultiFractal, NoiseFn, Seedable};
 use rand::{prelude::StdRng, Rng, SeedableRng};
+use std::time::Instant;
 use winit::{event_loop::EventLoop, window::Window};
 
 struct App {
     seed: u64,
+    start: Instant,
 }
 
 impl Application for App {
@@ -13,22 +18,37 @@ impl Application for App {
         let mut rng = StdRng::seed_from_u64(self.seed);
 
         let size = canvas.size();
+        let center = size / 2.;
+        let base_radius = size / 2.5;
+        let radius_variance = base_radius * 0.3;
 
-        canvas
-            .solid_color((30, 130, 200, u8::MAX))
-            .fill_rect(Vec2::ZERO, size);
+        let num_stops = 1024;
+
+        let noise = Fbm::new()
+            .set_seed(rng.gen())
+            .set_frequency((PI / 2.) as f64);
+
+        let time = self.start.elapsed().as_secs_f32() * 0.2;
 
         canvas.begin_path();
-        canvas.move_to(size / 2.);
-        for _ in 0..100 {
-            let pos = vec2(rng.gen::<f32>() * size.x, rng.gen::<f32>() * size.y);
-            canvas.line_to(pos);
+        for stop in 0..=num_stops {
+            let mut theta = (stop as f32 / num_stops as f32) * TAU;
+            if stop == num_stops {
+                theta = 0.;
+            }
+            let r = base_radius + noise.get([theta as f64, time as f64]) as f32 * radius_variance;
+            let pos = center + vec2(theta.cos(), theta.sin()) * r;
+            if stop == 0 {
+                canvas.move_to(pos);
+            } else {
+                canvas.line_to(pos);
+            }
         }
 
         canvas
-            .stroke_width(2.)
-            .stroke_cap(StrokeCap::Square)
-            .solid_color((200, 80, 140, u8::MAX))
+            .stroke_cap(StrokeCap::Round)
+            .stroke_width(3.)
+            .solid_color((60, 190, 150, u8::MAX))
             .stroke();
     }
 }
@@ -41,6 +61,7 @@ fn main() {
         let dume = DumeWinit::new(window).await;
         let app = App {
             seed: rand::random(),
+            start: Instant::now(),
         };
         dume.run(event_loop, app);
     });
