@@ -150,6 +150,37 @@ impl Canvas {
         self
     }
 
+    pub fn fill(&mut self) -> &mut Self {
+        let fill_bounding_box = self.current_path_bounding_box();
+        for &segment in &self.current_path {
+            self.batch.draw_node(Node {
+                shape: Shape::Fill {
+                    segment,
+                    path_id: self.next_path_id,
+                    fill_bounding_box,
+                },
+                paint_type: self.current_paint,
+            });
+        }
+        self.next_path_id += 1;
+        self
+    }
+
+    fn current_path_bounding_box(&self) -> Rect {
+        let mut min = Vec2::splat(f32::INFINITY);
+        let mut max = Vec2::splat(-f32::INFINITY);
+
+        for &segment in &self.current_path {
+            min = min.min(segment.start).min(segment.end);
+            max = max.max(segment.start).max(segment.start);
+        }
+
+        Rect {
+            pos: min,
+            size: max - min,
+        }
+    }
+
     pub fn fill_rect(&mut self, pos: Vec2, size: Vec2) -> &mut Self {
         self.batch.draw_node(Node {
             shape: Shape::Rect(Rect { pos, size }),

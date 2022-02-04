@@ -2,6 +2,19 @@
 // subdividing elements into tiles and one for
 // actually painting to the target texture.
 
+let SHAPE_RECT: i32 = 0;
+let SHAPE_CIRCLE: i32 = 1;
+let SHAPE_STROKE: i32 = 2;
+let SHAPE_FILL: i32 = 3;
+
+let PAINT_TYPE_SOLID: i32 = 0;
+let PAINT_TYPE_LINEAR_GRADIENT: i32 = 1;
+let PAINT_TYPE_RADIAL_GRADIENT: i32 = 2;
+let PAINT_TYPE_GLYPH: i32 = 3;
+
+let STROKE_CAP_ROUND: i32 = 0;
+let STROKE_CAP_SQUARE: i32 = 1;
+
 struct PackedBoundingBox {
     pos: u32;
     size: u32;
@@ -90,14 +103,6 @@ fn unpack_upos(pos: u32) -> vec2<u32> {
     );
 }
 
-// Shader that assigns an array of nodes
-// to each tile of 16x16 physical pixels.
-//
-// This kernel runs for each node and determines
-// the list of tiles the node intersects. For each tile
-// in the resulting list, it adds the node index to the tile's
-// list of intersecting nodes.
-
 fn unpack_bounding_box(bbox: PackedBoundingBox) -> BoundingBox {
     var result: BoundingBox;
     result.pos = unpack_pos(bbox.pos);
@@ -118,23 +123,15 @@ fn to_tile_pos(pos: vec2<f32>) -> vec2<u32> {
     return vec2<u32>(pos / 16.0);
 }
 
-[[stage(compute), workgroup_size(256, 1)]]
-fn tile_kernel(
-    [[builtin(global_invocation_id)]] global_id: vec3<u32>,
-) {
-    let node_index = global_id.x;
-    if (node_index >= globals.node_count) {
-        return;
-    }
+// Shader that assigns an array of nodes
+// to each tile of 16x16 physical pixels.
+//
+// This kernel runs for each node (excluding fills) and determines
+// the list of tiles the node intersects. For each tile
+// in the resulting list, it adds the node index to the tile's
+// list of intersecting nodes.
 
-    let bbox = unpack_bounding_box(node_bounding_boxes.bounding_boxes[node_index]);
-    if (bbox.pos.x + bbox.size.x < 0.0 || bbox.pos.y + bbox.size.y < 0.0) {
-        return;
-    }
-
-    let min = to_tile_pos(bbox.pos);
-    let max = to_tile_pos(bbox.pos + bbox.size);
-
+fn spread_tiles(node_index: u32, min: vec2<u32>, max: vec2<u32>) {
     var x = min.x;
     var y = min.y;
     loop {
@@ -159,6 +156,62 @@ fn tile_kernel(
         tiles.tile_nodes[tile_index + i] = node_index;
 
         x = x + u32(1);
+    }
+}
+
+fn tile_normal_node(node: Node, node_index: u32) {
+    let bbox = unpack_bounding_box(node_bounding_boxes.bounding_boxes[node_index]);
+    if (bbox.pos.x + bbox.size.x < 0.0 || bbox.pos.y + bbox.size.y < 0.0) {
+        return;
+    }
+
+    let min = to_tile_pos(bbox.pos);
+    let max = to_tile_pos(bbox.pos + bbox.size);
+
+    spread_tiles(node_index, min, max);
+}
+
+fn get_fill_bbox(offset: u32) -> BoundingBox {
+    var packed: PackedBoundingBox;
+    packed.pos = points.list[offset];
+    packed.size = points.list[offset + u32(1)];
+    return unpack_bounding_box(packed); 
+}
+
+fn tile_fill_node(node: Node, node_index: u32) {
+    // Add the node to the tiles it intersects and all tiles to the right
+    // for the remainder of the entire fill's bounding box.
+    let bbox = unpack_bounding_box(node_bounding_boxes.bounding_boxes[node_index]);
+    if (bbox.pos.x + bbox.size.x < 0.0 || bbox.pos.y + bbox.size.y < 0.0) {
+        return;
+    }
+
+    let min = to_tile_pos(bbox.pos);
+    let nodemax = to_tile_pos(bbox.pos + bbox.size);
+
+    let offset = unpack_upos(node.pos_a).y;
+    let fill_bbox = get_fill_bbox(offset);
+
+    var max = to_tile_pos(fill_bbox.size + fill_bbox.pos);
+    max.y = clamp(max.y, min.y, nodemax.y);
+
+    spread_tiles(node_index, min, max);
+}
+
+[[stage(compute), workgroup_size(256)]]
+fn tile_kernel(
+    [[builtin(global_invocation_id)]] global_id: vec3<u32>,
+) {
+    let node_index = global_id.x;
+    if (node_index >= globals.node_count) {
+        return;
+    }
+
+    let node = nodes.nodes[node_index];
+    if (node.shape == SHAPE_FILL) {
+        tile_fill_node(node, node_index);
+    } else {
+        tile_normal_node(node, node_index);
     }
 }
 
@@ -234,18 +287,6 @@ fn sort_kernel([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
 // 2) Determine the color of the pixel based on the paint type
 // 3) Composite the color onto the target texture, using the alpha value
 //    from the coverage step
-
-let SHAPE_RECT: i32 = 0;
-let SHAPE_CIRCLE: i32 = 1;
-let SHAPE_STROKE: i32 = 2;
-
-let PAINT_TYPE_SOLID: i32 = 0;
-let PAINT_TYPE_LINEAR_GRADIENT: i32 = 1;
-let PAINT_TYPE_RADIAL_GRADIENT: i32 = 2;
-let PAINT_TYPE_GLYPH: i32 = 3;
-
-let STROKE_CAP_ROUND: i32 = 0;
-let STROKE_CAP_SQUARE: i32 = 1;
 
 fn srgb_to_linear(srgb: vec3<f32>) -> vec3<f32> {
     let cutoff = srgb < vec3<f32>(0.04045);
@@ -359,6 +400,23 @@ fn node_color(node: Node, pixel_pos: vec2<f32>) -> vec4<f32> {
     }
 }
 
+var<workgroup> nodes_in_tile: array<Node, 64>;
+var<private> node_index: i32;
+var<private> num_nodes: i32;
+
+fn has_next_node() -> bool {
+    return node_index < num_nodes;
+}
+
+fn peek_next_node() -> Node {
+    return nodes_in_tile[node_index];
+}
+
+fn take_next_node() -> Node {
+    node_index = node_index + 1;
+    return nodes_in_tile[node_index - 1];
+}
+
 fn rect_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
     let pixel_min = pixel_pos;
     let pixel_max = pixel_min + 1.0;
@@ -450,6 +508,60 @@ fn stroke_coverage(node: Node, pos: vec2<f32>) -> f32 {
     return alpha;
 }
 
+fn fill_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
+    // Use even-odd fill rule on all nodes with the same fill ID.
+    let fill_id = node.extra;
+
+    var intersections = 0;
+    var alpha = 1.0;
+    var node = node;
+
+    loop {
+        let offset = unpack_upos(node.pos_a).x;
+        var point_a = unpack_pos(points.list[offset]);
+        var point_b = unpack_pos(points.list[offset + u32(1)]);
+        if (point_a.x > point_b.x) {
+            let temp = point_b;
+            point_b = point_a;
+            point_a = temp;
+        }
+
+        // Determine whether the segment intersects the horizontal
+        // line of this pixel.
+        let x_diff = point_b.x - point_a.x;
+        let y_diff = point_b.y - point_a.y;
+        var x = 0.0;
+        var t = 0.0;
+        if (x_diff > 0.0) {
+            let slope = y_diff / x_diff;
+            x = (pixel_pos.y + slope * point_a.x - point_a.y) / slope;
+            t = (x - point_a.x) / x_diff;
+        } else {
+            x = point_a.x;
+            t = (pixel_pos.y - point_a.y) / y_diff;
+        }
+    
+        if (t >= 0.0 && t <= 1.0 && x < pixel_pos.x) {
+            intersections = intersections + 1;
+        }
+
+        if (!has_next_node()) {
+            break;
+        }
+        let next_node = peek_next_node();
+        if (next_node.extra != fill_id) {
+            break;
+        }
+        node = take_next_node();
+    }
+
+    if (intersections % 2 == 0) {
+        return 0.0;
+    } else {
+        return alpha;
+    }
+}
+
 fn node_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
     if (node.shape == SHAPE_RECT) {
         return rect_coverage(node, pixel_pos);
@@ -457,6 +569,8 @@ fn node_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
         return circle_coverage(node, pixel_pos);
     } else if (node.shape == SHAPE_STROKE) {
         return stroke_coverage(node, pixel_pos);
+    } else if (node.shape == SHAPE_FILL) {
+        return fill_coverage(node, pixel_pos);
     } else {
         // Should never happen
         return 1.0;
@@ -474,37 +588,45 @@ fn paint_kernel(
     var color = textureLoad(target_texture, pixel).rgb;
     color = srgb_to_linear(color);
 
-    var index = tile_index(tile_id.xy);
-    let base_index = index;
-    var num_nodes = tile_counters.counters[tile_id.x + tile_id.y * globals.tile_count.x];
-    num_nodes = min(num_nodes, u32(64));
+    let base_index = i32(tile_index(tile_id.xy));
+    num_nodes = i32(tile_counters.counters[tile_id.x + tile_id.y * globals.tile_count.x]);
+    num_nodes = min(num_nodes, 64);
+    node_index = 0;
+
+    // Copy nodes into workgroup memory
+    if (local_id.x == u32(0)) {
+        var i = 0;
+        loop {
+            if (i >= num_nodes) {
+                break;
+            }
+            let node_index = tiles.tile_nodes[base_index + i];
+            nodes_in_tile[i] = nodes.nodes[node_index];
+            i = i + 1;
+        }
+    }
+
+    workgroupBarrier();
+
     loop {
-        if (index - base_index >= num_nodes) {
+        if (!has_next_node()) {
             break;
         }
-
-        let node_index = tiles.tile_nodes[index];
-
-        var node: Node = nodes.nodes[node_index];
+        let node: Node = take_next_node();
 
         var coverage = 0.0;
         if (node.shape == SHAPE_STROKE) {
             // Consume all segments in the same path (each is its own node)
             // then choose the segment with the highest coverage.
             let path_id = node.extra;
+            var n = node;
             loop {
-                let i = tiles.tile_nodes[index];
-                let n = nodes.nodes[i];
                 coverage = max(coverage, node_coverage(n, pixel_pos));
-                index = index + u32(1);
-                if (index - base_index == num_nodes) {
-                    break;
-                }
-                let i = tiles.tile_nodes[index];
-                let next_node = nodes.nodes[i];
+                let next_node = peek_next_node();
                 if (next_node.extra != path_id || next_node.shape != SHAPE_STROKE) {
                     break;
                 }
+                n = next_node;
             }
         } else {
             coverage = node_coverage(node, pixel_pos);
@@ -512,10 +634,6 @@ fn paint_kernel(
 
         let node_color = node_color(node, pixel_pos);
         color = mix(color, node_color.rgb, coverage * node_color.a);
-        
-        if (node.shape != SHAPE_STROKE) {
-            index = index + u32(1);
-        }
     }
 
     // Blend onto the target texture. Note that we have

@@ -11,15 +11,16 @@ struct App {
 
 impl Application for App {
     fn draw(&mut self, canvas: &mut Canvas) {
-        let time = self.start.elapsed().as_secs_f32();
+        let _time = self.start.elapsed().as_secs_f32();
         canvas
             .solid_color(Srgba::new(230, 30, 80, u8::MAX))
-            .fill_rect(vec2(50., 50.), Vec2::splat(1000.))
-            .solid_color(Srgba::new(u8::MAX, u8::MAX, u8::MAX, u8::MAX))
-            .fill_circle(
-                vec2(300., 300.).lerp(vec2(500., 500.), (time.sin() + 1.) / 2.),
-                250.,
-            );
+            .begin_path()
+            .move_to(Vec2::splat(10.))
+            .line_to(vec2(100., 20.))
+            .line_to(vec2(110., 120.))
+            .line_to(vec2(10., 110.))
+            .line_to(Vec2::splat(10.))
+            .fill();
     }
 }
 

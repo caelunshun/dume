@@ -15,6 +15,7 @@ const TILE_SIZE: u32 = 16;
 const SHAPE_RECT: i32 = 0;
 const SHAPE_CIRCLE: i32 = 1;
 const SHAPE_STROKE: i32 = 2;
+const SHAPE_FILL: i32 = 3;
 
 const PAINT_TYPE_SOLID: i32 = 0;
 const PAINT_TYPE_LINEAR_GRADIENT: i32 = 1;
@@ -542,6 +543,11 @@ pub enum Shape {
         cap: StrokeCap,
         path_id: u32,
     },
+    Fill {
+        segment: LineSegment,
+        path_id: u32,
+        fill_bounding_box: Rect,
+    },
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -570,6 +576,14 @@ impl Node {
                 Rect {
                     pos: min - width,
                     size: (max - min) + 2. * width,
+                }
+            }
+            Shape::Fill { segment, .. } => {
+                let min = segment.start.min(segment.end);
+                let max = segment.start.max(segment.end);
+                Rect {
+                    pos: min,
+                    size: max - min,
                 }
             }
         }
@@ -716,6 +730,24 @@ impl Batch {
 
                 packed.pos_a = self.pack_upos(uvec2(base_index, 0));
                 packed.pos_b = self.pack_pos(vec2(width, (cap as u32) as f32));
+                packed.extra = path_id;
+            }
+            Shape::Fill {
+                segment,
+                path_id,
+                fill_bounding_box,
+            } => {
+                packed.shape = SHAPE_FILL;
+
+                let base_index = self.points.len() as u32;
+                self.points.push(self.pack_pos(segment.start));
+                self.points.push(self.pack_pos(segment.end));
+
+                let packed_bbox = self.pack_bounding_box(fill_bounding_box);
+                self.points.push(packed_bbox.pos);
+                self.points.push(packed_bbox.size);
+
+                packed.pos_a = self.pack_upos(uvec2(base_index, base_index + 2));
                 packed.extra = path_id;
             }
         }
