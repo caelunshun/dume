@@ -622,11 +622,14 @@ fn paint_kernel(
             var n = node;
             loop {
                 coverage = max(coverage, node_coverage(n, pixel_pos));
+                if (!has_next_node()) {
+                    break;
+                }
                 let next_node = peek_next_node();
                 if (next_node.extra != path_id || next_node.shape != SHAPE_STROKE) {
                     break;
                 }
-                n = next_node;
+                n = take_next_node();
             }
         } else {
             coverage = node_coverage(node, pixel_pos);
