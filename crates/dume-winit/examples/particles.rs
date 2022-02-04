@@ -58,21 +58,23 @@ fn main() {
         .unwrap();
 
     block_on(async move {
+        let size = window.inner_size().to_logical(window.scale_factor());
         let dume = DumeWinit::new(window).await;
         let app = App {
             last_time: Instant::now(),
-            particles: init_particles(),
+            particles: init_particles(size),
             velocity_field: init_velocity_field(),
         };
         dume.run(event_loop, app);
     });
 }
 
-fn init_particles() -> Vec<Particle> {
+fn init_particles(size: LogicalSize<u32>) -> Vec<Particle> {
     let mut rng = rand::thread_rng();
     (0..10_000)
         .map(|_| Particle {
-            pos: vec2(rng.gen(), rng.gen()) * vec2(1920., 1080.) / 2. + vec2(1920., 1080.) / 4.,
+            pos: vec2(rng.gen(), rng.gen()) * vec2(size.width as f32, size.height as f32) / 2.
+                + vec2(size.width as f32, size.height as f32) / 4.,
             vel: Vec2::ZERO,
             color: Srgba::new(rng.gen(), rng.gen(), rng.gen(), 180),
             is_circle: rng.gen_bool(0.3),

@@ -85,7 +85,7 @@ struct Points {
 [[group(0), binding(2)]] var<storage, read> node_bounding_boxes: NodeBoundingBoxes;
 [[group(0), binding(3)]] var<storage, read_write> tiles: TileNodes;
 [[group(0), binding(4)]] var<storage, read_write> tile_counters: TileNodeCounters;
-[[group(0), binding(5)]] var target_texture: texture_storage_2d<rgba8unorm, read_write>;
+[[group(0), binding(5)]] var target_texture: texture_storage_2d<r32uint, read_write>;
 
 [[group(0), binding(6)]] var samp_linear: sampler;
 [[group(0), binding(7)]] var glyph_atlas: texture_2d<f32>;
@@ -93,7 +93,7 @@ struct Points {
 [[group(0), binding(8)]] var<storage, read> points: Points;
 
 fn unpack_pos(pos: u32) -> vec2<f32> {
-    return unpack2x16unorm(pos) * globals.target_size * 2.0 * globals.scale_factor - globals.target_size / 2.0;
+    return unpack2x16unorm(pos) * globals.target_size * 2.0 - globals.target_size / 2.0;
 }
 
 fn unpack_upos(pos: u32) -> vec2<u32> {
@@ -102,6 +102,18 @@ fn unpack_upos(pos: u32) -> vec2<u32> {
         (pos >> u32(16)) & u32(0xFFFF),
     );
 }
+
+fn to_physical(pos: vec2<f32>) -> vec2<f32> {
+    return pos * globals.scale_factor;
+}
+
+// Shader that assigns an array of nodes
+// to each tile of 16x16 physical pixels.
+//
+// This kernel runs for each node and determines
+// the list of tiles the node intersects. For each tile
+// in the resulting list, it adds the node index to the tile's
+// list of intersecting nodes.
 
 fn unpack_bounding_box(bbox: PackedBoundingBox) -> BoundingBox {
     var result: BoundingBox;
@@ -119,7 +131,8 @@ fn tile_index(tile_pos: vec2<u32>) -> u32 {
 }
 
 fn to_tile_pos(pos: vec2<f32>) -> vec2<u32> {
-    let pos = clamp(pos, vec2<f32>(0.0), globals.target_size);
+    let pos = to_physical(pos);
+    let pos = clamp(pos, vec2<f32>(0.0), globals.target_size * globals.scale_factor);
     return vec2<u32>(pos / 16.0);
 }
 
@@ -375,14 +388,14 @@ fn node_color(node: Node, pixel_pos: vec2<f32>) -> vec4<f32> {
     if (paint == PAINT_TYPE_SOLID) {
         return unpack_color(node.color_a);
     } else if (paint == PAINT_TYPE_LINEAR_GRADIENT) {
-        let point_a = unpack_pos(node.gradient_point_a);
-        let point_b = unpack_pos(node.gradient_point_b);
+        let point_a = to_physical(unpack_pos(node.gradient_point_a));
+        let point_b = to_physical(unpack_pos(node.gradient_point_b));
         let color_a = unpack_color(node.color_a);
         let color_b = unpack_color(node.color_b);
         return linear_gradient(pixel_pos, point_a, point_b, color_a, color_b);
     } else if (paint == PAINT_TYPE_RADIAL_GRADIENT) {
-        let center = unpack_pos(node.gradient_point_a);
-        let radius = unpack_pos(node.gradient_point_b).x;
+        let center = to_physical(unpack_pos(node.gradient_point_a));
+        let radius = to_physical(unpack_pos(node.gradient_point_b)).x;
         let color_a = unpack_color(node.color_a);
         let color_b = unpack_color(node.color_b);
         return radial_gradient(pixel_pos, center, radius, color_a, color_b); 
@@ -421,8 +434,8 @@ fn rect_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
     let pixel_min = pixel_pos;
     let pixel_max = pixel_min + 1.0;
     let pixel_mid = pixel_min + 0.5;
-    let size = unpack_pos(node.pos_b);
-    let rect_min = unpack_pos(node.pos_a);
+    let size = to_physical(unpack_pos(node.pos_b));
+    let rect_min = to_physical(unpack_pos(node.pos_a));
     let rect_max = rect_min + size;
     // Compute intersection area
     // between the pixel and the rectangle.
@@ -439,8 +452,8 @@ fn rect_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
 
 fn circle_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
     let pixel_mid = pixel_pos + 0.5;
-    let center = unpack_pos(node.pos_a);
-    let radius = unpack_pos(node.pos_b).x;
+    let center = to_physical(unpack_pos(node.pos_a));
+    let radius = to_physical(unpack_pos(node.pos_b)).x;
 
     let distance = length(pixel_mid - center);
     // Not the exact coverage, but close enough to look fine.
@@ -474,11 +487,11 @@ fn distance_to_line_segment(a: vec2<f32>, b: vec2<f32>, pos: vec2<f32>) -> f32 {
 
 fn stroke_coverage(node: Node, pos: vec2<f32>) -> f32 {
     let index = unpack_upos(node.pos_a).x;
-    let point_a = unpack_pos(points.list[index]);
-    let point_b = unpack_pos(points.list[index + u32(1)]);
+    let point_a = to_physical(unpack_pos(points.list[index]));
+    let point_b = to_physical(unpack_pos(points.list[index + u32(1)]));
 
     let params2 = unpack_pos(node.pos_b);
-    let stroke_width = params2.x;
+    let stroke_width = params2.x * globals.scale_factor;
     let stroke_cap = i32(round(params2.y));
 
     var dist = 0.0;
@@ -585,7 +598,7 @@ fn paint_kernel(
     let pixel = vec2<i32>(tile_id.xy) * vec2<i32>(16) + vec2<i32>(local_id.xy);
     let pixel_pos = vec2<f32>(pixel);
     
-    var color = textureLoad(target_texture, pixel).rgb;
+    var color = unpack4x8unorm(textureLoad(target_texture, pixel).r).rgb;
     color = srgb_to_linear(color);
 
     let base_index = i32(tile_index(tile_id.xy));
@@ -643,5 +656,5 @@ fn paint_kernel(
     // to do the linear => sRGB conversion ourselves.
     let color = clamp(color, vec3<f32>(0.0), vec3<f32>(1.0));
     let result = linear_to_srgb(color);
-    textureStore(target_texture, pixel, vec4<f32>(result, 1.0));
+    textureStore(target_texture, pixel, vec4<u32>(pack4x8unorm(vec4<f32>(result, 1.0))));
 }

@@ -19,7 +19,7 @@ pub mod yuv;
 
 // NB: the data stored in these textures is sRGB, but we handle
 // the sRGB conversions ourselves.
-const INTERMEDIATE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+const INTERMEDIATE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R32Uint;
 pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 
 pub use canvas::Canvas;

@@ -227,6 +227,11 @@ impl Canvas {
         color: Srgba<u8>,
         pos: Vec2,
     ) {
+        let scale_factor = self.batch.scale_factor();
+        // Convert to physical pixels
+        let size = size * scale_factor;
+        let pos = pos * scale_factor;
+
         let mut glyphs = self.context.glyph_cache();
         let glyph = glyphs.glyph_or_rasterize(&self.context, font, glyph_id, size, pos);
 
@@ -245,8 +250,8 @@ impl Canvas {
                 color,
             },
             shape: Shape::Rect(Rect {
-                pos,
-                size: uvec2(placement.width, placement.height).as_f32(),
+                pos: pos / scale_factor,
+                size: uvec2(placement.width, placement.height).as_f32() / scale_factor,
             }),
         });
     }
@@ -491,10 +496,11 @@ impl Canvas {
             self.context
                 .renderer()
                 .prepare_render(batch, &self.context, &intermediate_texture);
-        let prepared_blit = self
-            .context
-            .renderer()
-            .prepare_blit(&self.context, &intermediate_texture);
+        let prepared_blit = self.context.renderer().prepare_blit(
+            &self.context,
+            &intermediate_texture,
+            physical_size,
+        );
 
         // Render
         let mut encoder = self

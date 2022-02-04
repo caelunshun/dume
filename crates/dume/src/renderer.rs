@@ -205,8 +205,18 @@ impl Renderer {
         pass.dispatch(prepared.tile_count.x, prepared.tile_count.y, 1);
     }
 
-    pub fn prepare_blit(&self, context: &Context, source: &wgpu::TextureView) -> PreparedBlit {
+    pub fn prepare_blit(
+        &self,
+        context: &Context,
+        source: &wgpu::TextureView,
+        target_size: UVec2,
+    ) -> PreparedBlit {
         let device = context.device();
+        let ubuf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::bytes_of(&target_size),
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &self.pipelines.blit_bg_layout,
@@ -218,6 +228,14 @@ impl Renderer {
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(&self.pipelines.nearest_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &ubuf,
+                        offset: 0,
+                        size: None,
+                    }),
                 },
             ],
         });
@@ -392,7 +410,7 @@ impl Pipelines {
                     binding: 0,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        sample_type: wgpu::TextureSampleType::Uint,
                         view_dimension: wgpu::TextureViewDimension::D2,
                         multisampled: false,
                     },
@@ -402,6 +420,16 @@ impl Pipelines {
                     binding: 1,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
                     count: None,
                 },
             ],
