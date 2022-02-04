@@ -1,9 +1,34 @@
-use std::time::Instant;
+use std::{
+    f32::consts::{PI, TAU},
+    time::Instant,
+};
 
-use dume::{Canvas, Srgba};
+use dume::Canvas;
 use dume_winit::{block_on, Application, DumeWinit};
 use glam::{vec2, Vec2};
 use winit::{event_loop::EventLoop, window::Window};
+
+fn five_point_star(canvas: &mut Canvas, center: Vec2, outer_radius: f32, inner_radius: f32) {
+    let angle_step = PI * 2. / 5.;
+
+    for i in 0..5 {
+        let outer_theta = angle_step * i as f32 - PI / 2.;
+        let inner_theta = angle_step * (i as f32 + 0.5) - PI / 2.;
+
+        let outer_pos = vec2(outer_theta.cos(), outer_theta.sin()) * outer_radius + center;
+        let inner_pos = vec2(inner_theta.cos(), inner_theta.sin()) * inner_radius + center;
+
+        if i == 0 {
+            canvas.move_to(outer_pos);
+        } else {
+            canvas.line_to(outer_pos);
+        }
+        canvas.line_to(inner_pos);
+    }
+
+    // Close the path
+    canvas.line_to(center - vec2(0., outer_radius));
+}
 
 struct App {
     start: Instant,
@@ -11,16 +36,17 @@ struct App {
 
 impl Application for App {
     fn draw(&mut self, canvas: &mut Canvas) {
-        let _time = self.start.elapsed().as_secs_f32();
-        canvas
-            .solid_color(Srgba::new(230, 30, 80, u8::MAX))
-            .begin_path()
-            .move_to(Vec2::splat(10.))
-            .line_to(vec2(100., 20.))
-            .line_to(vec2(110., 120.))
-            .line_to(vec2(10., 110.))
-            .line_to(Vec2::splat(10.))
-            .fill();
+        let time = self.start.elapsed().as_secs_f32();
+        let num_stars = 16;
+        let center = canvas.size() / 2.;
+        let radius = 200.;
+        for i in 0..num_stars {
+            let theta = (i as f32 / num_stars as f32) * TAU + time;
+            let pos = vec2(theta.sin(), theta.cos()) * radius + center;
+            canvas.begin_path();
+            five_point_star(canvas, pos, 30., 15.);
+            canvas.solid_color((190, 60, 210, u8::MAX)).fill();
+        }
     }
 }
 

@@ -525,8 +525,7 @@ fn fill_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
     // Use even-odd fill rule on all nodes with the same fill ID.
     let fill_id = node.extra;
 
-    var intersections = 0;
-    var alpha = 1.0;
+    var signed_area = 0.0;
     var node = node;
 
     loop {
@@ -539,23 +538,25 @@ fn fill_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
             point_a = temp;
         }
 
-        // Determine whether the segment intersects the horizontal
-        // line of this pixel.
-        let x_diff = point_b.x - point_a.x;
-        let y_diff = point_b.y - point_a.y;
-        var x = 0.0;
-        var t = 0.0;
-        if (x_diff > 0.0) {
-            let slope = y_diff / x_diff;
-            x = (pixel_pos.y + slope * point_a.x - point_a.y) / slope;
-            t = (x - point_a.x) / x_diff;
-        } else {
-            x = point_a.x;
-            t = (pixel_pos.y - point_a.y) / y_diff;
-        }
-    
-        if (t >= 0.0 && t <= 1.0 && x < pixel_pos.x) {
-            intersections = intersections + 1;
+        // Determine the signed area contribution from this 
+        // segment.
+        let start = point_a - pixel_pos;
+        let end = point_b - pixel_pos;
+        let window = clamp(vec2<f32>(start.y, end.y), vec2<f32>(0.0), vec2<f32>(1.0));
+        if (window.x != window.y) {
+            let t = (window - start.y) / (end.y - start.y);
+            let xs = mix(vec2<f32>(start.x), vec2<f32>(end.x), t);
+            let xmin = min(min(xs.x, xs.y), 1.0);
+            let xmax = max(xs.x, xs.y);
+            if (abs(xmin - xmax) < 0.0001) {
+                signed_area = signed_area + (window.x - window.y);
+            } else {
+                let b = min(xmax, 1.0);
+                let c = max(b, 0.0);
+                let d = max(xmin, 0.0);
+                let area = (b + 0.5 * (d * d - c * c) - xmin) / (xmax - xmin);
+                signed_area = signed_area + area * (window.x - window.y);
+            }
         }
 
         if (!has_next_node()) {
@@ -567,12 +568,7 @@ fn fill_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
         }
         node = take_next_node();
     }
-
-    if (intersections % 2 == 0) {
-        return 0.0;
-    } else {
-        return alpha;
-    }
+    return clamp(abs(signed_area - 2.0 * round(0.5 * signed_area)), 0.0, 1.0);
 }
 
 fn node_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
