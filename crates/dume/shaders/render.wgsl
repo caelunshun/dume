@@ -437,16 +437,33 @@ fn rect_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
     let size = to_physical(unpack_pos(node.pos_b));
     let rect_min = to_physical(unpack_pos(node.pos_a));
     let rect_max = rect_min + size;
+
+    let border_radius = to_physical(unpack_pos(node.extra)).x;
+
     // Compute intersection area
-    // between the pixel and the rectangle.
+    // between the pixel and the (possibly rounded) rectangle.
     if (rect_max.x < pixel_min.x || rect_max.y < pixel_min.y 
         || rect_min.x > pixel_max.x || rect_min.y > pixel_max.y) {
         return 0.0;
     }
 
-    let length_x = min(rect_max.x, pixel_max.x) - max(rect_min.x, pixel_min.x);
-    let length_y = min(rect_max.y, pixel_max.y) - max(rect_min.y, pixel_min.y);
-    let area = length_x * length_y;
+    var area = 0.0;
+    if (border_radius > 0.01) {
+        // Rounded corners
+        let top_left = rect_min + border_radius;
+        let bottom_right = rect_max - border_radius;
+
+        let d1 = top_left - pixel_mid;
+        let d4 = pixel_mid - bottom_right;
+        let d = length(max(max(d1, d4), vec2<f32>(0.0))) - border_radius;
+        area = 1.0 - clamp(d, 0.0, 1.0);
+    } else {
+        // No rounded corners, cheaper calculation with no length() call
+        let length_x = min(rect_max.x, pixel_max.x) - max(rect_min.x, pixel_min.x);
+        let length_y = min(rect_max.y, pixel_max.y) - max(rect_min.y, pixel_min.y);
+        area = length_x * length_y;
+    }
+
     return clamp(area, 0.0, 1.0);
 }
 

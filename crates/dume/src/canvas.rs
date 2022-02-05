@@ -182,8 +182,15 @@ impl Canvas {
     }
 
     pub fn fill_rect(&mut self, pos: Vec2, size: Vec2) -> &mut Self {
+        self.fill_rounded_rect(pos, size, 0.)
+    }
+
+    pub fn fill_rounded_rect(&mut self, pos: Vec2, size: Vec2, border_radius: f32) -> &mut Self {
         self.batch.draw_node(Node {
-            shape: Shape::Rect(Rect { pos, size }),
+            shape: Shape::Rect {
+                rect: Rect { pos, size },
+                border_radius,
+            },
             paint_type: self.current_paint,
         });
         self
@@ -249,10 +256,13 @@ impl Canvas {
                 origin: pos.as_u32(),
                 color,
             },
-            shape: Shape::Rect(Rect {
-                pos: pos / scale_factor,
-                size: uvec2(placement.width, placement.height).as_f32() / scale_factor,
-            }),
+            shape: Shape::Rect {
+                rect: Rect {
+                    pos: pos / scale_factor,
+                    size: uvec2(placement.width, placement.height).as_f32() / scale_factor,
+                },
+                border_radius: 0.,
+            },
         });
     }
 

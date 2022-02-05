@@ -560,7 +560,10 @@ pub enum PaintType {
 
 #[derive(Copy, Clone, Debug)]
 pub enum Shape {
-    Rect(Rect),
+    Rect {
+        rect: Rect,
+        border_radius: f32,
+    },
     Circle {
         center: Vec2,
         radius: f32,
@@ -593,7 +596,7 @@ pub struct Node {
 impl Node {
     fn bounding_box(&self) -> Rect {
         match self.shape {
-            Shape::Rect(rect) => rect,
+            Shape::Rect { rect, .. } => rect,
             Shape::Circle { center, radius } => Rect {
                 pos: center - Vec2::splat(radius),
                 size: Vec2::splat(radius * 2.),
@@ -734,10 +737,14 @@ impl Batch {
         let mut packed = PackedNode::default();
 
         match node.shape {
-            Shape::Rect(rect) => {
+            Shape::Rect {
+                rect,
+                border_radius,
+            } => {
                 packed.shape = SHAPE_RECT;
                 packed.pos_a = self.pack_pos(rect.pos);
                 packed.pos_b = self.pack_pos(rect.size);
+                packed.extra = self.pack_pos(vec2(border_radius, 0.));
             }
             Shape::Circle { center, radius } => {
                 packed.shape = SHAPE_CIRCLE;
