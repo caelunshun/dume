@@ -41,7 +41,7 @@ impl Application for App {
         let center = canvas.size() / 2.;
         let radius = 200.;
         for i in 0..num_stars {
-            let theta = (i as f32 / num_stars as f32) * TAU + time;
+            let theta = (i as f32 / num_stars as f32) * TAU + time / 10.;
             let pos = vec2(theta.sin(), theta.cos()) * radius + center;
             canvas.begin_path();
             five_point_star(canvas, pos, 30., 15.);
