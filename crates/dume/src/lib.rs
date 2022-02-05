@@ -10,7 +10,6 @@ mod canvas;
 mod context;
 pub mod font;
 mod glyph;
-mod path;
 mod rect;
 mod renderer;
 mod text;

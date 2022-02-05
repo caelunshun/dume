@@ -530,8 +530,8 @@ fn fill_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
 
     loop {
         let offset = unpack_upos(node.pos_a).x;
-        var point_a = to_physical(unpack_pos(points.list[offset]));
-        var point_b = to_physical(unpack_pos(points.list[offset + u32(1)]));
+        var point_a = to_physical(vec2<f32>(unpack_upos(points.list[offset])));
+        var point_b = to_physical(vec2<f32>(unpack_upos(points.list[offset + u32(1)])));
         if (point_a.x > point_b.x) {
             let temp = point_b;
             point_b = point_a;

@@ -45,7 +45,12 @@ impl Application for App {
             let pos = vec2(theta.sin(), theta.cos()) * radius + center;
             canvas.begin_path();
             five_point_star(canvas, pos, 30., 15.);
-            canvas.solid_color((190, 60, 210, u8::MAX)).fill();
+            canvas
+                .solid_color((190, 60, 210, u8::MAX))
+                .fill()
+                .solid_color((u8::MAX, u8::MAX, u8::MAX, u8::MAX))
+                .stroke_width(1.)
+                .stroke();
         }
     }
 }

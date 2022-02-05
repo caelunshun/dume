@@ -6,7 +6,6 @@ use parking_lot::{Mutex, MutexGuard, RwLock, RwLockReadGuard};
 use crate::{
     font::{Font, Fonts, MalformedFont},
     glyph::GlyphCache,
-    path::PathCache,
     renderer::Renderer,
     texture::{MissingTexture, TextureId, TextureSet, TextureSetBuilder, Textures},
     yuv, Canvas, Text, TextBlob, TextOptions, YuvTexture,
@@ -58,7 +57,6 @@ impl ContextBuilder {
             textures: RwLock::new(Textures::default()),
             fonts: RwLock::new(Fonts::default()),
             glyph_cache: Mutex::new(GlyphCache::new(&self.device, &self.queue, &self.settings)),
-            path_cache: Mutex::new(PathCache::new()),
 
             settings: self.settings,
 
@@ -106,7 +104,6 @@ struct Inner {
     textures: RwLock<Textures>,
     fonts: RwLock<Fonts>,
     glyph_cache: Mutex<GlyphCache>,
-    path_cache: Mutex<PathCache>,
 }
 
 impl Context {
@@ -182,10 +179,6 @@ impl Context {
 
     pub(crate) fn glyph_cache(&self) -> MutexGuard<GlyphCache> {
         self.0.glyph_cache.lock()
-    }
-
-    pub(crate) fn path_cache(&self) -> MutexGuard<PathCache> {
-        self.0.path_cache.lock()
     }
 
     pub fn device(&self) -> &Arc<wgpu::Device> {

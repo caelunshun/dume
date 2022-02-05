@@ -768,8 +768,10 @@ impl Batch {
                 packed.shape = SHAPE_FILL;
 
                 let base_index = self.points.len() as u32;
-                self.points.push(self.pack_pos(segment.start));
-                self.points.push(self.pack_pos(segment.end));
+                self.points
+                    .push(self.pack_upos(segment.start.round().as_u32()));
+                self.points
+                    .push(self.pack_upos(segment.end.round().as_u32()));
 
                 let packed_bbox = self.pack_bounding_box(fill_bounding_box);
                 self.points.push(packed_bbox.pos);
