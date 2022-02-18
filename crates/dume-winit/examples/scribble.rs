@@ -49,7 +49,6 @@ impl Application for App {
             .stroke_cap(StrokeCap::Round)
             .stroke_width(3.)
             .solid_color((60, 190, 150, u8::MAX))
-          
             .fill();
     }
 }

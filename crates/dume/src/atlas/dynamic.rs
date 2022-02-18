@@ -204,6 +204,7 @@ impl DynamicTextureAtlas {
         );
         self.queue.submit(iter::once(encoder.finish()));
 
+        self.texture_view = new_texture.create_view(&Default::default());
         self.texture = new_texture;
     }
 }
