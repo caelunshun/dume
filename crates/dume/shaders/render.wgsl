@@ -13,6 +13,7 @@ let PAINT_TYPE_SOLID: i32 = 0;
 let PAINT_TYPE_LINEAR_GRADIENT: i32 = 1;
 let PAINT_TYPE_RADIAL_GRADIENT: i32 = 2;
 let PAINT_TYPE_GLYPH: i32 = 3;
+let PAINT_TYPE_TEXTURE: i32 = 4;
 
 let STROKE_CAP_ROUND: i32 = 0;
 let STROKE_CAP_SQUARE: i32 = 1;
@@ -93,6 +94,8 @@ struct Points {
 [[group(0), binding(7)]] var glyph_atlas: texture_2d<f32>;
 
 [[group(0), binding(8)]] var<storage, read> points: Points;
+
+[[group(0), binding(9)]] var texture_atlas: texture_2d<f32>;
 
 fn unpack_pos(pos: u32) -> vec2<f32> {
     return unpack2x16unorm(pos) * globals.target_size * 2.0 - globals.target_size / 2.0;
@@ -409,6 +412,16 @@ fn node_color(node: Node, pixel_pos: vec2<f32>) -> vec4<f32> {
         let texcoords = offset + (vec2<u32>(pixel_pos) - origin);
         let alpha = textureLoad(glyph_atlas, vec2<i32>(texcoords), 0).r;
         return vec4<f32>(color.rgb, alpha * color.a);
+    } else if (paint == PAINT_TYPE_TEXTURE) {
+        let offset = unpack_upos(node.gradient_point_a);
+        let origin = unpack_pos(node.gradient_point_b);
+        let scale = unpack_pos(node.color_a).x;
+
+        let texcoords = vec2<f32>(offset) + (pixel_pos - origin) * scale;
+        let texsize = textureDimensions(texture_atlas);
+        let texcoords = texcoords / vec2<f32>(texsize);
+
+        return textureSampleLevel(texture_atlas, samp_linear, texcoords, 0.0);
     } else {
         // Should never happen.
         return vec4<f32>(1.0, 0.0, 0.0, 1.0);

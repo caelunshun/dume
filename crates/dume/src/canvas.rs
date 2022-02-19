@@ -9,7 +9,7 @@ use crate::{
     glyph::Glyph,
     renderer::{Batch, LineSegment, Node, PaintType, Shape, StrokeCap},
     text::layout::GlyphCharacter,
-    Context, FontId, Rect, TextBlob, INTERMEDIATE_FORMAT,
+    Context, FontId, Rect, TextBlob, TextureId, INTERMEDIATE_FORMAT,
 };
 
 /// The current shape being drawn in a `Canvas`.
@@ -382,20 +382,50 @@ impl Canvas {
         });
     }
 
-    /*
-        /// Draws a texture / sprite on the canvas.
-        ///
-        /// `texture` is the ID of the texture to draw, which you
-        /// may acquire through `Context::texture_for_name`.
-        ///
-        /// `pos` is the position in logical pixels of the top-left of the sprite.
-        ///
-        /// `width` is the width of the image on the canvas, also in
-        /// logical pixels. The height is automatically computed from the texture's aspect ratio.
-        pub fn draw_sprite(&mut self, texture: TextureId, pos: Vec2, width: f32) -> &mut Self {
-            self.draw_sprite_with_rotation(texture, pos, width, SpriteRotate::Zero)
-        }
+    /// Draws a texture / sprite on the canvas.
+    ///
+    /// `texture` is the ID of the texture to draw, which you
+    /// may acquire through `Context::texture_for_name`.
+    ///
+    /// `pos` is the position in logical pixels of the top-left of the sprite.
+    ///
+    /// `width` is the width of the image on the canvas, also in
+    /// logical pixels. The height is automatically computed from the texture's aspect ratio.
+    pub fn draw_sprite(&mut self, texture: TextureId, pos: Vec2, width: f32) -> &mut Self {
+        let textures = self.context.textures();
+        let set_id = textures.set_for_texture(texture);
+        let set = textures.texture_set(set_id);
+        let texture = set.get(texture);
+        let mipmap_level =
+            texture.mipmap_level_for_target_size((width * self.batch.scale_factor()) as u32);
+        let atlas_entry = set.atlas().get(*texture.mipmap_level(mipmap_level));
 
+        let aspect_ratio = texture.size().y as f32 / texture.size().x as f32;
+        let size = vec2(width, width * aspect_ratio);
+
+        let scale = atlas_entry.size.x as f32 / width;
+
+        let offset_in_atlas = atlas_entry.pos;
+        self.batch.draw_node(Node {
+            shape: Shape::Rect {
+                rect: Rect::new(pos, size),
+                border_radius: 0.,
+                stroke_width: None,
+            },
+            paint_type: PaintType::Texture {
+                offset_in_atlas,
+                origin: pos,
+                texture_set: set_id,
+                scale,
+            },
+        });
+
+        drop(textures);
+
+        self
+    }
+
+    /*
         /// Draws a sprite, rotating the texture by the given amount.
         pub fn draw_sprite_with_rotation(
             &mut self,

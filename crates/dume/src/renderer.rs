@@ -5,7 +5,7 @@ use glam::{uvec2, vec2, UVec2, Vec2};
 use palette::Srgba;
 use wgpu::util::DeviceExt;
 
-use crate::{Context, Rect, INTERMEDIATE_FORMAT, TARGET_FORMAT};
+use crate::{Context, Rect, TextureSetId, INTERMEDIATE_FORMAT, TARGET_FORMAT};
 
 // Must match definitions in render.wgsl.
 const TILE_WORKGROUP_SIZE: u32 = 256;
@@ -23,6 +23,7 @@ const PAINT_TYPE_SOLID: i32 = 0;
 const PAINT_TYPE_LINEAR_GRADIENT: i32 = 1;
 const PAINT_TYPE_RADIAL_GRADIENT: i32 = 2;
 const PAINT_TYPE_GLYPH: i32 = 3;
+const PAINT_TYPE_TEXTURE: i32 = 4;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StrokeCap {
@@ -36,12 +37,28 @@ pub enum StrokeCap {
 /// To draw onto a canvas, create a `Batch`.
 pub struct Renderer {
     pipelines: Pipelines,
+    empty_texture: wgpu::TextureView,
 }
 
 impl Renderer {
     pub fn new(device: &wgpu::Device) -> Self {
         Self {
             pipelines: Pipelines::new(device),
+            empty_texture: device
+                .create_texture(&wgpu::TextureDescriptor {
+                    label: Some("empty_texture"),
+                    size: wgpu::Extent3d {
+                        width: 1,
+                        height: 1,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: wgpu::TextureFormat::Bgra8UnormSrgb,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING,
+                })
+                .create_view(&Default::default()),
         }
     }
 
@@ -54,6 +71,8 @@ impl Renderer {
             nodes: Vec::new(),
             node_bounding_boxes: Vec::new(),
             points: Vec::new(),
+
+            texture_set: None,
         }
     }
 
@@ -105,6 +124,12 @@ impl Renderer {
             contents: bytemuck::cast_slice(&batch.points),
             usage: wgpu::BufferUsages::STORAGE,
         });
+
+        let textures = context.textures();
+        let texture_atlas = match batch.texture_set {
+            Some(id) => textures.texture_set(id).atlas().texture_view(),
+            None => &self.empty_texture,
+        };
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
@@ -169,6 +194,10 @@ impl Renderer {
                         offset: 0,
                         size: None,
                     }),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 9,
+                    resource: wgpu::BindingResource::TextureView(texture_atlas),
                 },
             ],
         });
@@ -374,6 +403,16 @@ impl Pipelines {
                     },
                     count: None,
                 },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 9,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
             ],
         });
 
@@ -558,6 +597,12 @@ pub enum PaintType {
         origin: UVec2,
         color: Srgba<u8>,
     },
+    Texture {
+        offset_in_atlas: UVec2,
+        origin: Vec2,
+        texture_set: TextureSetId,
+        scale: f32,
+    },
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -675,6 +720,8 @@ pub struct Batch {
     physical_size: UVec2,
     logical_size: Vec2,
     scale_factor: f32,
+
+    texture_set: Option<TextureSetId>,
 }
 
 impl Batch {
@@ -862,6 +909,25 @@ impl Batch {
                 packed.color_a = self.pack_color(color);
                 packed.gradient_point_a = self.pack_upos(offset_in_atlas);
                 packed.gradient_point_b = self.pack_upos(origin);
+            }
+            PaintType::Texture {
+                offset_in_atlas,
+                origin,
+                texture_set,
+                scale,
+            } => {
+                packed.paint_type = PAINT_TYPE_TEXTURE;
+                packed.gradient_point_a = self.pack_upos(offset_in_atlas);
+                packed.gradient_point_b = self.pack_pos(origin);
+                packed.color_a = self.pack_pos(vec2(scale, 0.));
+
+                match self.texture_set {
+                    Some(id) => assert_eq!(
+                        id, texture_set,
+                        "using multiple texture sets in one batch is unimplemented"
+                    ),
+                    None => self.texture_set = Some(texture_set),
+                }
             }
         }
 

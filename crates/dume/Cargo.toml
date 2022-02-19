@@ -9,7 +9,7 @@ ahash = "0.7"
 anyhow = "1"
 bytemuck = { version = "1", features = [ "derive" ] }
 dume-markup = { path = "../dume-markup" }
-fast_image_resize = "0.5"
+fast_image_resize = "0.7"
 glam = { version = "0.17", features = [ "bytemuck" ] }
 guillotiere = "0.6"
 image = { version = "0.23", default-features = false, optional = true }
