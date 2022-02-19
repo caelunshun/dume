@@ -115,15 +115,6 @@ impl Canvas {
         self
     }
 
-    /// Appends a rectangle to the current path.
-    pub fn rect(&mut self, pos: Vec2, size: Vec2) -> &mut Self {
-        self.move_to(pos)
-            .line_to(pos + vec2(size.x, 0.0))
-            .line_to(pos + size)
-            .line_to(pos + vec2(0.0, size.y))
-            .line_to(pos)
-    }
-
     pub fn stroke_width(&mut self, width: f32) -> &mut Self {
         self.stroke_width = width;
         self
@@ -190,6 +181,23 @@ impl Canvas {
             shape: Shape::Rect {
                 rect: Rect { pos, size },
                 border_radius,
+                stroke_width: None,
+            },
+            paint_type: self.current_paint,
+        });
+        self
+    }
+
+    pub fn stroke_rect(&mut self, pos: Vec2, size: Vec2) -> &mut Self {
+        self.stroke_rounded_rect(pos, size, 0.)
+    }
+
+    pub fn stroke_rounded_rect(&mut self, pos: Vec2, size: Vec2, border_radius: f32) -> &mut Self {
+        self.batch.draw_node(Node {
+            shape: Shape::Rect {
+                rect: Rect { pos, size },
+                border_radius,
+                stroke_width: Some(self.stroke_width),
             },
             paint_type: self.current_paint,
         });
@@ -198,7 +206,23 @@ impl Canvas {
 
     pub fn fill_circle(&mut self, center: Vec2, radius: f32) -> &mut Self {
         self.batch.draw_node(Node {
-            shape: Shape::Circle { center, radius },
+            shape: Shape::Circle {
+                center,
+                radius,
+                stroke_width: None,
+            },
+            paint_type: self.current_paint,
+        });
+        self
+    }
+
+    pub fn stroke_circle(&mut self, center: Vec2, radius: f32) -> &mut Self {
+        self.batch.draw_node(Node {
+            shape: Shape::Circle {
+                center,
+                radius,
+                stroke_width: Some(self.stroke_width),
+            },
             paint_type: self.current_paint,
         });
         self
@@ -262,6 +286,7 @@ impl Canvas {
                     size: uvec2(placement.width, placement.height).as_f32() / scale_factor,
                 },
                 border_radius: 0.,
+                stroke_width: None,
             },
         });
     }

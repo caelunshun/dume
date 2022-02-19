@@ -2,10 +2,12 @@
 // subdividing elements into tiles and one for
 // actually painting to the target texture.
 
-let SHAPE_RECT: i32 = 0;
-let SHAPE_CIRCLE: i32 = 1;
-let SHAPE_STROKE: i32 = 2;
-let SHAPE_FILL: i32 = 3;
+let SHAPE_FILL_RECT: i32 = 0;
+let SHAPE_STROKE_RECT: i32 = 1;
+let SHAPE_FILL_CIRCLE: i32 = 2;
+let SHAPE_STROKE_CIRCLE: i32 = 3;
+let SHAPE_FILL_PATH: i32 = 4;
+let SHAPE_STROKE_PATH: i32 = 5;
 
 let PAINT_TYPE_SOLID: i32 = 0;
 let PAINT_TYPE_LINEAR_GRADIENT: i32 = 1;
@@ -221,7 +223,7 @@ fn tile_kernel(
     }
 
     let node = nodes.nodes[node_index];
-    if (node.shape == SHAPE_FILL) {
+    if (node.shape == SHAPE_FILL_PATH) {
         tile_fill_node(node, node_index);
     } else {
         tile_normal_node(node, node_index);
@@ -438,25 +440,35 @@ fn rect_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
     let rect_min = to_physical(unpack_pos(node.pos_a));
     let rect_max = rect_min + size;
 
-    let border_radius = to_physical(unpack_pos(node.extra)).x;
+    let stroke = node.shape == SHAPE_STROKE_RECT;
+
+    let params = to_physical(unpack_pos(node.extra));
+    let border_radius = params.x;
+    let stroke_width = params.y;
 
     // Compute intersection area
     // between the pixel and the (possibly rounded) rectangle.
-    if (rect_max.x < pixel_min.x || rect_max.y < pixel_min.y 
-        || rect_min.x > pixel_max.x || rect_min.y > pixel_max.y) {
+    if (rect_max.x + stroke_width < pixel_min.x || rect_max.y + stroke_width < pixel_min.y 
+        || rect_min.x - stroke_width > pixel_max.x || rect_min.y - stroke_width > pixel_max.y) {
         return 0.0;
     }
 
     var area = 0.0;
-    if (border_radius > 0.01) {
+    if (border_radius > 0.01 || stroke) {
         // Rounded corners
-        let top_left = rect_min + border_radius;
-        let bottom_right = rect_max - border_radius;
+        let top_left = rect_min;
+        let bottom_right = rect_max;
 
-        let d1 = top_left - pixel_mid;
-        let d4 = pixel_mid - bottom_right;
-        let d = length(max(max(d1, d4), vec2<f32>(0.0))) - border_radius;
-        area = 1.0 - clamp(d, 0.0, 1.0);
+        if (stroke) {
+            let q = abs(pixel_mid - (top_left + size / 2.)) - size / 2. + border_radius;
+            let dist = min(max(q.x, q.y), 0.0) + length(max(q, vec2<f32>(0.0))) - border_radius;
+            area = stroke_width - abs(dist);
+        } else {
+            let d1 = top_left - pixel_mid;
+            let d2 = pixel_mid - bottom_right;
+            let dist = length(max(max(d1, d2), vec2<f32>(0.0))) - border_radius;
+            area = 1.0 - dist;
+        } 
     } else {
         // No rounded corners, cheaper calculation with no length() call
         let length_x = min(rect_max.x, pixel_max.x) - max(rect_min.x, pixel_min.x);
@@ -470,12 +482,23 @@ fn rect_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
 fn circle_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
     let pixel_mid = pixel_pos + 0.5;
     let center = to_physical(unpack_pos(node.pos_a));
-    let radius = to_physical(unpack_pos(node.pos_b)).x;
+    let params = to_physical(unpack_pos(node.pos_b));
+    let radius = params.x;
+
+    let stroke = node.shape == SHAPE_STROKE_CIRCLE;
+    let stroke_width = params.y;
 
     let distance = length(pixel_mid - center);
+
     // Not the exact coverage, but close enough to look fine.
-    let alpha = clamp(radius - distance, 0.0, 1.0);
-    return alpha;
+    var alpha = 0.0;
+    if (stroke) {
+        alpha = min(distance - (radius - stroke_width), (radius + stroke_width) - distance);
+    } else {
+        alpha = radius - distance;
+    }
+
+    return clamp(alpha, 0.0, 1.0);
 }
 
 fn projection_on_line(a: vec2<f32>, b: vec2<f32>, pos: vec2<f32>) -> f32 {
@@ -589,13 +612,13 @@ fn fill_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
 }
 
 fn node_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
-    if (node.shape == SHAPE_RECT) {
+    if (node.shape == SHAPE_FILL_RECT || node.shape == SHAPE_STROKE_RECT) {
         return rect_coverage(node, pixel_pos);
-    } else if (node.shape == SHAPE_CIRCLE) {
+    } else if (node.shape == SHAPE_FILL_CIRCLE || node.shape == SHAPE_STROKE_CIRCLE) {
         return circle_coverage(node, pixel_pos);
-    } else if (node.shape == SHAPE_STROKE) {
+    } else if (node.shape == SHAPE_STROKE_PATH) {
         return stroke_coverage(node, pixel_pos);
-    } else if (node.shape == SHAPE_FILL) {
+    } else if (node.shape == SHAPE_FILL_PATH) {
         return fill_coverage(node, pixel_pos);
     } else {
         // Should never happen
@@ -641,7 +664,7 @@ fn paint_kernel(
         let node: Node = take_next_node();
 
         var coverage = 0.0;
-        if (node.shape == SHAPE_STROKE) {
+        if (node.shape == SHAPE_STROKE_PATH) {
             // Consume all segments in the same path (each is its own node)
             // then choose the segment with the highest coverage.
             let path_id = node.extra;
@@ -652,7 +675,7 @@ fn paint_kernel(
                     break;
                 }
                 let next_node = peek_next_node();
-                if (next_node.extra != path_id || next_node.shape != SHAPE_STROKE) {
+                if (next_node.extra != path_id || next_node.shape != SHAPE_STROKE_PATH) {
                     break;
                 }
                 n = take_next_node();

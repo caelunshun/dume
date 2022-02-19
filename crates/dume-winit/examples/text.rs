@@ -87,13 +87,11 @@ impl Application for App {
                 (227, 101, 105, u8::MAX),
                 (151, 146, 216, 50),
             )
-            .fill_rect(pos, Vec2::splat(200.))
+            .fill_circle(pos + 100., 100.)
             .solid_color((0, 0, 0, u8::MAX))
-            .begin_path()
-            .rect(pos, Vec2::splat(200.))
-            .stroke_width(1.)
+            .stroke_width(2.)
             .stroke_cap(StrokeCap::Square)
-            .stroke();
+            .stroke_circle(pos + 100., 100.);
     }
 }
 

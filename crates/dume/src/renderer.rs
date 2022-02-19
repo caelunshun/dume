@@ -12,10 +12,12 @@ const TILE_WORKGROUP_SIZE: u32 = 256;
 const SORT_WORKGROUP_SIZE: u32 = 16;
 const TILE_SIZE: u32 = 16;
 
-const SHAPE_RECT: i32 = 0;
-const SHAPE_CIRCLE: i32 = 1;
-const SHAPE_STROKE: i32 = 2;
-const SHAPE_FILL: i32 = 3;
+const SHAPE_FILL_RECT: i32 = 0;
+const SHAPE_STROKE_RECT: i32 = 1;
+const SHAPE_FILL_CIRCLE: i32 = 2;
+const SHAPE_STROKE_CIRCLE: i32 = 3;
+const SHAPE_FILL_PATH: i32 = 4;
+const SHAPE_STROKE_PATH: i32 = 5;
 
 const PAINT_TYPE_SOLID: i32 = 0;
 const PAINT_TYPE_LINEAR_GRADIENT: i32 = 1;
@@ -563,10 +565,12 @@ pub enum Shape {
     Rect {
         rect: Rect,
         border_radius: f32,
+        stroke_width: Option<f32>,
     },
     Circle {
         center: Vec2,
         radius: f32,
+        stroke_width: Option<f32>,
     },
     Stroke {
         segment: LineSegment,
@@ -596,10 +600,28 @@ pub struct Node {
 impl Node {
     fn bounding_box(&self) -> Rect {
         match self.shape {
-            Shape::Rect { rect, .. } => rect,
-            Shape::Circle { center, radius } => Rect {
-                pos: center - Vec2::splat(radius),
-                size: Vec2::splat(radius * 2.),
+            Shape::Rect {
+                rect, stroke_width, ..
+            } => match stroke_width {
+                Some(w) => Rect {
+                    pos: rect.pos - w,
+                    size: rect.size + 2. * w,
+                },
+                None => rect,
+            },
+            Shape::Circle {
+                center,
+                radius,
+                stroke_width,
+            } => match stroke_width {
+                Some(w) => Rect {
+                    pos: center - radius - w,
+                    size: Vec2::splat(radius * 2. + w * 2.),
+                },
+                None => Rect {
+                    pos: center - radius,
+                    size: Vec2::splat(radius * 2.),
+                },
             },
             Shape::Stroke { segment, width, .. } => {
                 let min = segment.start.min(segment.end);
@@ -740,16 +762,29 @@ impl Batch {
             Shape::Rect {
                 rect,
                 border_radius,
+                stroke_width,
             } => {
-                packed.shape = SHAPE_RECT;
+                packed.shape = if stroke_width.is_some() {
+                    SHAPE_STROKE_RECT
+                } else {
+                    SHAPE_FILL_RECT
+                };
                 packed.pos_a = self.pack_pos(rect.pos);
                 packed.pos_b = self.pack_pos(rect.size);
-                packed.extra = self.pack_pos(vec2(border_radius, 0.));
+                packed.extra = self.pack_pos(vec2(border_radius, stroke_width.unwrap_or(0.)));
             }
-            Shape::Circle { center, radius } => {
-                packed.shape = SHAPE_CIRCLE;
+            Shape::Circle {
+                center,
+                radius,
+                stroke_width,
+            } => {
+                packed.shape = if stroke_width.is_some() {
+                    SHAPE_STROKE_CIRCLE
+                } else {
+                    SHAPE_FILL_CIRCLE
+                };
                 packed.pos_a = self.pack_pos(center);
-                packed.pos_b = self.pack_pos(vec2(radius, 0.));
+                packed.pos_b = self.pack_pos(vec2(radius, stroke_width.unwrap_or(0.)));
             }
             Shape::Stroke {
                 segment,
@@ -757,7 +792,7 @@ impl Batch {
                 cap,
                 path_id,
             } => {
-                packed.shape = SHAPE_STROKE;
+                packed.shape = SHAPE_STROKE_PATH;
 
                 let base_index = self.points.len() as u32;
                 self.points.push(self.pack_pos(segment.start));
@@ -772,7 +807,7 @@ impl Batch {
                 path_id,
                 fill_bounding_box,
             } => {
-                packed.shape = SHAPE_FILL;
+                packed.shape = SHAPE_FILL_PATH;
 
                 let base_index = self.points.len() as u32;
                 self.points
