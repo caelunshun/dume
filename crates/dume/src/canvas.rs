@@ -11,6 +11,21 @@ use crate::{
     Context, FontId, Rect, TextBlob, INTERMEDIATE_FORMAT,
 };
 
+/// The current shape being drawn in a `Canvas`.
+#[derive(Debug, Copy, Clone)]
+enum PathType {
+    Rect {
+        rect: Rect,
+        border_radius: f32,
+    },
+    Circle {
+        center: Vec2,
+        radius: f32,
+    },
+    /// A path of line segments stored in `canvas.current_path`
+    Path,
+}
+
 /// A 2D canvas using `wgpu`. Modeled after the HTML5 canvas
 /// API.
 pub struct Canvas {
@@ -19,6 +34,7 @@ pub struct Canvas {
 
     current_paint: PaintType,
     current_path: Vec<LineSegment>,
+    current_path_type: PathType,
     stroke_width: f32,
     stroke_cap: StrokeCap,
 
@@ -36,6 +52,7 @@ impl Canvas {
             batch,
             current_paint: PaintType::Solid(Srgba::default()),
             current_path: Vec::new(),
+            current_path_type: PathType::Path,
             stroke_width: 1.,
             stroke_cap: StrokeCap::Round,
             next_path_id: 0,
@@ -86,12 +103,17 @@ impl Canvas {
         self
     }
 
-    pub fn begin_path(&mut self) -> &mut Self {
+    fn clear_path(&mut self) {
         self.current_path.clear();
+    }
+
+    pub fn begin_path(&mut self) -> &mut Self {
+        self.clear_path();
         self
     }
 
     pub fn move_to(&mut self, pos: Vec2) -> &mut Self {
+        self.current_path_type = PathType::Path;
         self.current_path.push(LineSegment {
             start: pos,
             end: pos,
@@ -107,6 +129,7 @@ impl Canvas {
     }
 
     pub fn line_to(&mut self, pos: Vec2) -> &mut Self {
+        self.current_path_type = PathType::Path;
         let last = self.last_pos();
         self.current_path.push(LineSegment {
             start: last,
@@ -125,7 +148,50 @@ impl Canvas {
         self
     }
 
+    pub fn rect(&mut self, pos: Vec2, size: Vec2) -> &mut Self {
+        self.rounded_rect(pos, size, 0.)
+    }
+
+    pub fn rounded_rect(&mut self, pos: Vec2, size: Vec2, border_radius: f32) -> &mut Self {
+        self.clear_path();
+        self.current_path_type = PathType::Rect {
+            rect: Rect::new(pos, size),
+            border_radius,
+        };
+        self
+    }
+
+    pub fn circle(&mut self, center: Vec2, radius: f32) -> &mut Self {
+        self.clear_path();
+        self.current_path_type = PathType::Circle { center, radius };
+        self
+    }
+
     pub fn stroke(&mut self) -> &mut Self {
+        match self.current_path_type {
+            PathType::Rect {
+                rect,
+                border_radius,
+            } => self.stroke_rounded_rect(rect.pos, rect.size, border_radius),
+            PathType::Circle { center, radius } => self.stroke_circle(center, radius),
+            PathType::Path => self.stroke_path(),
+        }
+        self
+    }
+
+    pub fn fill(&mut self) -> &mut Self {
+        match self.current_path_type {
+            PathType::Rect {
+                rect,
+                border_radius,
+            } => self.fill_rounded_rect(rect.pos, rect.size, border_radius),
+            PathType::Circle { center, radius } => self.fill_circle(center, radius),
+            PathType::Path => self.fill_path(),
+        }
+        self
+    }
+
+    fn stroke_path(&mut self) {
         for &segment in &self.current_path {
             self.batch.draw_node(Node {
                 shape: Shape::Stroke {
@@ -138,10 +204,9 @@ impl Canvas {
             });
         }
         self.next_path_id += 1;
-        self
     }
 
-    pub fn fill(&mut self) -> &mut Self {
+    fn fill_path(&mut self) {
         let fill_bounding_box = self.current_path_bounding_box();
         for &segment in &self.current_path {
             self.batch.draw_node(Node {
@@ -154,7 +219,6 @@ impl Canvas {
             });
         }
         self.next_path_id += 1;
-        self
     }
 
     fn current_path_bounding_box(&self) -> Rect {
@@ -172,11 +236,7 @@ impl Canvas {
         }
     }
 
-    pub fn fill_rect(&mut self, pos: Vec2, size: Vec2) -> &mut Self {
-        self.fill_rounded_rect(pos, size, 0.)
-    }
-
-    pub fn fill_rounded_rect(&mut self, pos: Vec2, size: Vec2, border_radius: f32) -> &mut Self {
+    fn fill_rounded_rect(&mut self, pos: Vec2, size: Vec2, border_radius: f32) {
         self.batch.draw_node(Node {
             shape: Shape::Rect {
                 rect: Rect { pos, size },
@@ -185,14 +245,9 @@ impl Canvas {
             },
             paint_type: self.current_paint,
         });
-        self
     }
 
-    pub fn stroke_rect(&mut self, pos: Vec2, size: Vec2) -> &mut Self {
-        self.stroke_rounded_rect(pos, size, 0.)
-    }
-
-    pub fn stroke_rounded_rect(&mut self, pos: Vec2, size: Vec2, border_radius: f32) -> &mut Self {
+    fn stroke_rounded_rect(&mut self, pos: Vec2, size: Vec2, border_radius: f32) {
         self.batch.draw_node(Node {
             shape: Shape::Rect {
                 rect: Rect { pos, size },
@@ -201,10 +256,9 @@ impl Canvas {
             },
             paint_type: self.current_paint,
         });
-        self
     }
 
-    pub fn fill_circle(&mut self, center: Vec2, radius: f32) -> &mut Self {
+    fn fill_circle(&mut self, center: Vec2, radius: f32) {
         self.batch.draw_node(Node {
             shape: Shape::Circle {
                 center,
@@ -213,10 +267,9 @@ impl Canvas {
             },
             paint_type: self.current_paint,
         });
-        self
     }
 
-    pub fn stroke_circle(&mut self, center: Vec2, radius: f32) -> &mut Self {
+    fn stroke_circle(&mut self, center: Vec2, radius: f32) {
         self.batch.draw_node(Node {
             shape: Shape::Circle {
                 center,
@@ -225,7 +278,6 @@ impl Canvas {
             },
             paint_type: self.current_paint,
         });
-        self
     }
 
     /// Draws a blob of text.

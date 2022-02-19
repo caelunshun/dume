@@ -42,10 +42,11 @@ impl Application for App {
         for particle in &self.particles {
             canvas.solid_color(particle.color);
             if particle.is_circle {
-                canvas.fill_circle(particle.pos, 10.);
+                canvas.circle(particle.pos, 10.);
             } else {
-                canvas.fill_rect(particle.pos, Vec2::splat(20.));
+                canvas.rect(particle.pos, Vec2::splat(20.));
             }
+            canvas.fill();
         }
     }
 }

@@ -62,7 +62,8 @@ impl Application for App {
                 (255, 200, 30, 255),
                 (11, 212, 226, 255),
             )
-            .fill_rect(Vec2::ZERO, size);
+            .rect(Vec2::ZERO, size)
+            .fill();
         canvas
             .begin_path()
             .move_to(vec2(1000., 0.))
@@ -87,11 +88,12 @@ impl Application for App {
                 (227, 101, 105, u8::MAX),
                 (151, 146, 216, 50),
             )
-            .fill_circle(pos + 100., 100.)
+            .circle(pos + 100., 100.)
+            .fill()
             .solid_color((0, 0, 0, u8::MAX))
             .stroke_width(2.)
             .stroke_cap(StrokeCap::Square)
-            .stroke_circle(pos + 100., 100.);
+            .stroke();
     }
 }
 
