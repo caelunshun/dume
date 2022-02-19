@@ -1,6 +1,7 @@
 use std::{iter, mem};
 
 use glam::{uvec2, vec2, UVec2, Vec2};
+use kurbo::{PathEl, Point};
 use palette::Srgba;
 use swash::GlyphId;
 
@@ -22,7 +23,7 @@ enum PathType {
         center: Vec2,
         radius: f32,
     },
-    /// A path of line segments stored in `canvas.current_path`
+    /// A path of segments stored in `canvas.current_path`
     Path,
 }
 
@@ -33,10 +34,12 @@ pub struct Canvas {
     batch: Batch,
 
     current_paint: PaintType,
-    current_path: Vec<LineSegment>,
+    current_path: Vec<PathEl>,
     current_path_type: PathType,
     stroke_width: f32,
     stroke_cap: StrokeCap,
+
+    segment_buffer: Vec<LineSegment>,
 
     next_path_id: u32,
 }
@@ -56,6 +59,7 @@ impl Canvas {
             stroke_width: 1.,
             stroke_cap: StrokeCap::Round,
             next_path_id: 0,
+            segment_buffer: Vec::new(),
         }
     }
 
@@ -114,27 +118,34 @@ impl Canvas {
 
     pub fn move_to(&mut self, pos: Vec2) -> &mut Self {
         self.current_path_type = PathType::Path;
-        self.current_path.push(LineSegment {
-            start: pos,
-            end: pos,
-        });
-        self
-    }
-
-    fn last_pos(&self) -> Vec2 {
         self.current_path
-            .last()
-            .expect("no segments in path; call move_to first")
-            .end
+            .push(PathEl::MoveTo(Point::new(pos.x as f64, pos.y as f64)));
+        self
     }
 
     pub fn line_to(&mut self, pos: Vec2) -> &mut Self {
         self.current_path_type = PathType::Path;
-        let last = self.last_pos();
-        self.current_path.push(LineSegment {
-            start: last,
-            end: pos,
-        });
+        self.current_path
+            .push(PathEl::LineTo(Point::new(pos.x as f64, pos.y as f64)));
+        self
+    }
+
+    pub fn quad_to(&mut self, control: Vec2, pos: Vec2) -> &mut Self {
+        self.current_path_type = PathType::Path;
+        self.current_path.push(PathEl::QuadTo(
+            Point::new(control.x as f64, control.y as f64),
+            Point::new(pos.x as f64, pos.y as f64),
+        ));
+        self
+    }
+
+    pub fn cubic_to(&mut self, control1: Vec2, control2: Vec2, pos: Vec2) -> &mut Self {
+        self.current_path_type = PathType::Path;
+        self.current_path.push(PathEl::CurveTo(
+            Point::new(control1.x as f64, control1.y as f64),
+            Point::new(control2.x as f64, control2.y as f64),
+            Point::new(pos.x as f64, pos.y as f64),
+        ));
         self
     }
 
@@ -191,8 +202,35 @@ impl Canvas {
         self
     }
 
+    fn flatten_path(&mut self) {
+        self.segment_buffer.clear();
+        if self.current_path.last() != Some(&PathEl::ClosePath) {
+            self.current_path.push(PathEl::ClosePath);
+        }
+
+        let mut pos = Vec2::ZERO;
+        kurbo::flatten(
+            self.current_path.iter().copied(),
+            0.25,
+            |element| match element {
+                PathEl::MoveTo(p) => pos = vec2(p.x as f32, p.y as f32),
+                PathEl::LineTo(p) => {
+                    let target = vec2(p.x as f32, p.y as f32);
+                    self.segment_buffer.push(LineSegment {
+                        start: pos,
+                        end: target,
+                    });
+                    pos = target;
+                }
+                PathEl::ClosePath => {}
+                _ => unreachable!(),
+            },
+        );
+    }
+
     fn stroke_path(&mut self) {
-        for &segment in &self.current_path {
+        self.flatten_path();
+        for &segment in &self.segment_buffer {
             self.batch.draw_node(Node {
                 shape: Shape::Stroke {
                     segment,
@@ -207,8 +245,9 @@ impl Canvas {
     }
 
     fn fill_path(&mut self) {
+        self.flatten_path();
         let fill_bounding_box = self.current_path_bounding_box();
-        for &segment in &self.current_path {
+        for &segment in &self.segment_buffer {
             self.batch.draw_node(Node {
                 shape: Shape::Fill {
                     segment,
@@ -225,7 +264,7 @@ impl Canvas {
         let mut min = Vec2::splat(f32::INFINITY);
         let mut max = Vec2::splat(-f32::INFINITY);
 
-        for &segment in &self.current_path {
+        for &segment in &self.segment_buffer {
             min = min.min(segment.start).min(segment.end);
             max = max.max(segment.start).max(segment.start);
         }

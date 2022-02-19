@@ -13,6 +13,7 @@ fast_image_resize = "0.5"
 glam = { version = "0.17", features = [ "bytemuck" ] }
 guillotiere = "0.6"
 image = { version = "0.23", default-features = false, optional = true }
+kurbo = "0.8"
 log = "0.4"
 lru = "0.7"
 once_cell = "1"

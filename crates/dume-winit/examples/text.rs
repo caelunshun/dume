@@ -64,13 +64,14 @@ impl Application for App {
             )
             .rect(Vec2::ZERO, size)
             .fill();
+
         canvas
             .begin_path()
             .move_to(vec2(1000., 0.))
-            .line_to(vec2(1400., 1080.))
+            .quad_to(vec2(1800., 500.), vec2(1400., 1080.))
             .solid_color((0, 0, 0, u8::MAX))
             .stroke_width(10.)
-            .stroke_cap(StrokeCap::Square)
+            .stroke_cap(StrokeCap::Round)
             .stroke();
 
         canvas
