@@ -919,7 +919,7 @@ impl Batch {
                 packed.paint_type = PAINT_TYPE_TEXTURE;
                 packed.gradient_point_a = self.pack_upos(offset_in_atlas);
                 packed.gradient_point_b = self.pack_pos(origin);
-                packed.color_a = self.pack_pos(vec2(scale, 0.));
+                packed.color_a = scale.to_bits();
 
                 match self.texture_set {
                     Some(id) => assert_eq!(

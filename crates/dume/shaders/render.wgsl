@@ -415,7 +415,7 @@ fn node_color(node: Node, pixel_pos: vec2<f32>) -> vec4<f32> {
     } else if (paint == PAINT_TYPE_TEXTURE) {
         let offset = unpack_upos(node.gradient_point_a);
         let origin = to_physical(unpack_pos(node.gradient_point_b));
-        let scale = unpack_pos(node.color_a).x / globals.scale_factor;
+        let scale = bitcast<f32>(node.color_a) / globals.scale_factor;
 
         let texcoords = vec2<f32>(offset) + (pixel_pos - origin) * scale;
         let texsize = textureDimensions(texture_atlas);
