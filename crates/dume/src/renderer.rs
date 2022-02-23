@@ -622,7 +622,7 @@ impl PaintType {
             PaintType::Glyph { .. } => {}
             PaintType::Texture { origin, scale, .. } => {
                 *origin = transform.transform_point2(*origin);
-                *scale = transform_scalar(*scale, transform);
+                *scale /= transform_scalar(1., transform);
             }
         }
     }
