@@ -91,7 +91,7 @@ impl GlyphCache {
                 let mut render = Render::new(&[Source::Outline]);
                 render
                     .offset(Vector::new(position.x.fract(), position.y.fract()))
-                    .format(Format::Alpha);
+                    .format(Format::Alpha).embolden(0.25);
 
                 let fonts = cx.fonts();
                 let font = fonts.get(font);

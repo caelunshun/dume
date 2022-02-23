@@ -388,7 +388,7 @@ fn radial_gradient(pos: vec2<f32>, center: vec2<f32>, radius: f32, color_a: vec4
     return interpolate_colors(color_a, color_b, t);
 }
 
-fn node_color(node: Node, pixel_pos: vec2<f32>) -> vec4<f32> {
+fn node_color(node: Node, pixel_pos: vec2<f32>, node_index: i32) -> vec4<f32> {
     let paint = node.paint_type;
     if (paint == PAINT_TYPE_SOLID) {
         return unpack_color(node.color_a);
@@ -416,10 +416,22 @@ fn node_color(node: Node, pixel_pos: vec2<f32>) -> vec4<f32> {
         let offset = unpack_upos(node.gradient_point_a);
         let origin = to_physical(unpack_pos(node.gradient_point_b));
         let scale = bitcast<f32>(node.color_a) / globals.scale_factor;
+        let rotation = i32(node.color_b) & 3;
 
-        let texcoords = vec2<f32>(offset) + (pixel_pos - origin) * scale;
+        var texcoords = (pixel_pos - origin) * scale;
+
+        let texture_size = vec2<u32>(points.list[node.color_b >> u32(2)], points.list[(node.color_b >> u32(2)) + u32(1)]);
+
+        if (rotation == 1) {
+            texcoords = vec2<f32>(texcoords.y, texcoords.x);
+        } else if (rotation == 2) {
+            texcoords.y = f32(texture_size.y) - texcoords.y;
+        } else if (rotation == 3) {
+            texcoords = vec2<f32>(texcoords.y, f32(texture_size.y) - texcoords.x);
+        }
+
         let texsize = textureDimensions(texture_atlas);
-        let texcoords = texcoords / vec2<f32>(texsize);
+        let texcoords = (vec2<f32>(offset) + texcoords) / vec2<f32>(texsize);
 
         return textureSampleLevel(texture_atlas, samp_linear, texcoords, 0.0);
     } else {
@@ -443,6 +455,10 @@ fn peek_next_node() -> Node {
 fn take_next_node() -> Node {
     node_index = node_index + 1;
     return nodes_in_tile[node_index - 1];
+}
+
+fn get_node_index() -> i32 {
+    return node_index;
 }
 
 fn rect_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
@@ -472,16 +488,18 @@ fn rect_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
         let top_left = rect_min;
         let bottom_right = rect_max;
 
+        let q = abs(pixel_mid - (top_left + size / 2.)) - size / 2. + border_radius;
+        var dist = min(max(q.x, q.y), 0.0) + length(max(q, vec2<f32>(0.0))) - border_radius;
+
         if (stroke) {
-            let q = abs(pixel_mid - (top_left + size / 2.)) - size / 2. + border_radius;
-            let dist = min(max(q.x, q.y), 0.0) + length(max(q, vec2<f32>(0.0))) - border_radius;
-            area = stroke_width - abs(dist);
+            if (dist > 0.0) {
+                area = 1.0 - dist;
+            } else {
+                area = stroke_width - abs(dist);
+            }
         } else {
-            let d1 = top_left - pixel_mid;
-            let d2 = pixel_mid - bottom_right;
-            let dist = length(max(max(d1, d2), vec2<f32>(0.0))) - border_radius;
             area = 1.0 - dist;
-        } 
+        }
     } else {
         // No rounded corners, cheaper calculation with no length() call
         let length_x = min(rect_max.x, pixel_max.x) - max(rect_min.x, pixel_min.x);
@@ -506,7 +524,7 @@ fn circle_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
     // Not the exact coverage, but close enough to look fine.
     var alpha = 0.0;
     if (stroke) {
-        alpha = min(distance - (radius - stroke_width), (radius + stroke_width) - distance);
+        alpha = min(distance - (radius - stroke_width / 2.), (radius + stroke_width / 2.) - distance);
     } else {
         alpha = radius - distance;
     }
@@ -544,7 +562,7 @@ fn stroke_coverage(node: Node, pos: vec2<f32>) -> f32 {
     let point_b = to_physical(unpack_pos(points.list[index + u32(1)]));
 
     let params2 = unpack_pos(node.pos_b);
-    let stroke_width = params2.x * globals.scale_factor;
+    let stroke_width = params2.x * globals.scale_factor / 2.;
     let stroke_cap = i32(round(params2.y));
 
     var dist = 0.0;
@@ -697,7 +715,7 @@ fn paint_kernel(
             coverage = node_coverage(node, pixel_pos);
         }
 
-        let node_color = node_color(node, pixel_pos);
+        let node_color = node_color(node, pixel_pos, get_node_index() - 1);
         color = mix(color, node_color.rgb, coverage * node_color.a);
     }
 

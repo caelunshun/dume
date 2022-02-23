@@ -1,6 +1,6 @@
 use std::fs;
 
-use dume::{Canvas, TextureId};
+use dume::{Canvas, SpriteRotate, TextureId};
 use dume_winit::{block_on, Application, DumeWinit};
 use glam::{vec2, Vec2};
 use winit::{event_loop::EventLoop, window::Window};
@@ -15,7 +15,12 @@ impl Application for App {
         let size = canvas.size();
         canvas
             .draw_sprite(self.image1, Vec2::ZERO, size.x / 2.)
-            .draw_sprite(self.image2, vec2(size.x / 2., 0.), size.x / 2.);
+            .draw_sprite_with_rotation(
+                self.image2,
+                vec2(size.x / 2., 0.),
+                size.x / 2.,
+                SpriteRotate::Three,
+            );
     }
 }
 

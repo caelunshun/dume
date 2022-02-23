@@ -1,7 +1,5 @@
 //! Renders a bunch of text.
 
-use std::f32::consts::TAU;
-
 use instant::Instant;
 
 use dume::{Canvas, Context, StrokeCap, TextBlob};
@@ -93,7 +91,7 @@ impl Application for App {
                 (227, 101, 105, u8::MAX),
                 (151, 146, 216, 50),
             )
-            .rect(Vec2::ZERO, Vec2::splat(200.))
+            .rounded_rect(Vec2::ZERO, Vec2::splat(200.), 0.)
             .fill()
             .solid_color((0, 0, 0, u8::MAX))
             .stroke_width(2.)

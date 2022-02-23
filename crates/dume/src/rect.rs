@@ -64,4 +64,16 @@ impl Rect {
             size: max - min,
         }
     }
+
+    pub fn normalize_negative_size(&mut self) {
+        if self.size.x < 0. {
+            self.pos.x += self.size.x;
+            self.size.x = self.size.x.abs();
+        }
+
+        if self.size.y < 0. {
+            self.pos.y += self.size.y;
+            self.size.y = self.size.y.abs();
+        }
+    }
 }

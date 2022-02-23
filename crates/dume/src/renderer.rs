@@ -5,7 +5,7 @@ use glam::{uvec2, vec2, Affine2, UVec2, Vec2};
 use palette::Srgba;
 use wgpu::util::DeviceExt;
 
-use crate::{Context, Rect, TextureSetId, INTERMEDIATE_FORMAT, TARGET_FORMAT};
+use crate::{Context, Rect, SpriteRotate, TextureSetId, INTERMEDIATE_FORMAT, TARGET_FORMAT};
 
 // Must match definitions in render.wgsl.
 const TILE_WORKGROUP_SIZE: u32 = 256;
@@ -602,6 +602,8 @@ pub enum PaintType {
         origin: Vec2,
         texture_set: TextureSetId,
         scale: f32,
+        rotation: SpriteRotate,
+        texture_size: UVec2,
     },
 }
 
@@ -995,11 +997,18 @@ impl Batch {
                 origin,
                 texture_set,
                 scale,
+                rotation,
+                texture_size,
             } => {
+                let index = self.points.len() as u32;
+                self.points.push(texture_size.x);
+                self.points.push(texture_size.y);
+
                 packed.paint_type = PAINT_TYPE_TEXTURE;
                 packed.gradient_point_a = self.pack_upos(offset_in_atlas);
                 packed.gradient_point_b = self.pack_pos(origin);
                 packed.color_a = scale.to_bits();
+                packed.color_b = rotation as u32 | (index << 2);
 
                 match self.texture_set {
                     Some(id) => assert_eq!(

@@ -9,7 +9,7 @@ use crate::{
     glyph::Glyph,
     renderer::{Batch, LineSegment, Node, PaintType, Shape, StrokeCap},
     text::layout::GlyphCharacter,
-    Context, FontId, Rect, TextBlob, TextureId, INTERMEDIATE_FORMAT,
+    Context, FontId, Rect, SpriteRotate, TextBlob, TextureId, INTERMEDIATE_FORMAT,
 };
 
 /// The current shape being drawn in a `Canvas`.
@@ -169,8 +169,10 @@ impl Canvas {
 
     pub fn rounded_rect(&mut self, pos: Vec2, size: Vec2, border_radius: f32) -> &mut Self {
         self.clear_path();
+        let mut rect = Rect::new(pos, size);
+        rect.normalize_negative_size();
         self.current_path_type = PathType::Rect {
-            rect: Rect::new(pos, size),
+            rect,
             border_radius,
         };
         self
@@ -183,6 +185,9 @@ impl Canvas {
     }
 
     pub fn stroke(&mut self) -> &mut Self {
+        if self.stroke_width * self.current_transform_scale < 0.1 {
+            return self;
+        }
         match self.current_path_type {
             PathType::Rect {
                 rect,
@@ -408,12 +413,24 @@ impl Canvas {
     /// `width` is the width of the image on the canvas, also in
     /// logical pixels. The height is automatically computed from the texture's aspect ratio.
     pub fn draw_sprite(&mut self, texture: TextureId, pos: Vec2, width: f32) -> &mut Self {
+        self.draw_sprite_with_rotation(texture, pos, width, SpriteRotate::Zero)
+    }
+
+    /// Draws a sprite rotated in increments of 90 degrees.
+    pub fn draw_sprite_with_rotation(
+        &mut self,
+        texture: TextureId,
+        pos: Vec2,
+        width: f32,
+        rotation: SpriteRotate,
+    ) -> &mut Self {
         let textures = self.context.textures();
         let set_id = textures.set_for_texture(texture);
         let set = textures.texture_set(set_id);
         let texture = set.get(texture);
-        let mipmap_level =
-            texture.mipmap_level_for_target_size((width * self.batch.scale_factor()) as u32);
+        let mipmap_level = texture.mipmap_level_for_target_size(
+            (width * self.batch.scale_factor() * self.current_transform_scale) as u32,
+        );
         let atlas_entry = set.atlas().get(*texture.mipmap_level(mipmap_level));
 
         let aspect_ratio = texture.size().y as f32 / texture.size().x as f32;
@@ -421,11 +438,16 @@ impl Canvas {
 
         let scale = atlas_entry.size.x as f32 / width;
 
+        let mut rect = Rect::new(pos, size);
+        if matches!(rotation, SpriteRotate::One | SpriteRotate::Three) {
+            rect.size = vec2(rect.size.y, rect.size.x);
+        }
+
         let offset_in_atlas = atlas_entry.pos;
         self.batch.draw_node(Node {
             transform: self.current_transform,
             shape: Shape::Rect {
-                rect: Rect::new(pos, size),
+                rect,
                 border_radius: 0.,
                 stroke_width: None,
             },
@@ -434,6 +456,8 @@ impl Canvas {
                 origin: pos,
                 texture_set: set_id,
                 scale,
+                rotation,
+                texture_size: atlas_entry.size,
             },
         });
 
