@@ -1,4 +1,4 @@
-use glam::{Affine2, Vec2};
+use glam::{vec2, Affine2, Vec2};
 
 /// A rectangle.
 #[derive(Copy, Clone, Debug, PartialEq, Default)]
@@ -40,6 +40,28 @@ impl Rect {
         Self {
             pos: transform.transform_point2(self.pos),
             size: transform.transform_vector2(self.size),
+        }
+    }
+
+    pub fn bbox_transformed(self, transform: Affine2) -> Self {
+        let points = [
+            self.pos,
+            self.pos + vec2(0., self.size.y),
+            self.pos + vec2(self.size.x, 0.),
+            self.pos + self.size,
+        ]
+        .map(|p| transform.transform_point2(p));
+
+        let mut min = Vec2::splat(f32::INFINITY);
+        let mut max = Vec2::splat(-f32::INFINITY);
+        for point in points {
+            min = min.min(point);
+            max = max.max(point);
+        }
+
+        Self {
+            pos: min,
+            size: max - min,
         }
     }
 }

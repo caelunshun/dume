@@ -1,5 +1,7 @@
 //! Renders a bunch of text.
 
+use std::f32::consts::TAU;
+
 use instant::Instant;
 
 use dume::{Canvas, Context, StrokeCap, TextBlob};
@@ -83,13 +85,15 @@ impl Application for App {
 
         let pos = Vec2::splat((time.sin() + 1.) / 2. * 500.);
         canvas
+            .translate(pos)
+            .scale((time.sin() + 1.) / 2. + 1.)
             .radial_gradient(
-                pos + 100.,
+                Vec2::splat(100.),
                 100.,
                 (227, 101, 105, u8::MAX),
                 (151, 146, 216, 50),
             )
-            .circle(pos + 100., 100.)
+            .rect(Vec2::ZERO, Vec2::splat(200.))
             .fill()
             .solid_color((0, 0, 0, u8::MAX))
             .stroke_width(2.)

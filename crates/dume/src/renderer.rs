@@ -1,7 +1,7 @@
 use std::{mem::size_of, num::NonZeroU64};
 
 use bytemuck::{Pod, Zeroable};
-use glam::{uvec2, vec2, UVec2, Vec2};
+use glam::{uvec2, vec2, Affine2, UVec2, Vec2};
 use palette::Srgba;
 use wgpu::util::DeviceExt;
 
@@ -605,6 +605,29 @@ pub enum PaintType {
     },
 }
 
+impl PaintType {
+    fn transform(&mut self, transform: Affine2) {
+        match self {
+            PaintType::Solid(_) => {}
+            PaintType::LinearGradient {
+                point_a, point_b, ..
+            } => {
+                *point_a = transform.transform_point2(*point_a);
+                *point_b = transform.transform_point2(*point_b);
+            }
+            PaintType::RadialGradient { center, radius, .. } => {
+                *center = transform.transform_point2(*center);
+                *radius = transform_scalar(*radius, transform);
+            }
+            PaintType::Glyph { .. } => {}
+            PaintType::Texture { origin, scale, .. } => {
+                *origin = transform.transform_point2(*origin);
+                *scale = transform_scalar(*scale, transform);
+            }
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub enum Shape {
     Rect {
@@ -630,6 +653,54 @@ pub enum Shape {
     },
 }
 
+fn transform_scalar(s: f32, t: Affine2) -> f32 {
+    t.transform_vector2(Vec2::splat(s)).x
+}
+
+impl Shape {
+    fn transform(&mut self, transform: Affine2) {
+        match self {
+            Shape::Rect {
+                rect,
+                border_radius,
+                stroke_width,
+            } => {
+                *rect = rect.transformed(transform);
+                *border_radius = transform_scalar(*border_radius, transform);
+                if let Some(w) = stroke_width {
+                    *w = transform_scalar(*w, transform);
+                }
+            }
+            Shape::Circle {
+                center,
+                radius,
+                stroke_width,
+            } => {
+                *center = transform.transform_point2(*center);
+                *radius = transform_scalar(*radius, transform);
+                if let Some(w) = stroke_width {
+                    *w = transform_scalar(*w, transform);
+                }
+            }
+            Shape::Stroke { segment, width, .. } => {
+                segment.start = transform.transform_point2(segment.start);
+                segment.end = transform.transform_point2(segment.end);
+                *width = transform_scalar(*width, transform);
+            }
+            Shape::Fill {
+                segment,
+
+                fill_bounding_box,
+                ..
+            } => {
+                segment.start = transform.transform_point2(segment.start);
+                segment.end = transform.transform_point2(segment.end);
+                *fill_bounding_box = fill_bounding_box.transformed(transform);
+            }
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct LineSegment {
     pub start: Vec2,
@@ -638,11 +709,18 @@ pub struct LineSegment {
 
 #[derive(Debug)]
 pub struct Node {
+    pub transform: Affine2,
     pub shape: Shape,
     pub paint_type: PaintType,
 }
 
 impl Node {
+    fn apply_transform(&mut self) {
+        self.shape.transform(self.transform);
+        self.paint_type.transform(self.transform);
+        self.transform = Affine2::IDENTITY;
+    }
+
     fn bounding_box(&self) -> Rect {
         match self.shape {
             Shape::Rect {
@@ -725,8 +803,10 @@ pub struct Batch {
 }
 
 impl Batch {
-    pub fn draw_node(&mut self, node: Node) {
-        let bbox = node.bounding_box();
+    pub fn draw_node(&mut self, mut node: Node) {
+        node.apply_transform();
+
+        let bbox = node.bounding_box().bbox_transformed(node.transform);
         if !self.will_draw(bbox) {
             return;
         }

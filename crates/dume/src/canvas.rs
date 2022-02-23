@@ -1,6 +1,6 @@
 use std::{iter, mem};
 
-use glam::{uvec2, vec2, UVec2, Vec2};
+use glam::{uvec2, vec2, Affine2, UVec2, Vec2};
 use kurbo::{PathEl, Point};
 use palette::Srgba;
 use swash::GlyphId;
@@ -38,6 +38,8 @@ pub struct Canvas {
     current_path_type: PathType,
     stroke_width: f32,
     stroke_cap: StrokeCap,
+    current_transform: Affine2,
+    current_transform_scale: f32,
 
     segment_buffer: Vec<LineSegment>,
 
@@ -58,6 +60,8 @@ impl Canvas {
             current_path_type: PathType::Path,
             stroke_width: 1.,
             stroke_cap: StrokeCap::Round,
+            current_transform: Affine2::IDENTITY,
+            current_transform_scale: 1.,
             next_path_id: 0,
             segment_buffer: Vec::new(),
         }
@@ -232,6 +236,7 @@ impl Canvas {
         self.flatten_path();
         for &segment in &self.segment_buffer {
             self.batch.draw_node(Node {
+                transform: self.current_transform,
                 shape: Shape::Stroke {
                     segment,
                     width: self.stroke_width,
@@ -249,6 +254,7 @@ impl Canvas {
         let fill_bounding_box = self.current_path_bounding_box();
         for &segment in &self.segment_buffer {
             self.batch.draw_node(Node {
+                transform: self.current_transform,
                 shape: Shape::Fill {
                     segment,
                     path_id: self.next_path_id,
@@ -277,6 +283,7 @@ impl Canvas {
 
     fn fill_rounded_rect(&mut self, pos: Vec2, size: Vec2, border_radius: f32) {
         self.batch.draw_node(Node {
+            transform: self.current_transform,
             shape: Shape::Rect {
                 rect: Rect { pos, size },
                 border_radius,
@@ -288,6 +295,7 @@ impl Canvas {
 
     fn stroke_rounded_rect(&mut self, pos: Vec2, size: Vec2, border_radius: f32) {
         self.batch.draw_node(Node {
+            transform: self.current_transform,
             shape: Shape::Rect {
                 rect: Rect { pos, size },
                 border_radius,
@@ -299,6 +307,7 @@ impl Canvas {
 
     fn fill_circle(&mut self, center: Vec2, radius: f32) {
         self.batch.draw_node(Node {
+            transform: self.current_transform,
             shape: Shape::Circle {
                 center,
                 radius,
@@ -310,6 +319,7 @@ impl Canvas {
 
     fn stroke_circle(&mut self, center: Vec2, radius: f32) {
         self.batch.draw_node(Node {
+            transform: self.current_transform,
             shape: Shape::Circle {
                 center,
                 radius,
@@ -351,8 +361,8 @@ impl Canvas {
     ) {
         let scale_factor = self.batch.scale_factor();
         // Convert to physical pixels
-        let size = size * scale_factor;
-        let pos = pos * scale_factor;
+        let size = self.current_transform_scale * size * scale_factor;
+        let pos = self.current_transform.transform_point2(pos * scale_factor);
 
         let mut glyphs = self.context.glyph_cache();
         let glyph = glyphs.glyph_or_rasterize(&self.context, font, glyph_id, size, pos);
@@ -366,6 +376,7 @@ impl Canvas {
         let entry = glyphs.atlas().get(key);
 
         self.batch.draw_node(Node {
+            transform: Affine2::IDENTITY, // transform applied manually
             paint_type: PaintType::Glyph {
                 offset_in_atlas: entry.pos,
                 origin: pos.as_u32(),
@@ -407,6 +418,7 @@ impl Canvas {
 
         let offset_in_atlas = atlas_entry.pos;
         self.batch.draw_node(Node {
+            transform: self.current_transform,
             shape: Shape::Rect {
                 rect: Rect::new(pos, size),
                 border_radius: 0.,
@@ -424,195 +436,29 @@ impl Canvas {
 
         self
     }
+}
 
-    /*
-        /// Draws a sprite, rotating the texture by the given amount.
-        pub fn draw_sprite_with_rotation(
-            &mut self,
-            texture: TextureId,
-            pos: Vec2,
-            width: f32,
-            rotation: SpriteRotate,
-        ) -> &mut Self {
-            self.renderer.draw_sprite(
-                &self.context,
-                self.current_transform,
-                self.current_transform_scale,
-                texture,
-                pos,
-                width,
-                rotation,
-            );
-            self
-        }
-
-        /// Draws a YUV texture.
-        pub fn draw_yuv_texture(
-            &mut self,
-            texture: &YuvTexture,
-            pos: Vec2,
-            width: f32,
-            alpha: f32,
-        ) -> &mut Self {
-            self.renderer
-                .draw_yuv_texture(self.current_transform, texture, pos, width, alpha);
-            self
-        }
-
-        /// Sets the current paint color to a solid color.
-        pub fn solid_color(&mut self, color: impl Into<Srgba<u8>>) -> &mut Self {
-            self.current_paint = Paint::SolidColor(srgba_to_vec4(color));
-            self
-        }
-
-        /// Fills the current path with the current paint.
-        pub fn fill(&mut self) -> &mut Self {
-            let path = mem::take(&mut self.current_path);
-            let path = (path, TesselateKind::Fill);
-            self.renderer.draw_path(
-                &self.context,
-                self.current_transform,
-                &path,
-                self.current_paint,
-            );
-            self.current_path = path.0;
-            self
-        }
-
-        /// Sets the current stroke width for path rendering.
-        pub fn stroke_width(&mut self, width: f32) -> &mut Self {
-            self.stroke_width = width;
-            self
-        }
-
-        /// Strokes the current path with the current paint and stroke width.
-        pub fn stroke(&mut self) -> &mut Self {
-            let path = mem::take(&mut self.current_path);
-            let path = (
-                path,
-                TesselateKind::Stroke {
-                    width: (self.stroke_width * 100.).round() as u32,
-                },
-            );
-            self.renderer.draw_path(
-                &self.context,
-                self.current_transform,
-                &path,
-                self.current_paint,
-            );
-            self.current_path = path.0;
-            self
-        }
+/// Canvas transformation functions
+impl Canvas {
+    /// Resets the current transformation to the identity matrix.
+    pub fn reset_transform(&mut self) -> &mut Self {
+        self.current_transform = Affine2::IDENTITY;
+        self.current_transform_scale = 1.;
+        self
     }
 
-    fn srgba_to_vec4(srgba: impl Into<Srgba<u8>>) -> Vec4 {
-        let linear = srgba.into().into_format::<f32, f32>().into_linear();
-        vec4(linear.red, linear.green, linear.blue, linear.alpha)
+    /// Translates the canvas.
+    pub fn translate(&mut self, translation: Vec2) -> &mut Self {
+        self.current_transform.translation += translation;
+        self
     }
 
-    /// Path rendering
-    impl Canvas {
-        /// Clears any currently staged path.
-        pub fn begin_path(&mut self) -> &mut Self {
-            self.current_path.segments.clear();
-            self
-        }
-
-        /// Moves the cursor to the given position.
-        pub fn move_to(&mut self, pos: Vec2) -> &mut Self {
-            self.current_path.segments.push(PathSegment::MoveTo(pos));
-            self
-        }
-
-        /// Appends a line from the current cursor to `pos`.
-        pub fn line_to(&mut self, pos: Vec2) -> &mut Self {
-            self.current_path.segments.push(PathSegment::LineTo(pos));
-            self
-        }
-
-        /// Appends a quadratic Bezier curve through `control` to `pos`.
-        pub fn quad_to(&mut self, control: Vec2, pos: Vec2) -> &mut Self {
-            self.current_path
-                .segments
-                .push(PathSegment::QuadTo(control, pos));
-            self
-        }
-
-        /// Appends a cubic Bezier curve.
-        pub fn cubic_to(&mut self, control1: Vec2, control2: Vec2, pos: Vec2) -> &mut Self {
-            self.current_path
-                .segments
-                .push(PathSegment::CubicTo(control1, control2, pos));
-            self
-        }
-
-        /// Appends an arc to the current path.
-        pub fn arc(
-            &mut self,
-            center: Vec2,
-            radius: f32,
-            start_angle: f32,
-            end_angle: f32,
-        ) -> &mut Self {
-            self.current_path
-                .segments
-                .push(PathSegment::Arc(center, radius, start_angle, end_angle));
-            self
-        }
-
-        /// Appends a rounded rectangle to the current path.
-        pub fn rounded_rect(&mut self, pos: Vec2, size: Vec2, radius: f32) -> &mut Self {
-            let offset_x = vec2(radius, 0.0);
-            let offset_y = vec2(0.0, radius);
-
-            let size_x = vec2(size.x, 0.0);
-            let size_y = vec2(0.0, size.y);
-
-            self.move_to(pos + offset_x)
-                .line_to(pos + size_x - offset_x)
-                .quad_to(pos + size_x, pos + size_x + offset_y)
-                .line_to(pos + size - offset_y)
-                .quad_to(pos + size, pos + size - offset_x)
-                .line_to(pos + size_y + offset_x)
-                .quad_to(pos + size_y, pos + size_y - offset_y)
-                .line_to(pos + offset_y)
-                .quad_to(pos, pos + offset_x)
-        }
-
-        /// Appends a circle to the current path.
-        pub fn circle(&mut self, center: Vec2, radius: f32) -> &mut Self {
-            self.arc(center, radius, 0., TAU)
-        }
+    /// Scales the canvas.
+    pub fn scale(&mut self, scale: f32) -> &mut Self {
+        self.current_transform = self.current_transform * Affine2::from_scale(Vec2::splat(scale));
+        self.current_transform_scale *= scale;
+        self
     }
-
-    /// Canvas transformation functions
-    impl Canvas {
-        /// Resets the current transformation to the identity matrix.
-        pub fn reset_transform(&mut self) -> &mut Self {
-            self.current_transform = Affine2::IDENTITY;
-            self.current_transform_scale = 1.;
-            self
-        }
-
-        /// Translates the canvas.
-        pub fn translate(&mut self, translation: Vec2) -> &mut Self {
-            self.current_transform.translation += translation;
-            self
-        }
-
-        /// Scales the canvas.
-        pub fn scale(&mut self, scale: f32) -> &mut Self {
-            self.current_transform = self.current_transform * Affine2::from_scale(Vec2::splat(scale));
-            self.current_transform_scale *= scale;
-            self
-        }
-
-        /// Rotates the canvas (in radians).
-        pub fn rotate(&mut self, theta: f32) -> &mut Self {
-            self.current_transform = self.current_transform * Affine2::from_angle(theta);
-            self
-        }
-        */
 }
 
 /// Rendering functions
@@ -675,6 +521,7 @@ impl Canvas {
     }
 
     fn reset(&mut self) {
+        self.reset_transform();
         self.current_path.clear();
         self.next_path_id = 1;
     }
