@@ -345,7 +345,12 @@ impl Canvas {
                     self.draw_glyph(*glyph_id, glyph.font, *size, color, pos + glyph.pos);
                 }
                 GlyphCharacter::LineBreak => {}
-                GlyphCharacter::Icon(_, _) => todo!(),
+                GlyphCharacter::Icon(texture_id, size) => {
+                    let dims = self.context.texture_dimensions(*texture_id);
+                    let aspect_ratio = dims.y as f32 / dims.x as f32;
+                    let height = aspect_ratio * *size;
+                    self.draw_sprite(*texture_id, glyph.pos - vec2(0., height), *size);
+                }
             }
         }
         self
