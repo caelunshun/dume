@@ -90,7 +90,7 @@ impl GlyphCache {
                 // NB: color bitmaps can't be supported yet because the atlas is alpha-only.
                 let mut render = Render::new(&[Source::Outline]);
                 render
-                    .offset(Vector::new(position.x.fract(), position.y.fract()))
+                    .offset(Vector::new(position.x.fract(), 1.0 - position.y.fract()))
                     .format(Format::Alpha).embolden(0.25);
 
                 let fonts = cx.fonts();
