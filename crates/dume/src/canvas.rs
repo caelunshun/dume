@@ -372,7 +372,7 @@ impl Canvas {
         let scale_factor = self.batch.scale_factor();
         // Convert to physical pixels
         let size = self.current_transform_scale * size * scale_factor;
-        let pos = self.current_transform.transform_point2(pos * scale_factor);
+        let pos = self.current_transform.transform_point2(pos) * scale_factor;
 
         let mut glyphs = self.context.glyph_cache();
         let glyph = glyphs.glyph_or_rasterize(&self.context, font, glyph_id, size, pos);
