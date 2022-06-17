@@ -47,8 +47,8 @@ impl StaticTextureAtlas {
 
     pub fn texcoords(&self, key: TextureKey) -> [Vec2; 4] {
         let placement = self.get(key);
-        let start = placement.pos.as_f32() / self.size().as_f32();
-        let size = placement.size.as_f32() / self.size().as_f32();
+        let start = placement.pos.as_vec2() / self.size().as_vec2();
+        let size = placement.size.as_vec2() / self.size().as_vec2();
         [
             start,
             start + vec2(size.x, 0.),

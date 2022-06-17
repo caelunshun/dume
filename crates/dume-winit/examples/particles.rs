@@ -28,7 +28,7 @@ impl App {
             particle.pos += particle.vel * dt;
             let pos = particle
                 .pos
-                .as_i32()
+                .as_ivec2()
                 .clamp(IVec2::splat(0), IVec2::new(1919, 1079));
             particle.vel += self.velocity_field[pos.x as usize][pos.y as usize] * dt;
         }

@@ -66,7 +66,7 @@ impl Renderer {
         Batch {
             scale_factor,
             physical_size,
-            logical_size: physical_size.as_f32() / scale_factor,
+            logical_size: physical_size.as_vec2() / scale_factor,
 
             nodes: Vec::new(),
             node_bounding_boxes: Vec::new(),
@@ -940,9 +940,9 @@ impl Batch {
 
                 let base_index = self.points.len() as u32;
                 self.points
-                    .push(self.pack_upos(segment.start.round().as_u32()));
+                    .push(self.pack_upos(segment.start.round().as_uvec2()));
                 self.points
-                    .push(self.pack_upos(segment.end.round().as_u32()));
+                    .push(self.pack_upos(segment.end.round().as_uvec2()));
 
                 let packed_bbox = self.pack_bounding_box(fill_bounding_box);
                 self.points.push(packed_bbox.pos);

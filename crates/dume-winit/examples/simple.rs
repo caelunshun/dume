@@ -49,7 +49,7 @@ impl Application for App {
                 .solid_color((190, 60, 210, u8::MAX))
                 .fill()
                 .solid_color((u8::MAX, u8::MAX, u8::MAX, u8::MAX))
-                .stroke_width(1.)
+                .stroke_width(2.)
                 .stroke();
         }
     }

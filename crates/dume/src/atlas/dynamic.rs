@@ -123,8 +123,8 @@ impl DynamicTextureAtlas {
             self.descriptor.size.width as f32,
             self.descriptor.size.height as f32,
         );
-        let start = placement.pos.as_f32() / size;
-        let size = placement.size.as_f32() / size;
+        let start = placement.pos.as_vec2() / size;
+        let size = placement.size.as_vec2() / size;
         [
             start,
             start + vec2(size.x, 0.),

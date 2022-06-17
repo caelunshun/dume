@@ -75,7 +75,7 @@ impl GlyphCache {
         size: f32,
         position: Vec2,
     ) -> Glyph {
-        let subpixel_offset = (position.fract() * self.glyph_subpixel_steps.as_f32()).as_u32();
+        let subpixel_offset = (position.fract() * self.glyph_subpixel_steps.as_vec2()).as_uvec2();
         let key = GlyphKey {
             font,
             size: (size * 10.) as u32,
@@ -91,7 +91,8 @@ impl GlyphCache {
                 let mut render = Render::new(&[Source::Outline]);
                 render
                     .offset(Vector::new(position.x.fract(), 1.0 - position.y.fract()))
-                    .format(Format::Alpha).embolden(0.25);
+                    .format(Format::Alpha)
+                    .embolden(0.25);
 
                 let fonts = cx.fonts();
                 let font = fonts.get(font);

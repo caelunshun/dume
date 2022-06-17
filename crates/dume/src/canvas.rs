@@ -389,13 +389,13 @@ impl Canvas {
             transform: Affine2::IDENTITY, // transform applied manually
             paint_type: PaintType::Glyph {
                 offset_in_atlas: entry.pos,
-                origin: pos.as_u32(),
+                origin: pos.as_uvec2(),
                 color,
             },
             shape: Shape::Rect {
                 rect: Rect {
                     pos: pos / scale_factor,
-                    size: uvec2(placement.width, placement.height).as_f32() / scale_factor,
+                    size: uvec2(placement.width, placement.height).as_vec2() / scale_factor,
                 },
                 border_radius: 0.,
                 stroke_width: None,

@@ -1,4 +1,4 @@
-use std::num::NonZeroU32;
+use std::{mem, num::NonZeroU32};
 
 use ahash::AHashMap;
 use fast_image_resize::{FilterType, Image, MulDiv, PixelType, ResizeAlg, Resizer};
@@ -222,8 +222,12 @@ impl TextureSetBuilder {
         data: &[u8],
         name: impl Into<String>,
     ) -> Result<(), image::ImageError> {
-        let image = image::load_from_memory(data)?.to_bgra8();
-        self.add_raw_texture(image.width(), image.height(), image.into_raw(), name);
+        let image = image::load_from_memory(data)?.to_rgba8();
+        let width = image.width();
+        let height = image.height();
+        let mut bytes = image.into_raw();
+        rgba_to_bgra(&mut bytes);
+        self.add_raw_texture(width, height, bytes, name);
         Ok(())
     }
 
@@ -251,4 +255,12 @@ impl TextureSetBuilder {
             by_id: SecondaryMap::new(), // initialized by Textures::add_texture_set
         })
     }
+}
+
+fn rgba_to_bgra(rgba: &mut [u8]) {
+    rgba.chunks_exact_mut(4).for_each(|chunk| {
+        if let [r, _g, b, _a] = chunk {
+            mem::swap(r, b);
+        }
+    })
 }
