@@ -5,7 +5,10 @@ use glam::{uvec2, vec2, Affine2, UVec2, Vec2};
 use palette::Srgba;
 use wgpu::util::DeviceExt;
 
-use crate::{Context, Rect, SpriteRotate, TextureSetId, INTERMEDIATE_FORMAT, TARGET_FORMAT};
+use crate::{
+    scissor::{PackedScissor, Scissor},
+    Context, Rect, SpriteRotate, TextureSetId, INTERMEDIATE_FORMAT, TARGET_FORMAT,
+};
 
 // Must match definitions in render.wgsl.
 const TILE_WORKGROUP_SIZE: u32 = 256;
@@ -71,6 +74,7 @@ impl Renderer {
             nodes: Vec::new(),
             node_bounding_boxes: Vec::new(),
             points: Vec::new(),
+            scissors: Vec::new(),
 
             texture_set: None,
         }
@@ -84,6 +88,9 @@ impl Renderer {
     ) -> PreparedRender {
         if batch.points.is_empty() {
             batch.points.push(0);
+        }
+        if batch.scissors.is_empty() {
+            batch.scissors.push(PackedScissor::default());
         }
 
         let device = context.device();
@@ -122,6 +129,11 @@ impl Renderer {
         let points = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             contents: bytemuck::cast_slice(&batch.points),
+            usage: wgpu::BufferUsages::STORAGE,
+        });
+        let scissors = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(&batch.scissors),
             usage: wgpu::BufferUsages::STORAGE,
         });
 
@@ -198,6 +210,14 @@ impl Renderer {
                 wgpu::BindGroupEntry {
                     binding: 9,
                     resource: wgpu::BindingResource::TextureView(texture_atlas),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 10,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &scissors,
+                        offset: 0,
+                        size: None,
+                    }),
                 },
             ],
         });
@@ -410,6 +430,16 @@ impl Pipelines {
                         sample_type: wgpu::TextureSampleType::Float { filterable: true },
                         view_dimension: wgpu::TextureViewDimension::D2,
                         multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 10,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
                     },
                     count: None,
                 },
@@ -714,6 +744,7 @@ pub struct Node {
     pub transform: Affine2,
     pub shape: Shape,
     pub paint_type: PaintType,
+    pub scissor: Option<Scissor>,
 }
 
 impl Node {
@@ -724,7 +755,7 @@ impl Node {
     }
 
     fn bounding_box(&self) -> Rect {
-        match self.shape {
+        let bbox = match self.shape {
             Shape::Rect {
                 rect, stroke_width, ..
             } => match stroke_width {
@@ -764,6 +795,11 @@ impl Node {
                     size: max - min,
                 }
             }
+        };
+        if let Some(scissor) = self.scissor {
+            scissor.region.intersection(bbox)
+        } else {
+            bbox
         }
     }
 }
@@ -777,6 +813,7 @@ struct PackedNode {
     extra: u32,
 
     paint_type: i32,
+    scissor: u32,
     color_a: u32,
     color_b: u32,
     gradient_point_a: u32,
@@ -796,6 +833,7 @@ pub struct Batch {
     nodes: Vec<PackedNode>,
     node_bounding_boxes: Vec<PackedBoundingBox>,
     points: Vec<u32>,
+    scissors: Vec<PackedScissor>,
 
     physical_size: UVec2,
     logical_size: Vec2,
@@ -1018,6 +1056,12 @@ impl Batch {
                     None => self.texture_set = Some(texture_set),
                 }
             }
+        }
+
+        if let Some(scissor) = node.scissor {
+            self.scissors.push(scissor.into());
+            let id = self.scissors.len(); // + 1 - 1
+            packed.scissor = id.try_into().expect("too many scissors whoops");
         }
 
         packed

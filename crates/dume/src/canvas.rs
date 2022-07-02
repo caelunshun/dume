@@ -9,7 +9,7 @@ use crate::{
     glyph::Glyph,
     renderer::{Batch, LineSegment, Node, PaintType, Shape, StrokeCap},
     text::layout::GlyphCharacter,
-    Context, FontId, Rect, SpriteRotate, TextBlob, TextureId, INTERMEDIATE_FORMAT,
+    Context, FontId, Rect, Scissor, SpriteRotate, TextBlob, TextureId, INTERMEDIATE_FORMAT,
 };
 
 /// The current shape being drawn in a `Canvas`.
@@ -40,6 +40,7 @@ pub struct Canvas {
     stroke_cap: StrokeCap,
     current_transform: Affine2,
     current_transform_scale: f32,
+    scissor: Option<Scissor>,
 
     segment_buffer: Vec<LineSegment>,
 
@@ -62,6 +63,7 @@ impl Canvas {
             stroke_cap: StrokeCap::Round,
             current_transform: Affine2::IDENTITY,
             current_transform_scale: 1.,
+            scissor: None,
             next_path_id: 0,
             segment_buffer: Vec::new(),
         }
@@ -70,6 +72,19 @@ impl Canvas {
     /// Gets the size of the drawing region.
     pub fn size(&self) -> Vec2 {
         self.batch.logical_size()
+    }
+
+    /// Sets the scissor region.
+    pub fn scissor(&mut self, mut scissor: Scissor) -> &mut Self {
+        scissor.transform(self.current_transform);
+        self.scissor = Some(scissor);
+        self
+    }
+
+    /// Clears the scissor region.
+    pub fn clear_scissor(&mut self) -> &mut Self {
+        self.scissor = None;
+        self
     }
 
     pub fn solid_color(&mut self, color: impl Into<Srgba<u8>>) -> &mut Self {
@@ -249,6 +264,7 @@ impl Canvas {
                     path_id: self.next_path_id,
                 },
                 paint_type: self.current_paint,
+                scissor: self.scissor,
             });
         }
         self.next_path_id += 1;
@@ -266,6 +282,7 @@ impl Canvas {
                     fill_bounding_box,
                 },
                 paint_type: self.current_paint,
+                scissor: self.scissor,
             });
         }
         self.next_path_id += 1;
@@ -295,6 +312,7 @@ impl Canvas {
                 stroke_width: None,
             },
             paint_type: self.current_paint,
+            scissor: self.scissor,
         });
     }
 
@@ -307,6 +325,7 @@ impl Canvas {
                 stroke_width: Some(self.stroke_width),
             },
             paint_type: self.current_paint,
+            scissor: self.scissor,
         });
     }
 
@@ -319,6 +338,7 @@ impl Canvas {
                 stroke_width: None,
             },
             paint_type: self.current_paint,
+            scissor: self.scissor,
         });
     }
 
@@ -331,6 +351,7 @@ impl Canvas {
                 stroke_width: Some(self.stroke_width),
             },
             paint_type: self.current_paint,
+            scissor: self.scissor,
         });
     }
 
@@ -400,6 +421,7 @@ impl Canvas {
                 border_radius: 0.,
                 stroke_width: None,
             },
+            scissor: self.scissor,
         });
     }
 
@@ -459,6 +481,7 @@ impl Canvas {
                 rotation,
                 texture_size: atlas_entry.size,
             },
+            scissor: self.scissor,
         });
 
         drop(textures);

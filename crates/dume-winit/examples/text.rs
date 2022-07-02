@@ -2,7 +2,7 @@
 
 use instant::Instant;
 
-use dume::{Canvas, Context, StrokeCap, TextBlob};
+use dume::{Canvas, Context, Rect, Scissor, StrokeCap, TextBlob};
 use dume_winit::{block_on, Application, DumeWinit};
 use glam::{vec2, Vec2};
 use winit::{dpi::LogicalSize, event_loop::EventLoop, window::WindowBuilder};
@@ -54,8 +54,18 @@ impl Application for App {
         let time = self.start_time.elapsed().as_secs_f32();
         let size = canvas.size();
 
+        let scissor_scale = (time.sin() + 1.) / 2. * 3. + 1.;
+
         // Background
         canvas
+            .scissor(Scissor {
+                region: Rect {
+                    pos: vec2(100., 100.),
+                    size: vec2(300., 300.) * scissor_scale,
+                },
+
+                border_radius: 10.,
+            })
             .linear_gradient(
                 Vec2::ZERO,
                 vec2(size.x, 0.),

@@ -12,6 +12,7 @@ pub mod font;
 mod glyph;
 mod rect;
 mod renderer;
+mod scissor;
 mod text;
 mod texture;
 pub mod yuv;
@@ -26,6 +27,7 @@ pub use context::Context;
 pub use font::{FontId, Style, Weight};
 pub use rect::Rect;
 pub use renderer::StrokeCap;
+pub use scissor::Scissor;
 use smartstring::LazyCompact;
 pub use text::{
     layout::{Align, Baseline, TextBlob, TextOptions},

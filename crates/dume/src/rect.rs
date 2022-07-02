@@ -76,4 +76,11 @@ impl Rect {
             self.size.y = self.size.y.abs();
         }
     }
+
+    pub fn intersection(self, other: Rect) -> Rect {
+        Rect {
+            pos: self.pos.max(other.pos),
+            size: self.size.min(other.size),
+        }
+    }
 }

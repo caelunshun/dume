@@ -46,6 +46,10 @@ struct Node {
     extra: u32;
 
     paint_type: i32;
+
+    // 0 if none; if nonzero then points to an index
+    // in the scissors buffer
+    scissor: u32;
     
     // Some fields are unused depending on paint_type
     color_a: u32;
@@ -83,6 +87,17 @@ struct Points {
     list: array<u32>;
 };
 
+struct Scissor {
+    pos: vec2<u32>;
+    size: vec2<u32>;
+    border_radius: f32;
+    _padding: f32;
+};
+
+struct Scissors {
+    list: array<Scissor>;
+};
+
 [[group(0), binding(0)]] var<uniform> globals: Globals;
 [[group(0), binding(1)]] var<storage, read> nodes: Nodes;
 [[group(0), binding(2)]] var<storage, read> node_bounding_boxes: NodeBoundingBoxes;
@@ -96,6 +111,8 @@ struct Points {
 [[group(0), binding(8)]] var<storage, read> points: Points;
 
 [[group(0), binding(9)]] var texture_atlas: texture_2d<f32>;
+
+[[group(0), binding(10)]] var<storage, read> scissors: Scissors;
 
 fn unpack_pos(pos: u32) -> vec2<f32> {
     return unpack2x16unorm(pos) * globals.target_size * 2.0 - globals.target_size / 2.0;
@@ -657,6 +674,22 @@ fn node_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
     }
 }
 
+fn scissor_coverage_factor(node: Node, pixel_pos: vec2<f32>) -> f32 {
+    if (node.scissor == u32(0)) {
+        return 1.0;
+    }
+
+    let scissor = scissors.list[node.scissor - u32(1)];
+    let top_left = vec2<f32>(scissor.pos);
+    let size = vec2<f32>(scissor.size);
+    let border_radius = scissor.border_radius;
+
+    let q = abs(pixel_pos - (top_left + size / 2.)) - size / 2. + border_radius;
+    var dist = min(max(q.x, q.y), 0.0) + length(max(q, vec2<f32>(0.0))) - border_radius;
+
+    return clamp(1.0 - dist, 0.0, 1.0);
+}
+
 [[stage(compute), workgroup_size(16, 16)]]
 fn paint_kernel(
     [[builtin(local_invocation_id)]] local_id: vec3<u32>,
@@ -714,6 +747,8 @@ fn paint_kernel(
         } else {
             coverage = node_coverage(node, pixel_pos);
         }
+
+        coverage = coverage * scissor_coverage_factor(node, pixel_pos);
 
         let node_color = node_color(node, pixel_pos, get_node_index() - 1);
         color = mix(color, node_color.rgb, coverage * node_color.a);
