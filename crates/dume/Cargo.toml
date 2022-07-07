@@ -10,7 +10,7 @@ anyhow = "1"
 bytemuck = { version = "1", features = [ "derive" ] }
 dume-markup = { path = "../dume-markup" }
 fast_image_resize = "0.9"
-glam = { version = "0.20", features = [ "bytemuck" ] }
+glam = { version = "0.21", features = [ "bytemuck" ] }
 guillotiere = "0.6"
 image = { version = "0.24", default-features = false, optional = true }
 kurbo = "0.8"

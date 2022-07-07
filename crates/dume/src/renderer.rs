@@ -298,19 +298,30 @@ impl Renderer {
         encoder: &mut wgpu::CommandEncoder,
         prepared: PreparedBlit,
         target: &wgpu::TextureView,
+        scissor: Option<Rect>,
     ) {
+        let load = if scissor.is_some() {
+            wgpu::LoadOp::Load
+        } else {
+            wgpu::LoadOp::Clear(wgpu::Color::BLACK)
+        };
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[wgpu::RenderPassColorAttachment {
                 view: target,
                 resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: true,
-                },
+                ops: wgpu::Operations { load, store: true },
             }],
             depth_stencil_attachment: None,
         });
+        if let Some(scissor) = scissor {
+            pass.set_scissor_rect(
+                scissor.pos.x.floor() as u32,
+                scissor.pos.y.floor() as u32,
+                scissor.size.x.ceil() as u32,
+                scissor.size.y.ceil() as u32,
+            );
+        }
         pass.set_pipeline(&self.pipelines.blit_pipeline);
         pass.set_bind_group(0, &prepared.bind_group, &[]);
         pass.draw(0..3, 0..1);
@@ -754,7 +765,7 @@ impl Node {
         self.transform = Affine2::IDENTITY;
     }
 
-    fn bounding_box(&self) -> Rect {
+    fn bounding_box(&self) -> Option<Rect> {
         let bbox = match self.shape {
             Shape::Rect {
                 rect, stroke_width, ..
@@ -799,7 +810,7 @@ impl Node {
         if let Some(scissor) = self.scissor {
             scissor.region.intersection(bbox)
         } else {
-            bbox
+            Some(bbox)
         }
     }
 }
@@ -846,14 +857,20 @@ impl Batch {
     pub fn draw_node(&mut self, mut node: Node) {
         node.apply_transform();
 
-        let bbox = node.bounding_box().bbox_transformed(node.transform);
-        if !self.will_draw(bbox) {
-            return;
-        }
+        // No bounding box indicates the node is fully clipped by
+        // the scissor region.
+        if let Some(bbox) = node
+            .bounding_box()
+            .map(|r| r.bbox_transformed(node.transform))
+        {
+            if !self.will_draw(bbox) {
+                return;
+            }
 
-        let node = self.pack_node(node);
-        self.nodes.push(node);
-        self.node_bounding_boxes.push(self.pack_bounding_box(bbox));
+            let node = self.pack_node(node);
+            self.nodes.push(node);
+            self.node_bounding_boxes.push(self.pack_bounding_box(bbox));
+        }
     }
 
     /// Clipping step on the CPU.

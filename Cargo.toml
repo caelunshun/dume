@@ -3,12 +3,8 @@ members = [
     "crates/dume",
     "crates/dume-winit",
     "crates/dume-markup",
-    "crates/dume-video",
 ]
 resolver = "2"
 
 [profile.dev]
 opt-level = 3
-
-[patch.crates-io]
-naga = { path = "../naga" }

@@ -77,10 +77,40 @@ impl Rect {
         }
     }
 
-    pub fn intersection(self, other: Rect) -> Rect {
+    pub fn bottom_right(self) -> Vec2 {
+        self.pos + self.size
+    }
+
+    pub fn overlaps(self, other: Rect) -> bool {
+        !(self.pos.x > other.pos.x + other.size.x
+            || other.pos.x > self.pos.x + self.size.x
+            || self.pos.y > other.pos.y + other.size.y
+            || other.pos.y > self.pos.y + self.size.y)
+    }
+
+    /// Computes the intersection of the regions bounded by `self` and `other`.
+    ///
+    /// If the two rectangles do not overlap, this function returns `None`.
+    pub fn intersection(self, other: Rect) -> Option<Rect> {
+        if !self.overlaps(other) {
+            None
+        } else {
+            let pos = self.pos.max(other.pos);
+            Some(Rect {
+                pos,
+                size: self.bottom_right().min(other.bottom_right()) - pos,
+            })
+        }
+    }
+
+    /// Computes the union of the regions bounded by `self` and `other`.
+    ///
+    /// This function returns a rectangle that contains both `self` and `other`.
+    pub fn union(self, other: Rect) -> Rect {
+        let pos = self.pos.min(other.pos);
         Rect {
-            pos: self.pos.max(other.pos),
-            size: self.size.min(other.size),
+            pos,
+            size: self.bottom_right().max(other.bottom_right()) - pos,
         }
     }
 }

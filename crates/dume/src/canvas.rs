@@ -496,6 +496,7 @@ impl Canvas {
     pub fn reset_transform(&mut self) -> &mut Self {
         self.current_transform = Affine2::IDENTITY;
         self.current_transform_scale = 1.;
+        self.scissor = None;
         self
     }
 
@@ -518,6 +519,24 @@ impl Canvas {
     /// Renders a frame and then blits it onto `target_texture`.
     /// `target_texture` must have `TextureUsages::RENDER_ATTACHMENT`.
     pub fn render(&mut self, target_texture: &wgpu::TextureView) {
+        self.render_with_scissor(target_texture, None);
+    }
+
+    /// Renders a frame and blits it onto `target_texture` with
+    /// an optional scissor.
+    ///
+    /// Note that if `scissor` is `Some(_)`, then the target texture
+    /// will not be cleared, so it needs to have been rendered to earlier.
+    /// Otherwise, wgpu will panic.
+    pub fn render_with_scissor(
+        &mut self,
+        target_texture: &wgpu::TextureView,
+        mut scissor: Option<Rect>,
+    ) {
+        if let Some(scissor) = &mut scissor {
+            scissor.pos *= self.batch.scale_factor();
+            scissor.size *= self.batch.scale_factor();
+        }
         let intermediate_texture = self
             .context
             .device()
@@ -565,7 +584,7 @@ impl Canvas {
         self.context.renderer().render(prepared, &mut encoder);
         self.context
             .renderer()
-            .blit(&mut encoder, prepared_blit, target_texture);
+            .blit(&mut encoder, prepared_blit, target_texture, scissor);
 
         self.context.queue().submit(iter::once(encoder.finish()));
 
