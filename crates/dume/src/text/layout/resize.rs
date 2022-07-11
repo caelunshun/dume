@@ -92,6 +92,7 @@ impl<'a> Layouter<'a> {
 
         self.cursor.x += glyph.advance;
         self.current_line.width += glyph.advance;
+        self.blob.max_content_size.x += glyph.advance;
 
         if let GlyphCharacter::Glyph(_, _, c) = &glyph.c {
             if *c == ' '
@@ -99,7 +100,16 @@ impl<'a> Layouter<'a> {
                     .used_line_breaks
                     .contains(&(self.next_glyph as u32 + 1))
             {
+                // Count length of this word to help determine min_content_size.x
+                let previous = self.previous_word_break.unwrap_or(0);
+                let word_length: f32 = self.blob.glyphs[previous..self.next_glyph]
+                    .iter()
+                    .map(|g| g.advance)
+                    .sum();
+                self.blob.min_content_size.x = self.blob.min_content_size.x.max(word_length);
+
                 self.previous_word_break = Some(self.next_glyph + 1);
+                self.blob.max_content_size.y += self.current_line.next_line_offset;
             }
         }
 
@@ -125,12 +135,16 @@ impl<'a> Layouter<'a> {
     }
 
     pub fn run_layout(mut self) {
+        self.blob.min_content_size = Vec2::ZERO;
+        self.blob.max_content_size = Vec2::ZERO;
         while self.next_glyph < self.blob.glyphs.len() {
             self.process_next_glyph();
         }
 
         self.next_line();
         self.apply_align();
+
+        self.blob.min_content_size.y = self.current_line.next_line_offset;
     }
 
     fn apply_align(&mut self) {

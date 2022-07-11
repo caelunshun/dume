@@ -114,6 +114,9 @@ pub struct TextBlob {
     glyphs: Vec<ShapedGlyph>,
 
     size: Vec2,
+
+    min_content_size: Vec2,
+    max_content_size: Vec2,
 }
 
 impl TextBlob {
@@ -141,6 +144,9 @@ impl TextBlob {
             glyphs: Vec::new(),
 
             size: Vec2::ZERO,
+
+            min_content_size: Vec2::ZERO,
+            max_content_size: Vec2::splat(f32::INFINITY),
         };
         blob.compute_runs(cx, text);
         blob.shape_glyphs(cx, text);
@@ -305,6 +311,14 @@ impl TextBlob {
 
     fn should_resize_for(&self, max_size: Vec2) -> bool {
         (max_size.x - self.max_size.x).abs() > 0.1 || (max_size.y - self.max_size.y).abs() > 0.1
+    }
+
+    pub fn min_content_size(&self) -> Vec2 {
+        self.min_content_size
+    }
+
+    pub fn max_content_size(&self) -> Vec2 {
+        self.max_content_size
     }
 }
 
