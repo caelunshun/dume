@@ -51,7 +51,7 @@ impl GlyphCache {
             atlas: DynamicTextureAtlas::new(
                 Arc::clone(device),
                 Arc::clone(queue),
-                wgpu::TextureFormat::R8Unorm,
+                wgpu::TextureFormat::Rgba8Unorm,
                 "glyph_atlas",
             ),
             cache: LruCache::unbounded(), // glyphs are expired manually
@@ -90,9 +90,8 @@ impl GlyphCache {
                 // NB: color bitmaps can't be supported yet because the atlas is alpha-only.
                 let mut render = Render::new(&[Source::Outline]);
                 render
-                    .offset(Vector::new(position.x.fract(), 1.0 - position.y.fract()))
-                    .format(Format::Alpha)
-                    .embolden(0.25);
+                    .offset(Vector::new(position.x.fract(), 0.))
+                    .format(Format::CustomSubpixel([0.3, 0., -0.3]));
 
                 let fonts = cx.fonts();
                 let font = fonts.get(font);

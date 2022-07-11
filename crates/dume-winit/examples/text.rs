@@ -1,128 +1,58 @@
-//! Renders a bunch of text.
-
-use instant::Instant;
-
-use dume::{Canvas, Context, Rect, Scissor, StrokeCap, TextBlob};
+use dume::{Align, Canvas, Context, Srgba, TextBlob, TextOptions};
 use dume_winit::{block_on, Application, DumeWinit};
 use glam::{vec2, Vec2};
-use winit::{dpi::LogicalSize, event_loop::EventLoop, window::WindowBuilder};
+use winit::{event_loop::EventLoop, window::Window};
 
 struct App {
     text: TextBlob,
-    text2: TextBlob,
-    start_time: Instant,
 }
 
 impl App {
-    pub fn new(cx: &Context) -> Self {
-        cx.add_font(include_bytes!("../../../assets/ZenAntiqueSoft-Regular.ttf").to_vec())
+    pub fn new(context: &Context) -> Self {
+        context
+            .add_font(include_bytes!("../../../assets/ZenAntiqueSoft-Regular.ttf").to_vec())
             .unwrap();
-        cx.add_font(include_bytes!("../../../assets/Allison-Regular.ttf").to_vec())
-            .unwrap();
-        cx.set_default_font_family("Zen Antique Soft");
+        context.set_default_font_family("Zen Antique Soft");
+        let contents = r#"
+        The Northrop (later Northrop Grumman) B-2 Spirit, also known as the Stealth Bomber, is an American heavy strategic bomber, featuring low observable stealth technology designed for penetrating dense anti-aircraft defenses. Designed during the Cold War, it is a flying wing design with a crew of two.[1][3] The bomber is subsonic and can deploy both conventional and thermonuclear weapons, such as up to eighty 500-pound class (230 kg) Mk 82 JDAM GPS-guided bombs, or sixteen 2,400-pound (1,100 kg) B83 nuclear bombs. The B-2 is the only acknowledged aircraft that can carry large air-to-surface standoff weapons in a stealth configuration.
 
-        let text = dume::text!("@size[50][@color[0,0,0][Dume can render text.] @color[200,30,50][Here is some in scarlet.] @font[Allison][Here's a different font.]]");
-        let text2 = dume::text!(
-            "@color[0,0,0][
-            I met a traveller from an antique land,
-            Who said—“Two vast and trunkless legs of stone
-            Stand in the desert.... Near them, on the sand,
-            Half sunk a shattered visage lies, whose frown,
-            And wrinkled lip, and sneer of cold command,
-            Tell that its sculptor well those passions read
-            Which yet survive, stamped on these lifeless things,
-            The hand that mocked them, and the heart that fed;
-            And on the pedestal, these words appear:
-            My name is Ozymandias, King of Kings;
-            Look on my Works, ye Mighty, and despair!
-            Nothing beside remains. Round the decay
-            Of that colossal Wreck, boundless and bare
-            The lone and level sands stretch far away.]"
-        );
-        let text = cx.create_text_blob(text, Default::default());
-        let text2 = cx.create_text_blob(text2, Default::default());
-        Self {
+Development started under the "Advanced Technology Bomber" (ATB) project during the Carter administration; its expected performance was one of the President's reasons for the cancellation of the Mach 2 capable B-1A bomber. The ATB project continued during the Reagan administration, but worries about delays in its introduction led to the reinstatement of the B-1 program. Program costs rose throughout development. Designed and manufactured by Northrop, later Northrop Grumman, the cost of each aircraft averaged US$737 million (in 1997 dollars).[4] Total procurement costs averaged $929 million per aircraft, which includes spare parts, equipment, retrofitting, and software support.[4] The total program cost, which included development, engineering and testing, averaged $2.13 billion per aircraft in 1997.[4]
+
+Because of its considerable capital and operating costs, the project was controversial in the U.S. Congress. The winding-down of the Cold War in the latter portion of the 1980s dramatically reduced the need for the aircraft, which was designed with the intention of penetrating Soviet airspace and attacking high-value targets. During the late 1980s and 1990s, Congress slashed plans to purchase 132 bombers to 21. In 2008, a B-2 was destroyed in a crash shortly after takeoff, though the crew ejected safely.[5] As of 2018, twenty B-2s are in service with the United States Air Force, which plans to operate them until 2032, when the Northrop Grumman B-21 Raider is to replace them.[6]
+
+The B-2 is capable of all-altitude attack missions up to 50,000 feet (15,000 m), with a range of more than 6,000 nautical miles (6,900 mi; 11,000 km) on internal fuel and over 10,000 nautical miles (12,000 mi; 19,000 km) with one midair refueling. It entered service in 1997 as the second aircraft designed to have advanced stealth technology after the Lockheed F-117 Nighthawk attack aircraft. Though designed originally as primarily a nuclear bomber, the B-2 was first used in combat dropping conventional, non-nuclear ordnance in the Kosovo War in 1999. It later served in Iraq, Afghanistan, and Libya.[7]
+        "#;
+        let text = dume::text!("@size[14][{}]", contents);
+        let text = context.create_text_blob(
             text,
-            text2,
-            start_time: Instant::now(),
-        }
+            TextOptions {
+                align_v: Align::Start,
+                ..Default::default()
+            },
+        );
+        Self { text }
     }
 }
 
 impl Application for App {
     fn draw(&mut self, canvas: &mut Canvas) {
-        let time = self.start_time.elapsed().as_secs_f32();
         let size = canvas.size();
-
-        let scissor_scale = (time.sin() + 1.) / 2. * 3. + 1.;
-
-        // Background
+        canvas.context().resize_text_blob(&mut self.text, size);
         canvas
-            .scissor(Scissor {
-                region: Rect {
-                    pos: vec2(100., 100.),
-                    size: vec2(300., 300.) * scissor_scale,
-                },
-
-                border_radius: 10.,
-            })
-            .linear_gradient(
-                Vec2::ZERO,
-                vec2(size.x, 0.),
-                (255, 200, 30, 255),
-                (11, 212, 226, 255),
-            )
             .rect(Vec2::ZERO, size)
+            .solid_color(Srgba::new(u8::MAX, u8::MAX, u8::MAX, u8::MAX))
             .fill();
-
-        canvas
-            .begin_path()
-            .move_to(vec2(1000., 0.))
-            .quad_to(vec2(1800., 500.), vec2(1400., 1080.))
-            .solid_color((0, 0, 0, u8::MAX))
-            .stroke_width(10.)
-            .stroke_cap(StrokeCap::Round)
-            .stroke();
-
-        canvas
-            .context()
-            .resize_text_blob(&mut self.text, canvas.size());
-
-        canvas.draw_text(&self.text, vec2(10., 50.), 1.);
-        canvas.draw_text(&self.text2, vec2(10., 200.), 1.);
-
-        let pos = Vec2::splat((time.sin() + 1.) / 2. * 500.);
-        canvas
-            .translate(pos)
-            .scale((time.sin() + 1.) / 2. + 1.)
-            .radial_gradient(
-                Vec2::splat(100.),
-                100.,
-                (227, 101, 105, u8::MAX),
-                (151, 146, 216, 50),
-            )
-            .rounded_rect(Vec2::ZERO, Vec2::splat(200.), 0.)
-            .fill()
-            .solid_color((0, 0, 0, u8::MAX))
-            .stroke_width(2.)
-            .stroke_cap(StrokeCap::Square)
-            .stroke();
+        canvas.draw_text(&self.text, vec2(0., 20.), 1.);
     }
 }
 
 fn main() {
     let event_loop = EventLoop::new();
-    let window = WindowBuilder::new()
-        .with_title("Dume Text Example")
-        .with_inner_size(LogicalSize::new(1920, 1080))
-        .build(&event_loop)
-        .unwrap();
+    let window = Window::new(&event_loop).unwrap();
 
     block_on(async move {
         let dume = DumeWinit::new(window).await;
-
         let app = App::new(dume.context());
-
         dume.run(event_loop, app);
     });
 }

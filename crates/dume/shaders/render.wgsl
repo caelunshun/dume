@@ -421,14 +421,6 @@ fn node_color(node: Node, pixel_pos: vec2<f32>, node_index: i32) -> vec4<f32> {
         let color_a = unpack_color(node.color_a);
         let color_b = unpack_color(node.color_b);
         return radial_gradient(pixel_pos, center, radius, color_a, color_b); 
-    } else if (paint == PAINT_TYPE_GLYPH) {
-        let offset = unpack_upos(node.gradient_point_a);
-        let origin = unpack_upos(node.gradient_point_b);
-        let color = unpack_color(node.color_a);
-        
-        let texcoords = offset + (vec2<u32>(pixel_pos) - origin);
-        let alpha = textureLoad(glyph_atlas, vec2<i32>(texcoords), 0).r;
-        return vec4<f32>(color.rgb, alpha * color.a);
     } else if (paint == PAINT_TYPE_TEXTURE) {
         let offset = unpack_upos(node.gradient_point_a);
         let origin = to_physical(unpack_pos(node.gradient_point_b));
@@ -749,12 +741,24 @@ fn paint_kernel(
         }
 
         coverage = coverage * scissor_coverage_factor(node, pixel_pos);
-
-        let node_color = node_color(node, pixel_pos, get_node_index() - 1);
-        color = mix(color, node_color.rgb, coverage * node_color.a);
+        
+        if (node.paint_type == PAINT_TYPE_GLYPH) {
+            // Special case for subpixel blending.
+            let offset = unpack_upos(node.gradient_point_a);
+            let origin = unpack_upos(node.gradient_point_b);
+            let text_color = unpack_color(node.color_a);
+        
+            let texcoords = offset + (vec2<u32>(pixel_pos) - origin);
+            let mask = textureLoad(glyph_atlas, vec2<i32>(texcoords), 0).rgb;
+            //text_color.r * mask.r + (1 - text_color.a * mask.r) * dest.r
+            color = mix(color, text_color.rgb * mask + (1.0 - text_color.a * mask) * color, coverage);
+        } else {
+            let node_color = node_color(node, pixel_pos, get_node_index() - 1);
+            color = mix(color, node_color.rgb, coverage * node_color.a);
+        }
     }
 
-    // Blend onto the target texture. Note that we have
+    // Store onto the target texture. Note that we have
     // to do the linear => sRGB conversion ourselves.
     let color = clamp(color, vec3<f32>(0.0), vec3<f32>(1.0));
     let result = linear_to_srgb(color);
