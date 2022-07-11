@@ -30,7 +30,6 @@ The B-2 is capable of all-altitude attack missions up to 50,000 feet (15,000 m),
                 ..Default::default()
             },
         );
-        dbg!(text.min_content_size(), text.max_content_size());
         Self { text }
     }
 }

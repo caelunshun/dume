@@ -27,7 +27,7 @@ smartstring = { version = "1", features = [ "serde" ] }
 swash = "0.1"
 thiserror = "1"
 unicode-bidi = "0.3"
-wgpu = "0.12"
+wgpu = "0.13"
 
 [features]
 default = ["png", "jpeg"]

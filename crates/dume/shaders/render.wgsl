@@ -19,53 +19,53 @@ let STROKE_CAP_ROUND: i32 = 0;
 let STROKE_CAP_SQUARE: i32 = 1;
 
 struct PackedBoundingBox {
-    pos: u32;
-    size: u32;
-};
+    pos: u32,
+    size: u32,
+}
 
 struct BoundingBox {
-    pos: vec2<f32>;
-    size: vec2<f32>;
-};
+    pos: vec2<f32>,
+    size: vec2<f32>,
+}
 
 struct Globals {
     // Logical size of the target texture
-    target_size: vec2<f32>;
+    target_size: vec2<f32>,
     // Number of 16x16 tiles in each dimension
-    tile_count: vec2<u32>;
+    tile_count: vec2<u32>,
     // Number of nodes in the input
-    node_count: u32;
+    node_count: u32,
     // Scale factor from logical to physical pixel
-    scale_factor: f32;
-};
+    scale_factor: f32,
+}
 
 struct Node {
-    shape: i32;
-    pos_a: u32;
-    pos_b: u32;
-    extra: u32;
+    shape: i32,
+    pos_a: u32,
+    pos_b: u32,
+    extra: u32,
 
-    paint_type: i32;
+    paint_type: i32,
 
     // 0 if none; if nonzero then points to an index
     // in the scissors buffer
-    scissor: u32;
+    scissor: u32,
     
     // Some fields are unused depending on paint_type
-    color_a: u32;
-    color_b: u32;
-    gradient_point_a: u32;
-    gradient_point_b: u32;
-};
+    color_a: u32,
+    color_b: u32,
+    gradient_point_a: u32,
+    gradient_point_b: u32,
+}
 
 // Stores input nodes and theiir bounding boxes;
 struct NodeBoundingBoxes {
-    bounding_boxes: array<PackedBoundingBox>;
-};
+    bounding_boxes: array<PackedBoundingBox>,
+}
 
 struct Nodes {
-    nodes: array<Node>;
-};
+    nodes: array<Node>,
+}
 
 // Stores the nodes that intersect each tile.
 //
@@ -73,46 +73,68 @@ struct Nodes {
 // one node index consumes 4 bytes). We assume no more than
 // 64 elements will intersect one tile. (TODO handle this case.)
 struct TileNodes {
-    tile_nodes: array<u32>;
-};
+    tile_nodes: array<u32>,
+}
 
 // Stores atomic counters for how many
 // nodes are in each tile in `TileNodes`.
 struct TileNodeCounters {
-    counters: array<atomic<u32>>;
-};
+    counters: array<atomic<u32>>,
+}
 
 // Stores points used for filling and stroking paths.
 struct Points {
-    list: array<u32>;
-};
+    list: array<u32>,
+}
 
 struct Scissor {
-    pos: vec2<u32>;
-    size: vec2<u32>;
-    border_radius: f32;
-    _padding: f32;
-};
+    pos: vec2<u32>,
+    size: vec2<u32>,
+    border_radius: f32,
+    _padding: f32,
+}
 
 struct Scissors {
-    list: array<Scissor>;
-};
+    list: array<Scissor>,
+}
 
-[[group(0), binding(0)]] var<uniform> globals: Globals;
-[[group(0), binding(1)]] var<storage, read> nodes: Nodes;
-[[group(0), binding(2)]] var<storage, read> node_bounding_boxes: NodeBoundingBoxes;
-[[group(0), binding(3)]] var<storage, read_write> tiles: TileNodes;
-[[group(0), binding(4)]] var<storage, read_write> tile_counters: TileNodeCounters;
-[[group(0), binding(5)]] var target_texture: texture_storage_2d<r32uint, read_write>;
+@group(0)
+@binding(0)
+var<uniform> globals: Globals;
+@group(0)
+@binding(1)
+var<storage, read> nodes: Nodes;
+@group(0)
+@binding(2)
+var<storage, read> node_bounding_boxes: NodeBoundingBoxes;
+@group(0)
+@binding(3)
+var<storage, read_write> tiles: TileNodes;
+@group(0)
+@binding(4)
+var<storage, read_write> tile_counters: TileNodeCounters;
+@group(0)
+@binding(5)
+var target_texture: texture_storage_2d<r32uint, read_write>;
 
-[[group(0), binding(6)]] var samp_linear: sampler;
-[[group(0), binding(7)]] var glyph_atlas: texture_2d<f32>;
+@group(0)
+@binding(6)
+var samp_linear: sampler;
+@group(0)
+@binding(7) 
+var glyph_atlas: texture_2d<f32>;
 
-[[group(0), binding(8)]] var<storage, read> points: Points;
+@group(0)
+@binding(8) 
+var<storage, read> points: Points;
 
-[[group(0), binding(9)]] var texture_atlas: texture_2d<f32>;
+@group(0)
+@binding(9) 
+var texture_atlas: texture_2d<f32>;
 
-[[group(0), binding(10)]] var<storage, read> scissors: Scissors;
+@group(0)
+@binding(10)
+var<storage, read> scissors: Scissors;
 
 fn unpack_pos(pos: u32) -> vec2<f32> {
     return unpack2x16unorm(pos) * globals.target_size * 2.0 - globals.target_size / 2.0;
@@ -233,9 +255,10 @@ fn tile_fill_node(node: Node, node_index: u32) {
     spread_tiles(node_index, min, max);
 }
 
-[[stage(compute), workgroup_size(256)]]
+@compute
+@workgroup_size(256)
 fn tile_kernel(
-    [[builtin(global_invocation_id)]] global_id: vec3<u32>,
+    @builtin(global_invocation_id) global_id: vec3<u32>,
 ) {
     let node_index = global_id.x;
     if (node_index >= globals.node_count) {
@@ -260,8 +283,9 @@ fn tile_kernel(
 // access times
 var<private> local_nodes: array<u32, 64>;
 
-[[stage(compute), workgroup_size(16, 16)]]
-fn sort_kernel([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
+@compute
+@workgroup_size(16, 16)
+fn sort_kernel(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let tile_id = global_id.xy;
 
     if (tile_id.x >= globals.tile_count.x || tile_id.y >= globals.tile_count.y) {
@@ -331,17 +355,17 @@ fn srgb_to_linear(srgb: vec3<f32>) -> vec3<f32> {
     return mix(higher, lower, vec3<f32>(cutoff));
 }
 
-fn linear_to_srgb(linear: vec3<f32>) -> vec3<f32> {
-    let cutoff = linear < vec3<f32>(0.0031308);
-    let higher = 1.055 * pow(linear, vec3<f32>(1.0 / 2.4)) - 0.055;
-    let lower = linear * 12.92;
+fn linear_to_srgb(lin: vec3<f32>) -> vec3<f32> {
+    let cutoff = lin < vec3<f32>(0.0031308);
+    let higher = 1.055 * pow(lin, vec3<f32>(1.0 / 2.4)) - 0.055;
+    let lower = lin * 12.92;
     return mix(higher, lower, vec3<f32>(cutoff));
 }
 
-fn linear_to_oklab(linear: vec3<f32>) -> vec3<f32> {
-    let l = pow(0.4122214708 * linear.r + 0.5363325363 * linear.g + 0.0514459929 * linear.b, 0.33);
-    let m = pow(0.2119034982 * linear.r + 0.6806995451 * linear.g + 0.1073969566 * linear.b, 0.33);
-    let s = pow(0.0883024619 * linear.r + 0.2817188376 * linear.g + 0.6299787005 * linear.b, 0.33);
+fn linear_to_oklab(lin: vec3<f32>) -> vec3<f32> {
+    let l = pow(0.4122214708 * lin.r + 0.5363325363 * lin.g + 0.0514459929 * lin.b, 0.33);
+    let m = pow(0.2119034982 * lin.r + 0.6806995451 * lin.g + 0.1073969566 * lin.b, 0.33);
+    let s = pow(0.0883024619 * lin.r + 0.2817188376 * lin.g + 0.6299787005 * lin.b, 0.33);
     return vec3<f32>(l * 0.2104542553 + m * 0.7936177850 + s * -0.0040720468,
         l * 1.9779984951 + m * -2.4285922050 + s * 0.4505937099,
         l * 0.0259040371 + m * 0.7827717662 + s * -0.8086757660);
@@ -682,10 +706,11 @@ fn scissor_coverage_factor(node: Node, pixel_pos: vec2<f32>) -> f32 {
     return clamp(1.0 - dist, 0.0, 1.0);
 }
 
-[[stage(compute), workgroup_size(16, 16)]]
+@compute
+@workgroup_size(16, 16)
 fn paint_kernel(
-    [[builtin(local_invocation_id)]] local_id: vec3<u32>,
-    [[builtin(workgroup_id)]] tile_id: vec3<u32>,
+    @builtin(local_invocation_id) local_id: vec3<u32>,
+    @builtin(workgroup_id) tile_id: vec3<u32>,
 ) {
     let pixel = vec2<i32>(tile_id.xy) * vec2<i32>(16) + vec2<i32>(local_id.xy);
     let pixel_pos = vec2<f32>(pixel);
@@ -750,7 +775,6 @@ fn paint_kernel(
         
             let texcoords = offset + (vec2<u32>(pixel_pos) - origin);
             let mask = textureLoad(glyph_atlas, vec2<i32>(texcoords), 0).rgb;
-            //text_color.r * mask.r + (1 - text_color.a * mask.r) * dest.r
             color = mix(color, text_color.rgb * mask + (1.0 - text_color.a * mask) * color, coverage);
         } else {
             let node_color = node_color(node, pixel_pos, get_node_index() - 1);

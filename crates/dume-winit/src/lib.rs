@@ -123,7 +123,7 @@ fn configure_surface(surface: &wgpu::Surface, device: &wgpu::Device, size: Physi
             format: dume::TARGET_FORMAT,
             width: size.width,
             height: size.height,
-            present_mode: wgpu::PresentMode::Mailbox,
+            present_mode: wgpu::PresentMode::AutoVsync,
         },
     )
 }

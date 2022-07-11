@@ -235,7 +235,7 @@ impl Renderer {
         // Tiles
         pass.set_pipeline(&self.pipelines.tile_pipeline);
         pass.set_bind_group(0, &prepared.bind_group, &[]);
-        pass.dispatch(
+        pass.dispatch_workgroups(
             (prepared.node_count + TILE_WORKGROUP_SIZE - 1) / TILE_WORKGROUP_SIZE,
             1,
             1,
@@ -244,7 +244,7 @@ impl Renderer {
         // Sort
         pass.set_pipeline(&self.pipelines.sort_pipeline);
         pass.set_bind_group(0, &prepared.bind_group, &[]);
-        pass.dispatch(
+        pass.dispatch_workgroups(
             (prepared.tile_count.x + SORT_WORKGROUP_SIZE - 1) / SORT_WORKGROUP_SIZE,
             (prepared.tile_count.y + SORT_WORKGROUP_SIZE - 1) / SORT_WORKGROUP_SIZE,
             1,
@@ -253,7 +253,7 @@ impl Renderer {
         // Paint
         pass.set_pipeline(&self.pipelines.paint_pipeline);
         pass.set_bind_group(0, &prepared.bind_group, &[]);
-        pass.dispatch(prepared.tile_count.x, prepared.tile_count.y, 1);
+        pass.dispatch_workgroups(prepared.tile_count.x, prepared.tile_count.y, 1);
     }
 
     pub fn prepare_blit(
@@ -307,11 +307,11 @@ impl Renderer {
         };
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
-            color_attachments: &[wgpu::RenderPassColorAttachment {
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: target,
                 resolve_target: None,
                 ops: wgpu::Operations { load, store: true },
-            }],
+            })],
             depth_stencil_attachment: None,
         });
         if let Some(scissor) = scissor {
@@ -464,7 +464,7 @@ impl Pipelines {
         });
 
         let render_module =
-            device.create_shader_module(&wgpu::include_wgsl!("../shaders/render.wgsl"));
+            device.create_shader_module(wgpu::include_wgsl!("../shaders/render.wgsl"));
         let tile_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: None,
             layout: Some(&pipeline_layout),
@@ -484,7 +484,7 @@ impl Pipelines {
             entry_point: "sort_kernel",
         });
 
-        let blit_module = device.create_shader_module(&wgpu::include_wgsl!("../shaders/blit.wgsl"));
+        let blit_module = device.create_shader_module(wgpu::include_wgsl!("../shaders/blit.wgsl"));
         let blit_bg_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
             entries: &[
@@ -547,7 +547,7 @@ impl Pipelines {
             fragment: Some(wgpu::FragmentState {
                 module: &blit_module,
                 entry_point: "fs_main",
-                targets: &[wgpu::ColorTargetState {
+                targets: &[Some(wgpu::ColorTargetState {
                     format: TARGET_FORMAT,
                     blend: Some(wgpu::BlendState {
                         color: wgpu::BlendComponent {
@@ -562,7 +562,7 @@ impl Pipelines {
                         },
                     }),
                     write_mask: wgpu::ColorWrites::ALL,
-                }],
+                })],
             }),
             multiview: None,
         });
