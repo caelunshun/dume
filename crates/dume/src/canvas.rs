@@ -7,9 +7,10 @@ use swash::GlyphId;
 
 use crate::{
     glyph::Glyph,
+    layer::Layer,
     renderer::{Batch, LineSegment, Node, PaintType, Shape, StrokeCap},
     text::layout::GlyphCharacter,
-    Context, FontId, Rect, Scissor, SpriteRotate, TextBlob, TextureId, INTERMEDIATE_FORMAT,
+    Context, FontId, Rect, Scissor, SpriteRotate, TextBlob, TextureId,
 };
 
 /// The current shape being drawn in a `Canvas`.
@@ -516,44 +517,27 @@ impl Canvas {
 
 /// Rendering functions
 impl Canvas {
-    /// Renders a frame and then blits it onto `target_texture`.
+    /// Renders a frame into a new layer and then blits it directly onto `target_texture`.
     /// `target_texture` must have `TextureUsages::RENDER_ATTACHMENT`.
     pub fn render(&mut self, target_texture: &wgpu::TextureView) {
-        self.render_with_scissor(target_texture, None);
+        let temp_layer = self.context.create_layer(self.batch.physical_size());
+        self.render_to_layer(&temp_layer);
+        temp_layer.blit_onto(target_texture);
     }
 
-    /// Renders a frame and blits it onto `target_texture` with
-    /// an optional scissor.
+    /// Renders the canvas onto the given layer, flushing the draw command list.
     ///
-    /// Note that if `scissor` is `Some(_)`, then the target texture
-    /// will not be cleared, so it needs to have been rendered to earlier.
-    /// Otherwise, wgpu will panic.
-    pub fn render_with_scissor(
-        &mut self,
-        target_texture: &wgpu::TextureView,
-        mut scissor: Option<Rect>,
-    ) {
-        if let Some(scissor) = &mut scissor {
-            scissor.pos *= self.batch.scale_factor();
-            scissor.size *= self.batch.scale_factor();
-        }
-        let intermediate_texture = self
-            .context
-            .device()
-            .create_texture(&wgpu::TextureDescriptor {
-                label: Some("intermediate"),
-                size: wgpu::Extent3d {
-                    width: self.batch.physical_size().x,
-                    height: self.batch.physical_size().y,
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: INTERMEDIATE_FORMAT,
-                usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
-            })
-            .create_view(&Default::default());
+    /// Note that the layer is _not_ cleared. That means any existing contents
+    /// will not be overwritten unless they are explicitly drawn over.
+    ///
+    /// # Panics
+    /// Panics if the layer's physical size does not match the size of the canvas.
+    pub fn render_to_layer(&mut self, layer: &Layer) {
+        assert_eq!(
+            self.batch.physical_size(),
+            layer.physical_size(),
+            "target layer size does not match canvas size"
+        );
 
         let physical_size = self.batch.physical_size();
         let scale_factor = self.batch.scale_factor();
@@ -568,12 +552,7 @@ impl Canvas {
         let prepared =
             self.context
                 .renderer()
-                .prepare_render(batch, &self.context, &intermediate_texture);
-        let prepared_blit = self.context.renderer().prepare_blit(
-            &self.context,
-            &intermediate_texture,
-            physical_size,
-        );
+                .prepare_render(batch, &self.context, layer.texture());
 
         // Render
         let mut encoder = self
@@ -582,9 +561,6 @@ impl Canvas {
             .create_command_encoder(&Default::default());
 
         self.context.renderer().render(prepared, &mut encoder);
-        self.context
-            .renderer()
-            .blit(&mut encoder, prepared_blit, target_texture, scissor);
 
         self.context.queue().submit(iter::once(encoder.finish()));
 

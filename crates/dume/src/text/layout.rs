@@ -151,6 +151,7 @@ impl TextBlob {
         blob.compute_runs(cx, text);
         blob.shape_glyphs(cx, text);
         blob.resize(cx, Vec2::splat(f32::INFINITY));
+
         blob
     }
 

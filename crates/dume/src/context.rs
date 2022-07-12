@@ -8,7 +8,7 @@ use crate::{
     glyph::GlyphCache,
     renderer::Renderer,
     texture::{MissingTexture, TextureId, TextureSet, TextureSetBuilder, Textures},
-    yuv, Canvas, Text, TextBlob, TextOptions, YuvTexture,
+    yuv, Canvas, Layer, Text, TextBlob, TextOptions, YuvTexture,
 };
 
 /// Builder for a [`Context`].
@@ -145,6 +145,10 @@ impl Context {
 
     pub fn create_canvas(&self, target_physical_size: UVec2, hidpi_factor: f32) -> Canvas {
         Canvas::new(self.clone(), target_physical_size, hidpi_factor)
+    }
+
+    pub fn create_layer(&self, physical_size: UVec2) -> Layer {
+        Layer::new(self.clone(), physical_size, None)
     }
 
     pub fn create_text_blob(&self, text: impl AsRef<Text>, options: TextOptions) -> TextBlob {

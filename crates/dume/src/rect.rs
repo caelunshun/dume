@@ -22,6 +22,17 @@ impl Rect {
         }
     }
 
+    pub fn empty() -> Self {
+        Self {
+            pos: Vec2::ZERO,
+            size: Vec2::ZERO,
+        }
+    }
+
+    pub fn is_empty(self) -> bool {
+        self.size == Vec2::ZERO
+    }
+
     pub fn infinity() -> Self {
         Self {
             pos: Vec2::splat(0.0),
@@ -107,10 +118,16 @@ impl Rect {
     ///
     /// This function returns a rectangle that contains both `self` and `other`.
     pub fn union(self, other: Rect) -> Rect {
-        let pos = self.pos.min(other.pos);
-        Rect {
-            pos,
-            size: self.bottom_right().max(other.bottom_right()) - pos,
+        if self.is_empty() {
+            other
+        } else if other.is_empty() {
+            self
+        } else {
+            let pos = self.pos.min(other.pos);
+            Rect {
+                pos,
+                size: self.bottom_right().max(other.bottom_right()) - pos,
+            }
         }
     }
 }

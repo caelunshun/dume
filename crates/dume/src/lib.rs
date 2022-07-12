@@ -10,6 +10,7 @@ mod canvas;
 mod context;
 pub mod font;
 mod glyph;
+mod layer;
 mod rect;
 mod renderer;
 mod scissor;
@@ -25,6 +26,7 @@ pub const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 pub use canvas::Canvas;
 pub use context::Context;
 pub use font::{FontId, Style, Weight};
+pub use layer::Layer;
 pub use rect::Rect;
 pub use renderer::StrokeCap;
 pub use scissor::Scissor;
@@ -37,7 +39,6 @@ pub use texture::{MissingTexture, TextureId, TextureSet, TextureSetBuilder, Text
 pub use yuv::YuvTexture;
 
 pub use palette::Srgba;
-
 pub use dume_markup::markup;
 
 pub type SmartString = smartstring::SmartString<LazyCompact>;
