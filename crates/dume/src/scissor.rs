@@ -37,9 +37,11 @@ pub struct PackedScissor {
 
 impl From<Scissor> for PackedScissor {
     fn from(s: Scissor) -> Self {
+        let pos = s.region.pos.floor();
+        let pos2 = (pos + s.region.size).ceil();
         Self {
-            pos: s.region.pos.floor().as_uvec2(),
-            size: s.region.size.ceil().as_uvec2(),
+            pos: pos.as_uvec2(),
+            size: (pos2 - pos).as_uvec2(),
             border_radius: s.border_radius,
             _padding: 0.,
         }

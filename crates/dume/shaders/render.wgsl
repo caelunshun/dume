@@ -137,7 +137,10 @@ var texture_atlas: texture_2d<f32>;
 var<storage, read> scissors: Scissors;
 
 fn unpack_pos(pos: u32) -> vec2<f32> {
-    return unpack2x16unorm(pos) * globals.target_size * 2.0 - globals.target_size / 2.0;
+    var p = unpack2x16unorm(pos) * 65535.0;
+    p = p / 4.0;
+    p = p - 100.0;
+    return p;
 }
 
 fn unpack_upos(pos: u32) -> vec2<u32> {
@@ -497,7 +500,6 @@ fn get_node_index() -> i32 {
 fn rect_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
     let pixel_min = pixel_pos;
     let pixel_max = pixel_min + 1.0;
-    let pixel_mid = pixel_min + 0.5;
     let size = to_physical(unpack_pos(node.pos_b));
     let rect_min = to_physical(unpack_pos(node.pos_a));
     let rect_max = rect_min + size;
@@ -521,7 +523,7 @@ fn rect_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
         let top_left = rect_min;
         let bottom_right = rect_max;
 
-        let q = abs(pixel_mid - (top_left + size / 2.)) - size / 2. + border_radius;
+        let q = abs(pixel_min - (top_left + size / 2.)) - size / 2. + border_radius;
         var dist = min(max(q.x, q.y), 0.0) + length(max(q, vec2<f32>(0.0))) - border_radius;
 
         if (stroke) {
@@ -544,7 +546,6 @@ fn rect_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
 }
 
 fn circle_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
-    let pixel_mid = pixel_pos + 0.5;
     let center = to_physical(unpack_pos(node.pos_a));
     let params = to_physical(unpack_pos(node.pos_b));
     let radius = params.x;
@@ -552,7 +553,7 @@ fn circle_coverage(node: Node, pixel_pos: vec2<f32>) -> f32 {
     let stroke = node.shape == SHAPE_STROKE_CIRCLE;
     let stroke_width = params.y;
 
-    let distance = length(pixel_mid - center);
+    let distance = length(pixel_pos - center);
 
     // Not the exact coverage, but close enough to look fine.
     var alpha = 0.0;

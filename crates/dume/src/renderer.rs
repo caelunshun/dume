@@ -920,12 +920,16 @@ impl Batch {
     }
 
     fn pack_pos(&self, pos: Vec2) -> u32 {
-        let pos = pos.clamp(-self.logical_size * 0.5, self.logical_size * 1.5);
-        let x = (((pos.x + self.logical_size.x / 2.) / (2. * self.logical_size.x))
-            * (u16::MAX as f32)) as u16;
-        let y = (((pos.y + self.logical_size.y / 2.) / (2. * self.logical_size.y))
-            * (u16::MAX as f32)) as u16;
-        x as u32 | ((y as u32) << 16)
+        let factor = 4.;
+        let padding = Vec2::splat(100.);
+        let pos = pos.max(-padding).min(self.logical_size + padding);
+        let pos = pos + padding;
+        let pos = (pos * factor).round().as_uvec2();
+
+        assert!(pos.x <= u16::MAX as u32);
+        assert!(pos.y <= u16::MAX as u32);
+
+        pos.x | (pos.y << 16)
     }
 
     fn pack_upos(&self, pos: UVec2) -> u32 {

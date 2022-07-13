@@ -130,4 +130,14 @@ impl Rect {
             }
         }
     }
+
+    /// Returns a rectangle with borders expanded
+    /// by the given (possibly negative, yielding a shrink)
+    /// amount.
+    pub fn expanded(&self, amount: f32) -> Self {
+        Self {
+            pos: self.pos - Vec2::splat(amount),
+            size: self.size + 2. * Vec2::splat(amount),
+        }
+    }
 }
