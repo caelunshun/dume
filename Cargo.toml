@@ -1,8 +1,10 @@
 [workspace]
 members = [
-    "crates/dume",
-    "crates/dume-winit",
-    "crates/dume-markup",
+    "crates/zylo",
+    "crates/zylo-core",
+    "crates/zylo-wgpu",
+    "crates/zylo-tiny-skia",
+    "crates/zylo-app",
 ]
 resolver = "2"
 

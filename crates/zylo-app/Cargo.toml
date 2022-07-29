@@ -1,0 +1,23 @@
+[package]
+name = "zylo-app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+softbuffer = { version = "0.1", optional = true }
+winit = { version = "0.26", default-features = false }
+zylo = { path = "../zylo" }
+zylo-tiny-skia = { path = "../zylo-tiny-skia", optional = true }
+
+[features]
+default = ["x11", "backend-tiny-skia"]
+backend-tiny-skia = ["zylo-tiny-skia", "softbuffer"]
+x11 = ["winit/x11"]
+wayland = ["winit/wayland"]
+
+[dev-dependencies]
+noise = { version = "0.7", default-features = false }
+
+[[example]]
+name = "primitives"
+required-features = ["zylo/color-to-linear"]
