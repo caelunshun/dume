@@ -44,6 +44,9 @@ pub trait BuildText {
     fn color(self, color: impl Into<Color>) -> Text;
     fn clear_color(self) -> Text;
 
+    fn font_size(self, size: f32) -> Text;
+    fn clear_font_size(self) -> Text;
+
     fn append(self, text: impl Into<Text>) -> Text;
 }
 
@@ -97,6 +100,14 @@ where
 
     fn clear_color(self) -> Text {
         Text::from(self).clear_color()
+    }
+
+    fn font_size(self, size: f32) -> Text {
+        Text::from(self).font_size(size)
+    }
+
+    fn clear_font_size(self) -> Text {
+        Text::from(self).clear_font_size()
     }
 
     fn append(self, text: impl Into<Text>) -> Text {
@@ -172,12 +183,22 @@ impl BuildText for Text {
         self
     }
 
-    fn append(mut self, text: impl Into<Text>) -> Text {
-        self.extend(text.into_spans());
+    fn font_size(mut self, size: f32) -> Text {
+        self.spans_mut()
+            .for_each(|s| s.style_mut().set_font_size(size));
+        self
     }
 
+    fn clear_font_size(mut self) -> Text {
+        self.spans_mut()
+            .for_each(|s| s.style_mut().clear_font_size());
+        self
+    }
 
-    
+    fn append(mut self, text: impl Into<Text>) -> Text {
+        self.extend(text.into().into_spans());
+        self
+    }
 }
 
 #[cfg(test)]
@@ -188,14 +209,21 @@ mod tests {
 
     #[test]
     fn api() {
-        let text = "Goodbye World :(".bold().underlined().color(Color::WHITE);
+        let text = "Goodbye World :("
+            .bold()
+            .underlined()
+            .color(Color::WHITE)
+            .append(" (though I never liked it anyway)");
         let mut expected_style = Style::empty();
         expected_style.set_weight(Weight::BOLD);
         expected_style.set_underlined(true);
         expected_style.set_color(Color::WHITE);
         assert_eq!(
             text.spans().collect::<Vec<_>>(),
-            vec![&Span::with_style("Goodbye World :(", expected_style)]
+            vec![
+                &Span::with_style("Goodbye World :(", expected_style),
+                &Span::new(" (though I never liked it anyway)")
+            ]
         );
     }
 }

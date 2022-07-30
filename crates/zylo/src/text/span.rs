@@ -1,12 +1,12 @@
 use std::{
     iter::{self, Once},
-    mem, slice,
+    mem, slice, vec,
 };
 
 use super::style::Style;
 
 /// A span of styled text.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Span {
     text: String,
     style: Style,
@@ -72,7 +72,7 @@ where
 /// where a CSS-like styling language might set the size of
 /// some text (making it the default value) but then the rich
 /// text provided to the UI overrides that size.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Text {
     inner: Inner,
     default_style: Style,
@@ -142,6 +142,14 @@ impl Text {
         }
     }
 
+    /// Turns the `Text` into an iterator over its spans.
+    pub fn into_spans(self) -> impl Iterator<Item = Span> {
+        match self.inner {
+            Inner::One(one) => IntoSpanIter::One(iter::once(one)),
+            Inner::Many(spans) => IntoSpanIter::Many(spans.into_iter()),
+        }
+    }
+
     /// Gets the `i`th span in the text.
     pub fn span(&self, i: usize) -> Option<&Span> {
         match &self.inner {
@@ -183,7 +191,7 @@ where
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 enum Inner {
     /// Just one text span.
     One(Span),
@@ -219,6 +227,22 @@ impl<'a> Iterator for SpanIterMut<'a> {
         match self {
             SpanIterMut::One(one) => one.next(),
             SpanIterMut::Many(many) => many.next(),
+        }
+    }
+}
+
+enum IntoSpanIter {
+    One(Once<Span>),
+    Many(vec::IntoIter<Span>),
+}
+
+impl Iterator for IntoSpanIter {
+    type Item = Span;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            IntoSpanIter::One(one) => one.next(),
+            IntoSpanIter::Many(many) => many.next(),
         }
     }
 }

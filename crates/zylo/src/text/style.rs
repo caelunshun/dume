@@ -10,16 +10,19 @@ use crate::Color;
 /// they default to the default style parameters of the `Text`
 /// that contains the span with this style.
 /// If set to `Some`, they override the default style.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Style {
     weight: Option<Weight>,
     italic: Option<bool>,
     underlined: Option<bool>,
     font_family: Option<FontFamily<'static>>,
     color: Option<Color>,
+    font_size: Option<f32>,
 }
 
 impl Style {
+    pub const DEFAULT_FONT_SIZE: f32 = 12.;
+
     pub fn empty() -> Self {
         Self::default()
     }
@@ -44,6 +47,10 @@ impl Style {
         self.color
     }
 
+    pub fn size(&self) -> Option<f32> {
+        self.font_size
+    }
+
     pub fn set_weight(&mut self, weight: Weight) {
         self.weight = Some(weight);
     }
@@ -60,8 +67,15 @@ impl Style {
         self.font_family = Some(font_family);
     }
 
-    pub fn set_color(&mut self, color: Color) {
-        self.color = Some(color);
+    pub fn set_color(&mut self, color: impl Into<Color>) {
+        self.color = Some(color.into());
+    }
+
+    /// Sets the font size of the text span.
+    ///
+    /// Note: the size in in points, not pixels. 12pt = 16px (where px are logical pixels).
+    pub fn set_font_size(&mut self, size: f32) {
+        self.font_size = Some(size);
     }
 
     pub fn clear_weight(&mut self) {
@@ -84,6 +98,10 @@ impl Style {
         self.color = None;
     }
 
+    pub fn clear_font_size(&mut self) {
+        self.font_size = None;
+    }
+
     /// Resolves the style using the given `Style`
     /// as a set of default values.
     pub(crate) fn resolve_with_defaults<'a>(
@@ -102,6 +120,10 @@ impl Style {
                 .or(defaults.font_family.as_ref().map(FontFamily::as_ref))
                 .unwrap_or_else(|| FontFamily::named(fallback_font_family)),
             color: self.color.or(defaults.color).unwrap_or(Color::BLACK),
+            size: self
+                .font_size
+                .or(defaults.font_size)
+                .unwrap_or(Self::DEFAULT_FONT_SIZE),
         }
     }
 }
@@ -109,13 +131,14 @@ impl Style {
 /// A "resolved" style with all parameters set.
 ///
 /// Parameters that were set to `None` are changed to a default value.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct ResolvedStyle<'a> {
     weight: Weight,
     italic: bool,
     underlined: bool,
     font_family: FontFamily<'a>,
     color: Color,
+    size: f32,
 }
 
 impl<'a> ResolvedStyle<'a> {
@@ -137,6 +160,10 @@ impl<'a> ResolvedStyle<'a> {
 
     pub fn color(&self) -> Color {
         self.color
+    }
+
+    pub fn size(&self) -> f32 {
+        self.size
     }
 }
 
