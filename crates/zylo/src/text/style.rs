@@ -4,6 +4,8 @@ use fontdb::Weight;
 
 use crate::Color;
 
+use super::font::{self, FontId, FontStore};
+
 /// The style of a span of text.
 ///
 /// Most parameters are `Option`s. If set to `None`,
@@ -104,23 +106,31 @@ impl Style {
 
     /// Resolves the style using the given `Style`
     /// as a set of default values.
-    pub(crate) fn resolve_with_defaults<'a>(
-        &'a self,
-        defaults: &'a Style,
-        fallback_font_family: &'a str,
-    ) -> ResolvedStyle<'a> {
-        ResolvedStyle {
-            weight: self.weight.or(defaults.weight).unwrap_or(Weight::NORMAL),
-            italic: self.italic.or(defaults.italic).unwrap_or(false),
-            underlined: self.underlined.or(defaults.underlined).unwrap_or(false),
+    pub(crate) fn resolve_with_defaults(
+        &self,
+        defaults: &Style,
+        fonts: &FontStore,
+        fallback_font_family: &str,
+    ) -> ResolvedStyle {
+        let font_query = font::Query {
             font_family: self
                 .font_family
                 .as_ref()
                 .map(FontFamily::as_ref)
-                .or(defaults.font_family.as_ref().map(FontFamily::as_ref))
+                .or_else(|| defaults.font_family.as_ref().map(FontFamily::as_ref))
                 .unwrap_or_else(|| FontFamily::named(fallback_font_family)),
+            weight: self.weight.or(defaults.weight).unwrap_or(Weight::NORMAL),
+            italic: self.italic.or(defaults.italic).unwrap_or(false),
+        };
+        let font = fonts
+            .query(&font_query)
+            .unwrap_or_else(|| panic!("no font matched the query {:?}", font_query));
+
+        ResolvedStyle {
+            font,
+            underlined: self.underlined.or(defaults.underlined).unwrap_or(false),
             color: self.color.or(defaults.color).unwrap_or(Color::BLACK),
-            size: self
+            font_size: self
                 .font_size
                 .or(defaults.font_size)
                 .unwrap_or(Self::DEFAULT_FONT_SIZE),
@@ -132,38 +142,28 @@ impl Style {
 ///
 /// Parameters that were set to `None` are changed to a default value.
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct ResolvedStyle<'a> {
-    weight: Weight,
-    italic: bool,
+pub struct ResolvedStyle {
+    font: FontId,
     underlined: bool,
-    font_family: FontFamily<'a>,
     color: Color,
-    size: f32,
+    font_size: f32,
 }
 
-impl<'a> ResolvedStyle<'a> {
-    pub fn weight(&self) -> Weight {
-        self.weight
-    }
-
-    pub fn is_italic(&self) -> bool {
-        self.italic
+impl ResolvedStyle {
+    pub fn font(&self) -> FontId {
+        self.font
     }
 
     pub fn is_underlined(&self) -> bool {
         self.underlined
     }
 
-    pub fn font_family(&self) -> &FontFamily<'a> {
-        &self.font_family
-    }
-
     pub fn color(&self) -> Color {
         self.color
     }
 
-    pub fn size(&self) -> f32 {
-        self.size
+    pub fn font_size(&self) -> f32 {
+        self.font_size
     }
 }
 

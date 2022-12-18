@@ -17,4 +17,4 @@ zeno = { version = "0.2", optional = true }              # glyph rasterization
 [features]
 default = ["text"]
 color-to-linear = ["fast-srgb8"]
-text = ["fontdb", "rustybuzz", "zeno", "owned_ttf_parser", "hypher"]
+text = ["fontdb", "rustybuzz", "zeno", "owned_ttf_parser", "hypher", "swash"]

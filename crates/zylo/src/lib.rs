@@ -7,9 +7,9 @@ mod context;
 mod layer;
 mod path;
 mod primitive;
-mod types;
 #[cfg(feature = "text")]
-mod text; 
+pub mod text;
+mod types;
 
 pub use backend::{
     command::{Command, CommandStream},
@@ -22,6 +22,15 @@ pub use glam::Vec2;
 pub use layer::Layer;
 pub use path::{Path, PathBuilder, PathSegment};
 pub use primitive::{BorderRadii, Circle, Ellipse, Primitive, Rectangle, RoundedRectangle};
+#[cfg(feature = "text")]
+#[doc(inline)]
+pub use text::{
+    builder::{BuildText, IntoSpan},
+    layout::TextGalley,
+    span::{Span, Text},
+    style::{FontFamily, Style},
+    Weight,
+};
 pub use types::{DashPair, FillRule, GradientStop, LineCap, LineJoin, StrokeSettings};
 
 pub extern crate glam;
