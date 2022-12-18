@@ -2,19 +2,21 @@
 
 use std::mem;
 
+use slotmap::SlotMap;
 use tiny_skia::{
     ClipMask, LinearGradient, Paint, PathBuilder, Pixmap, Point, Rect, Shader, SpreadMode, Stroke,
     StrokeDash, Transform,
 };
 use zylo::{
-    glam::Affine2, Backend, BackendLayer, Color, Command, CommandStream, FillRule, GradientStop,
-    LineCap, LineJoin, PathSegment, Primitive, RoundedRectangle, StrokeSettings, Vec2,
+    glam::Affine2, Backend, Color, Command, CommandStream, FillRule, GradientStop, LayerId,
+    LayerInfo, LineCap, LineJoin, PathSegment, Primitive, RoundedRectangle, StrokeSettings, Vec2,
 };
 
 /// A `tiny-skia` rendering backend.
 #[derive(Default)]
 pub struct TinySkiaBackend {
     renderer: Renderer,
+    layers: SlotMap<LayerId, Layer>,
 }
 
 impl TinySkiaBackend {
@@ -24,52 +26,27 @@ impl TinySkiaBackend {
 }
 
 impl Backend for TinySkiaBackend {
-    type Layer = TinySkiaLayer;
-
-    fn create_layer(
-        &self,
-        physical_width: u32,
-        physical_height: u32,
-        hidpi_factor: f32,
-    ) -> Self::Layer {
-        TinySkiaLayer {
-            pixmap: Pixmap::new(physical_width, physical_height).expect("invalid layer dimensions"),
-            hidpi_factor,
-        }
+    fn create_layer(&mut self, info: LayerInfo) -> LayerId {
+        self.layers.insert(Layer {
+            pixmap: Pixmap::new(info.physical_width(), info.physical_height())
+                .expect("invalid layer dimensions"),
+            info,
+        })
     }
 
-    fn render_to_layer(&mut self, layer: &mut Self::Layer, commands: CommandStream) {
+    fn layer_info(&self, id: LayerId) -> Option<&LayerInfo> {
+        self.layers.get(id).map(|layer| &layer.info)
+    }
+
+    fn render_to_layer(&mut self, layer: LayerId, commands: CommandStream) {
+        let layer = &mut self.layers[layer];
         self.renderer.render_to_layer(layer, commands);
     }
 }
 
-pub struct TinySkiaLayer {
+struct Layer {
     pixmap: Pixmap,
-    hidpi_factor: f32,
-}
-
-impl BackendLayer for TinySkiaLayer {
-    fn to_argb(&self) -> Vec<u32> {
-        self.pixmap
-            .pixels()
-            .iter()
-            .map(|color| {
-                ((color.red() as u32) << 16) | ((color.green() as u32) << 8) | color.blue() as u32
-            })
-            .collect()
-    }
-
-    fn fill(&mut self, color: Color) {
-        self.pixmap.fill(convert_color(color))
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
+    info: LayerInfo,
 }
 
 enum CurrentShader {
@@ -106,7 +83,7 @@ impl Default for Renderer {
 }
 
 impl Renderer {
-    pub fn render_to_layer(&mut self, layer: &mut TinySkiaLayer, commands: CommandStream) {
+    pub fn render_to_layer(&mut self, layer: &mut Layer, commands: CommandStream) {
         for command in commands {
             self.execute_command(layer, command);
         }
@@ -173,7 +150,7 @@ impl Renderer {
         todo!()
     }
 
-    fn execute_command(&mut self, layer: &mut TinySkiaLayer, command: Command) {
+    fn execute_command(&mut self, layer: &mut Layer, command: Command) {
         match command {
             Command::UseSolidPaint(color) => {
                 self.shader = CurrentShader::Solid(convert_color(color));
@@ -244,20 +221,20 @@ impl Renderer {
         self.clip_mask_enabled.then_some(&self.clip_mask)
     }
 
-    fn fill_path(&mut self, layer: &mut TinySkiaLayer, fill_rule: FillRule) {
+    fn fill_path(&mut self, layer: &mut Layer, fill_rule: FillRule) {
         self.with_current_path(|this, path| {
             layer.pixmap.fill_path(
                 &path,
                 &this.paint(),
                 convert_fill_rule(fill_rule),
-                this.object_transform(layer.hidpi_factor),
+                this.object_transform(layer.info.hidpi_factor()),
                 this.clip_mask(),
             );
             path
         });
     }
 
-    fn stroke_path(&mut self, settings: &StrokeSettings, layer: &mut TinySkiaLayer) {
+    fn stroke_path(&mut self, settings: &StrokeSettings, layer: &mut Layer) {
         self.with_current_path(|this, path| {
             let dash = if this.dashes.is_empty() {
                 None
@@ -277,14 +254,14 @@ impl Renderer {
                     dash,
                     ..Default::default()
                 },
-                this.object_transform(layer.hidpi_factor),
+                this.object_transform(layer.info.hidpi_factor()),
                 this.clip_mask(),
             );
             path
         });
     }
 
-    fn set_clip_to_path(&mut self, fill_rule: FillRule, layer: &TinySkiaLayer) {
+    fn set_clip_to_path(&mut self, fill_rule: FillRule, layer: &Layer) {
         self.with_current_path(|this, mut path| {
             path = path
                 .transform(this.object_transform)

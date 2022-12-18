@@ -13,13 +13,13 @@ mod types;
 
 pub use backend::{
     command::{Command, CommandStream},
-    Backend, BackendLayer, ErasedBackend,
+    Backend,
 };
 pub use canvas::{Canvas, Fill, Stroke};
 pub use color::Color;
 pub use context::Context;
 pub use glam::Vec2;
-pub use layer::Layer;
+pub use layer::{LayerId, LayerInfo};
 pub use path::{Path, PathBuilder, PathSegment};
 pub use primitive::{BorderRadii, Circle, Ellipse, Primitive, Rectangle, RoundedRectangle};
 #[cfg(feature = "text")]

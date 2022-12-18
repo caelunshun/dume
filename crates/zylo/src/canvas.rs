@@ -2,10 +2,9 @@ use glam::{Affine2, Vec2};
 
 use crate::{
     backend::command::{Command, CommandBuffer},
-    layer::Layer,
     primitive::Primitive,
     types::{DashPair, GradientStop, LineCap, LineJoin, StrokeSettings},
-    Color, Context, FillRule, Path,
+    Backend, Color, Context, FillRule, LayerId, Path,
 };
 
 /// A canvas to draw to.
@@ -146,10 +145,10 @@ impl Canvas {
     /// the draw command buffer.
     ///
     /// The canvas can be reused after this call.
-    pub fn render_to_layer(&mut self, context: &mut Context, layer: &mut Layer) {
+    pub fn render_to_layer<B: Backend>(&mut self, context: &mut Context<B>, layer: LayerId) {
         context
             .backend_mut()
-            .render_to_layer(layer.inner_mut(), self.commands.to_stream());
+            .render_to_layer(layer, self.commands.to_stream());
         self.commands.clear();
         self.reset();
     }
