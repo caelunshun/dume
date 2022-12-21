@@ -2,13 +2,10 @@ use std::mem;
 
 use glam::{vec2, Vec2};
 use owned_ttf_parser::{AsFaceRef, GlyphId};
-use rustybuzz::Face;
 
-use crate::{Span, Style, Text};
+use crate::{Span, Text};
 
 use super::{font::FontStore, points_to_pixels, style::ResolvedStyle, TextContext};
-
-const DEFAULT_BOUNDS: Vec2 = Vec2::splat(f32::INFINITY);
 
 /// A galley represents a blob of [`Text`] that has been shaped
 /// and prepared for rendering.
@@ -36,11 +33,11 @@ impl TextGalley {
             items,
             size,
         };
-        galley.lay_out(context, DEFAULT_BOUNDS);
+        galley.lay_out(context);
         galley
     }
 
-    pub(crate) fn lay_out(&mut self, context: &mut TextContext, _max_size: Vec2) {
+     fn lay_out(&mut self, context: &mut TextContext) {
         let mut cursor = 0.;
         for item in &mut self.items {
             if let Item::Glyph(glyph) = item {

@@ -40,8 +40,20 @@ pub struct TextContext {
 }
 
 impl TextContext {
-    fn fonts(&self) -> &FontStore {
+    pub fn new(fallback_font_family: String) -> Self {
+        Self {
+            fonts: FontStore::new(),
+            cache: Cache::default(),
+            fallback_font_family,
+        }
+    }
+
+    pub fn fonts(&self) -> &FontStore {
         &self.fonts
+    }
+
+    pub fn fonts_mut(&mut self) -> &mut FontStore {
+        &mut self.fonts
     }
 
     fn fallback_font_family(&self) -> &str {
@@ -50,6 +62,7 @@ impl TextContext {
 }
 
 /// Caches some heap-allocated types for reuse.
+#[derive(Default)]
 struct Cache {
     unicode_buffer: UnicodeBuffer,
 }
